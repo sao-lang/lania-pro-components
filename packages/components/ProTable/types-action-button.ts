@@ -210,7 +210,7 @@ export type ToolbarActionButtonConfig =
   AddButtonConfig | ExportButtonConfig | ImportButtonConfig | JumpButtonConfig | CustomButtonConfig | MoreButtonConfig;
 
 /**
- * ProTableN 事件回调配置
+ * ProTable 事件回调配置
  */
 export interface ProTableNEventHandlers {
   /** 新增事件 */

@@ -40,7 +40,7 @@ export interface MergeState {
  * @example
  * ```tsx
  * const rowMerge = createRowMerge('category');
- * <ProTableN
+ * <ProTable
  *   cellMerge={{ rowSpan: rowMerge }}
  * />
  * ```
@@ -92,7 +92,7 @@ export function createRowMerge<T>(
  * const colMerge = createColMerge((record, index) => {
  *   return record.type === 'summary' ? 2 : 1;
  * });
- * <ProTableN
+ * <ProTable
  *   cellMerge={{ colSpan: colMerge }}
  * />
  * ```

@@ -2,7 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Modal, Button } from '@arco-design/web-react';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import type { OpenDialogConfig, ConfirmDialogConfig, DialogReturnProps, ProTableActionType } from '../types';
-import { ProTableN } from '../index';
+import { ProTable } from '../index';
 
 /**
  * 弹窗容器引用
@@ -170,7 +170,7 @@ export const openDialog = <
     // 表格选择模式
     if (columns) {
       return (
-        <ProTableN<TRow>
+        <ProTable<TRow>
           actionRef={tableActionRef}
           columns={columns}
           request={request}

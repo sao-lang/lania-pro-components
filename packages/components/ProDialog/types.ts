@@ -5,7 +5,7 @@
 import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 import type { ButtonProps } from '@arco-design/web-react';
 import type { ProFormProps, ProFormInstance, ProFormSchema } from '../ProFormN/types';
-import type { ProTableProps, ProTableActionType, ProColumnType } from '../ProTableN/types';
+import type { ProTableProps, ProTableActionType, ProColumnType } from '../ProTable/types';
 
 type Key = string | number;
 

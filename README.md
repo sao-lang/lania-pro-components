@@ -15,7 +15,7 @@
 | 组件 | 说明 | 核心能力 |
 |------|------|----------|
 | ProForm | Schema 驱动表单 | 响应式状态管理、字段联动、虚拟滚动、草稿/预览模式 |
-| ProTableN | Schema 驱动表格 | 数据状态管理、查询表单、列渲染、行选择、可编辑、缓存 |
+| ProTable | Schema 驱动表格 | 数据状态管理、查询表单、列渲染、行选择、可编辑、缓存 |
 | ProDialog | 高级弹窗 | 表单弹窗/表格弹窗/抽屉模式、实例化管理、二次确认 |
 | ActionButton | 操作按钮集 | 增删改查导出导入跳转等常用操作按钮 |
 | ProSelect | 增强选择器 | 远程搜索、分页加载、虚拟滚动、标签模式、全选 |
@@ -24,7 +24,7 @@
 ## 组件间关系
 
 ```
-ProTableN ── 内嵌 ──→ ProForm（查询表单）
+ProTable ── 内嵌 ──→ ProForm（查询表单）
     │                      │
     ├── 集成 ──→ ProDialog（表格弹窗）
     │                      │
@@ -32,7 +32,7 @@ ProTableN ── 内嵌 ──→ ProForm（查询表单）
 
 ProDialog ── 内嵌 ──→ ProForm（表单弹窗）
     │
-    └── 内嵌 ──→ ProTableN（表格选择弹窗）
+    └── 内嵌 ──→ ProTable（表格选择弹窗）
 ```
 
 ## 快速上手
@@ -68,10 +68,10 @@ const MyForm = () => (
 ### 基础表格
 
 ```tsx
-import { ProTableN } from '@/pro-components/ProTableN';
+import { ProTable } from '@/pro-components/ProTable';
 
 const MyTable = () => (
-  <ProTableN
+  <ProTable
     columns={[
       { title: 'ID', dataIndex: 'id', valueType: 'index' },
       { title: '用户名', dataIndex: 'username', valueType: 'text' },
@@ -130,22 +130,22 @@ dialogRef.current?.open({ title: '新增用户' });
 所有组件通过 Schema（配置对象）定义行为，而非命令式 API 调用。例如：
 
 - ProForm 通过 `schemas` 数组描述表单字段
-- ProTableN 通过 `columns` 数组描述表格列
+- ProTable 通过 `columns` 数组描述表格列
 - ProDialog 通过 `schemas` 或 `columns` 描述弹窗内容
 
 ### 响应式状态管理
 
-ProForm 和 ProTableN 都内置了基于 Proxy 的响应式状态管理系统：
+ProForm 和 ProTable 都内置了基于 Proxy 的响应式状态管理系统：
 
 - **ProForm**: `FormStore` + `FieldNode`，字段值变化自动触发联动和校验
-- **ProTableN**: `DataStore`，数据变化自动更新 UI 和触发请求
+- **ProTable**: `DataStore`，数据变化自动更新 UI 和触发请求
 
 ### Context 分层
 
 每个组件内部使用多层级 Context 进行数据传递：
 
 - **ProForm**: RootContext（全局状态）→ LayoutContext（布局配置）→ SchemaContext（字段配置）→ FieldContext（字段运行时）
-- **ProTableN**: RootContext（全局配置）→ DataContext（数据状态）→ ColumnContext（列配置）
+- **ProTable**: RootContext（全局配置）→ DataContext（数据状态）→ ColumnContext（列配置）
 
 ## 项目结构
 
@@ -159,7 +159,7 @@ pro-components/
 │   ├── components/    # 子组件（FormPerformanceMonitor、ProFormList、ProFormSteps）
 │   └── utils/         # 工具（reactive 响应式系统、performance）
 │
-├── ProTableN/         # Schema 驱动表格
+├── ProTable/         # Schema 驱动表格
 │   ├── store/         # 数据状态管理（DataStore）
 │   ├── request/       # 请求引擎（RequestEngine）
 │   ├── context/       # 上下文（Root、Data、Column、TableConfig）

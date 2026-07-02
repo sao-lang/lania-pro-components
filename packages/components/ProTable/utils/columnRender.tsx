@@ -1039,7 +1039,7 @@ export const customRendererRegistry = new CustomCellRendererRegistry();
  * @param renderer 渲染器函数
  * @example
  * ```tsx
- * import { registerCellRenderer } from '@/components/ProTableN';
+ * import { registerCellRenderer } from '@/components/ProTable';
  *
  * // 注册一个自定义的评分渲染器
  * registerCellRenderer('rate', (text, column, record, index) => {
@@ -1073,7 +1073,7 @@ export const unregisterCellRenderer = (type: string): void => {
  * @param renderers 渲染器映射对象
  * @example
  * ```tsx
- * import { registerCellRenderers } from '@/components/ProTableN';
+ * import { registerCellRenderers } from '@/components/ProTable';
  *
  * registerCellRenderers({
  *   rate: (text, column, record, index) => <Rate value={text} disabled />,

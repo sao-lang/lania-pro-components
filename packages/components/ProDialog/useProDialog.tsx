@@ -14,7 +14,7 @@ import type {
   OpenDialogParams,
 } from './types';
 import { ProForm, ProFormInstance } from '../ProFormN';
-import { ProTableN, ProTableActionType } from '../ProTableN';
+import { ProTable, ProTableActionType } from '../ProTable';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import { instanceRegistry as dialogInstanceRegistry } from './instanceRegistry';
 
@@ -643,7 +643,7 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
             };
 
       return (
-        <ProTableN<T>
+        <ProTable<T>
           ref={tableActionRef}
           columns={columns}
           request={request}

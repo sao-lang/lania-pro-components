@@ -47,9 +47,9 @@ export { useProForm } from './ProFormN/useProForm';
 export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProFormN/types';
 export type { ProFormListProps, ProFormStepsProps } from './ProFormN/components/types';
 
-export { ProTableN } from './ProTableN';
-export type { ProTableActionType } from './ProTableN/types';
-export type { ProTableProps, ProColumnType, ProTableState } from './ProTableN/types';
+export { ProTable } from './ProTable';
+export type { ProTableActionType } from './ProTable/types';
+export type { ProTableProps, ProColumnType, ProTableState } from './ProTable/types';
 
 export { ProSelect } from './ProSelect';
 export type { ProSelectProps } from './ProSelect/types';

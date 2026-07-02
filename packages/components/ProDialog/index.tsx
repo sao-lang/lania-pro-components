@@ -11,7 +11,7 @@ import type {
   DialogReturnProps,
 } from './types';
 import { ProForm, ProFormInstance } from '../ProFormN';
-import { ProTableN, ProTableActionType } from '../ProTableN';
+import { ProTable, ProTableActionType } from '../ProTable';
 import { instanceRegistry } from './instanceRegistry';
 import { renderConfirmDialog, createDialogHolder } from './dialogHolder';
 import { getSizeWidth, getFooterJustify } from './utils';
@@ -610,7 +610,7 @@ const ProDialogComponent = <
                 };
 
           const body = (
-            <ProTableN<T>
+            <ProTable<T>
               ref={tableActionRef}
               columns={columns}
               request={request}
@@ -894,4 +894,4 @@ export type {
 export { useProDialog } from './useProDialog';
 export { getProDialogInstance, instanceRegistry as dialogInstanceRegistry } from './instanceRegistry';
 export type { ProFormSchema } from '../ProFormN/types';
-export type { ProColumnType } from '../ProTableN/types';
+export type { ProColumnType } from '../ProTable/types';

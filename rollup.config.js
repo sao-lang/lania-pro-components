@@ -15,7 +15,7 @@ const components = [
   'ActionButton',
   'ProDialog',
   'ProForm',
-  'ProTableN',
+  'ProTable',
   'ProSelect',
   'ProUpload',
 ];

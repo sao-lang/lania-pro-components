@@ -267,12 +267,12 @@ import { AddButton } from '@/pro-components/ActionButton';
 />
 ```
 
-### 在 ProTableN 中使用
+### 在 ProTable 中使用
 
-ProTableN 内置了 ActionButton 的事件处理器，可直接在配置中使用：
+ProTable 内置了 ActionButton 的事件处理器，可直接在配置中使用：
 
 ```tsx
-<ProTableN
+<ProTable
   columns={[...]}
   request={fetchUsers}
   toolbar={{

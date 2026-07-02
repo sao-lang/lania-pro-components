@@ -12,7 +12,7 @@ import { useEditableTable } from './editable';
 import { CardView, ViewModeSwitch, SearchSchemaSelector } from './components';
 
 /**
- * ProTableN 组件 - 重构版高级表格组件
+ * ProTable 组件 - 重构版高级表格组件
  *
  * 架构设计：
  * - RootContext: 全局配置层（props, rowKey）
@@ -563,10 +563,10 @@ const ProTableComponent = forwardRef<ProTableActionType, ProTableProps<any>>(
   },
 );
 
-ProTableComponent.displayName = 'ProTableN';
+ProTableComponent.displayName = 'ProTable';
 
 // 导出组件
-export const ProTableN = ProTableComponent as unknown as <T extends Record<string, any> = Record<string, any>>(
+export const ProTable = ProTableComponent as unknown as <T extends Record<string, any> = Record<string, any>>(
   props: ProTableProps<T> & React.RefAttributes<ProTableActionType>,
 ) => React.ReactElement;
 
@@ -717,4 +717,4 @@ export type {
 } from './utils';
 
 // 默认导出
-export default ProTableN;
+export default ProTable;

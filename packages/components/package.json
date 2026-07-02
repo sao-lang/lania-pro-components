@@ -27,10 +27,10 @@
       "require": "./dist/ProForm/index.cjs",
       "types": "./dist/ProForm/index.d.ts"
     },
-    "./ProTableN": {
-      "import": "./dist/ProTableN/index.mjs",
-      "require": "./dist/ProTableN/index.cjs",
-      "types": "./dist/ProTableN/index.d.ts"
+    "./ProTable": {
+      "import": "./dist/ProTable/index.mjs",
+      "require": "./dist/ProTable/index.cjs",
+      "types": "./dist/ProTable/index.d.ts"
     },
     "./ProSelect": {
       "import": "./dist/ProSelect/index.mjs",

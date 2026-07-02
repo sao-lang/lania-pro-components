@@ -123,7 +123,7 @@ export interface UseProTableReturn<T = Record<string, unknown>> {
   tableRef: React.RefObject<ProTableInstance>;
   /** 表格实例方法 */
   instance: ProTableInstance;
-  /** 可直接绑定到 ProTableN 组件的 props */
+  /** 可直接绑定到 ProTable 组件的 props */
   bindingProps: ProTableProps<T>;
   /** 当前数据 */
   dataSource: T[];
