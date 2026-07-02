@@ -10,7 +10,6 @@ export { BatchButton } from './BatchButton';
 
 // 导出类型
 export type {
-  ActionButtonBaseProps,
   FormButtonProps,
   AddButtonProps,
   EditButtonProps,
@@ -20,6 +19,14 @@ export type {
   ImportButtonProps,
   JumpButtonProps,
   BatchButtonProps,
+  AddButtonRef,
+  EditButtonRef,
+  DeleteButtonRef,
+  ViewButtonRef,
+  BatchButtonRef,
+  ExportButtonRef,
+  ImportButtonRef,
+  JumpButtonRef,
 } from './types';
 
 // 默认导出

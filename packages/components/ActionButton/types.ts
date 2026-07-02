@@ -1,26 +1,51 @@
-import type { ReactNode, CSSProperties } from 'react';
-import type { ProFormSchema, ProFormProps } from '../ProFormN/types';
+import type { ReactNode } from 'react';
+import type { ProFormSchema, ProFormProps } from '../ProForm/types';
 import type { ProDialogProps } from '../ProDialog/types';
+import { ButtonProps } from '@arco-design/web-react';
 
-export interface ActionButtonBaseProps {
-  text?: ReactNode;
-  visible?: boolean;
-  style?: CSSProperties;
-  className?: string;
-  type?: 'primary' | 'secondary' | 'outline' | 'dashed' | 'text';
-  status?: 'default' | 'success' | 'warning' | 'danger';
-  icon?: ReactNode;
-  loading?: boolean;
-  disabled?: boolean;
-  size?: 'mini' | 'small' | 'medium' | 'large';
-  shape?: 'default' | 'circle' | 'round';
-  ghost?: boolean;
-  autoInsertSpace?: boolean;
+export interface AddButtonRef {
+  open: () => void;
 }
 
-export type ActionButtonProps = ActionButtonBaseProps;
+export interface EditButtonRef {
+  open: () => void;
+  loading: boolean;
+}
 
-export interface FormButtonProps extends ActionButtonBaseProps {
+export interface DeleteButtonRef {
+  openConfirm: () => void;
+  loading: boolean;
+}
+
+export interface ViewButtonRef {
+  open: () => void;
+}
+
+export interface BatchButtonRef {
+  execute: () => void;
+  loading: boolean;
+}
+
+export interface ExportButtonRef {
+  export: () => void;
+  loading: boolean;
+}
+
+export interface ImportButtonRef {
+  open: () => void;
+  loading: boolean;
+}
+
+export interface JumpButtonRef {
+  jump: () => void;
+}
+
+export type ActionButtonProps = ButtonProps & {
+  text?: ReactNode;
+  visible?: boolean;
+};
+
+export interface FormButtonProps extends Omit<ActionButtonProps, 'onSubmit'> {
   title?: string;
   width?: number | string;
   schemas: ProFormSchema[];
@@ -38,7 +63,7 @@ export interface EditButtonProps extends FormButtonProps {
   getInitialValues: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
-export interface ViewButtonProps extends ActionButtonBaseProps {
+export interface ViewButtonProps extends ActionButtonProps {
   title?: string;
   width?: number | string;
   dialogProps?: Omit<ProDialogProps, 'children'>;
@@ -46,17 +71,17 @@ export interface ViewButtonProps extends ActionButtonBaseProps {
   record?: unknown;
 }
 
-export interface DeleteButtonProps extends ActionButtonBaseProps {
+export interface DeleteButtonProps extends ActionButtonProps {
   confirmTitle?: string;
   confirmContent?: ReactNode | (() => ReactNode);
   okText?: string;
   cancelText?: string;
-  okButtonProps?: ActionButtonBaseProps;
+  okButtonProps?: ActionButtonProps;
   dialogProps?: Omit<ProDialogProps, 'onOk' | 'onCancel'>;
   onDelete: () => Promise<boolean | void> | boolean | void;
 }
 
-export interface ExportButtonProps extends ActionButtonBaseProps {
+export interface ExportButtonProps extends ActionButtonProps {
   exportUrl?: string;
   params?: Record<string, unknown>;
   fileName?: string;
@@ -66,7 +91,7 @@ export interface ExportButtonProps extends ActionButtonBaseProps {
   headers?: Record<string, string>;
 }
 
-export interface ImportButtonProps extends ActionButtonBaseProps {
+export interface ImportButtonProps extends ActionButtonProps {
   uploadUrl?: string;
   uploadParams?: Record<string, unknown>;
   accept?: string;
@@ -79,13 +104,13 @@ export interface ImportButtonProps extends ActionButtonBaseProps {
   onImportError?: (error: Error) => void;
 }
 
-export interface JumpButtonProps extends ActionButtonBaseProps {
+export interface JumpButtonProps extends ActionButtonProps {
   to: string;
   target?: '_blank' | '_self';
   onBeforeJump?: () => boolean | Promise<boolean>;
 }
 
-export interface BatchButtonProps extends ActionButtonBaseProps {
+export interface BatchButtonProps extends ActionButtonProps {
   selectedRows: unknown[];
   selectedKeys: (string | number)[];
   needSelection?: boolean;

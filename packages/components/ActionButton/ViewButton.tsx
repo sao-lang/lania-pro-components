@@ -1,14 +1,15 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconEye } from '@arco-design/web-react/icon';
 import { ProDialog } from '../ProDialog';
-import type { ViewButtonProps } from './types';
+import type { ViewButtonProps, ViewButtonRef } from './types';
 
 /**
  * 查看按钮组件
  * @description 点击后弹出详情弹窗，展示自定义内容
  * @example
  * ```tsx
+ * // 基础用法
  * <ViewButton
  *   text="查看"
  *   title="用户详情"
@@ -19,57 +20,60 @@ import type { ViewButtonProps } from './types';
  *     </div>
  *   )}
  * />
+ *
+ * // 通过 ref 手动触发
+ * const viewButtonRef = useRef<ViewButtonRef>(null);
+ * <ViewButton ref={viewButtonRef} ... />
+ * // 调用
+ * viewButtonRef.current?.open();
  * ```
  */
-export const ViewButton: React.FC<ViewButtonProps> = ({
-  text = '查看',
-  title = '查看详情',
-  type = 'text',
-  icon = <IconEye />,
-  width = 600,
-  renderContent,
-  dialogProps,
-  visible = true,
-  style,
-  className,
-  disabled,
-  size,
-  shape,
-  ghost,
-  autoInsertSpace,
-}) => {
-  const handleClick = useCallback(() => {
-    // 打开详情弹窗
-    ProDialog.open({
-      title,
-      width,
-      content: renderContent(),
-      showOk: false,
-      cancelText: '关闭',
-      ...dialogProps,
-    });
-  }, [title, width, renderContent, dialogProps]);
+export const ViewButton = forwardRef<ViewButtonRef, ViewButtonProps>(
+  (
+    {
+      text = '查看',
+      title = '查看详情',
+      type = 'text',
+      icon = <IconEye />,
+      width = 600,
+      renderContent,
+      dialogProps,
+      visible = true,
+      ...restProps
+    },
+    ref,
+  ) => {
+    const handleOpen = useCallback(() => {
+      ProDialog.open({
+        title,
+        width,
+        content: renderContent(),
+        showOk: false,
+        cancelText: '关闭',
+        ...dialogProps,
+      });
+    }, [title, width, renderContent, dialogProps]);
 
-  if (!visible) {
-    return null;
-  }
+    useImperativeHandle(
+      ref,
+      () => ({
+        open: handleOpen,
+      }),
+      [handleOpen],
+    );
 
-  return (
-    <Button
-      type={type}
-      icon={icon}
-      onClick={handleClick}
-      style={style}
-      className={className}
-      disabled={disabled}
-      size={size}
-      shape={shape}
-      ghost={ghost}
-      autoInsertSpace={autoInsertSpace}
-    >
-      {text}
-    </Button>
-  );
-};
+    if (!visible) {
+      return null;
+    }
+
+    return (
+      <Button type={type} icon={icon} onClick={handleOpen} {...restProps}>
+        {text}
+      </Button>
+    );
+  },
+);
+
+ViewButton.displayName = 'ViewButton';
 
 export default ViewButton;

@@ -1,4 +1,4 @@
-// ProFormN - 新一代表单组件
+// ProForm - 新一代表单组件
 // 基于 FormEngine + FieldRuntime + RendererSystem 架构
 
 // 类型定义

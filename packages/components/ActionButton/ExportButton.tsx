@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconDownload } from '@arco-design/web-react/icon';
-import type { ExportButtonProps } from './types';
+import type { ExportButtonProps, ExportButtonRef } from './types';
 
 /**
  * 导出按钮组件
@@ -24,80 +24,78 @@ import type { ExportButtonProps } from './types';
  *     downloadFile(data, '导出数据.xlsx');
  *   }}
  * />
+ *
+ * // 通过 ref 手动触发
+ * const exportButtonRef = useRef<ExportButtonRef>(null);
+ * <ExportButton ref={exportButtonRef} ... />
+ * // 调用
+ * exportButtonRef.current?.export();
  * ```
  */
-export const ExportButton: React.FC<ExportButtonProps> = ({
-  text = '导出',
-  type = 'secondary',
-  icon = <IconDownload />,
-  exportUrl,
-  params,
-  fileName,
-  onExport,
-  onBeforeExport,
-  visible = true,
-  style,
-  className,
-  timeout,
-  headers,
-  disabled,
-  size,
-  shape,
-  ghost,
-  autoInsertSpace,
-}) => {
-  const [loading, setLoading] = useState(false);
+export const ExportButton = forwardRef<ExportButtonRef, ExportButtonProps>(
+  (
+    {
+      text = '导出',
+      type = 'secondary',
+      icon = <IconDownload />,
+      exportUrl,
+      params,
+      fileName,
+      onExport,
+      onBeforeExport,
+      visible = true,
+      timeout,
+      headers,
+      ...restProps
+    },
+    ref,
+  ) => {
+    const [loading, setLoading] = useState(false);
 
-  const handleExport = useCallback(async () => {
-    // 导出前的回调
-    if (onBeforeExport) {
-      const shouldExport = await onBeforeExport();
-      if (shouldExport === false) {
-        return;
+    const handleExport = useCallback(async () => {
+      if (onBeforeExport) {
+        const shouldExport = await onBeforeExport();
+        if (shouldExport === false) {
+          return;
+        }
       }
+
+      setLoading(true);
+
+      try {
+        if (onExport) {
+          await onExport();
+        } else if (exportUrl) {
+          await defaultExport(exportUrl, params, fileName, { timeout, headers });
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, [exportUrl, params, fileName, onExport, onBeforeExport, timeout, headers]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        export: handleExport,
+        loading,
+      }),
+      [handleExport, loading],
+    );
+
+    if (!visible) {
+      return null;
     }
 
-    setLoading(true);
+    return (
+      <Button type={type} icon={icon} loading={loading} onClick={handleExport as unknown as () => void} {...restProps}>
+        {text}
+      </Button>
+    );
+  },
+);
 
-    try {
-      if (onExport) {
-        // 使用自定义导出方法
-        await onExport();
-      } else if (exportUrl) {
-        // 使用默认导出方式
-        await defaultExport(exportUrl, params, fileName, { timeout, headers });
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [exportUrl, params, fileName, onExport, onBeforeExport, timeout, headers]);
+ExportButton.displayName = 'ExportButton';
 
-  if (!visible) {
-    return null;
-  }
-
-  return (
-    <Button
-      type={type}
-      icon={icon}
-      loading={loading}
-      onClick={handleExport as unknown as () => void}
-      style={style}
-      className={className}
-      disabled={disabled}
-      size={size}
-      shape={shape}
-      ghost={ghost}
-      autoInsertSpace={autoInsertSpace}
-    >
-      {text}
-    </Button>
-  );
-};
-
-/**
- * 默认导出方法
- */
 async function defaultExport(
   url: string,
   params?: Record<string, unknown>,
@@ -109,15 +107,12 @@ async function defaultExport(
 ): Promise<void> {
   const { timeout = 60000, headers = {} } = options || {};
 
-  // 创建 AbortController 用于超时控制
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    // 构建查询参数
     const queryParams = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
 
-    // 发起请求
     const response = await fetch(url + queryParams, {
       method: 'GET',
       headers: {
@@ -131,12 +126,10 @@ async function defaultExport(
       throw new Error(`导出失败: ${response.status} ${response.statusText}`);
     }
 
-    // 获取文件名
     const contentDisposition = response.headers.get('content-disposition');
     const downloadFileName =
       fileName || (contentDisposition ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') : 'download');
 
-    // 下载文件
     const blob = await response.blob();
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
