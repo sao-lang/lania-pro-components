@@ -1,0 +1,37 @@
+{
+  "name": "@lania-pro-components/utils",
+  "version": "1.0.0",
+  "description": "公共工具函数包 - 响应式系统、性能优化、格式化、对象/路径操作等",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "rollup -c ../../rollup.config.js",
+    "dev": "rollup -c ../../rollup.config.js -w",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "utils",
+    "reactive",
+    "performance",
+    "format",
+    "shared"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dayjs": "^1.11.21"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "typescript": "^6.0.3"
+  }
+}

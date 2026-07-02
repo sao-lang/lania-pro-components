@@ -83,7 +83,7 @@ export {
   isReactive,
   trigger,
   type ComputedRef,
-} from './utils/reactive';
+} from '@lania-pro-components/utils';
 
 // 性能优化 Hooks
 export {
@@ -118,7 +118,7 @@ export {
   performanceMonitor,
   scheduleIdleTask,
   scheduleChunkedTask,
-} from './utils/performance';
+} from '@lania-pro-components/utils';
 
 // Schema 处理工具
 // Note: schemaUtils 已移除，功能集成到 ProForm 组件中

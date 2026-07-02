@@ -1,4 +1,4 @@
-import { deepMerge } from './utils';
+import { deepMerge } from '@lania-pro-components/utils';
 import React, { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { IconInfoCircle, IconCheckCircle, IconExclamationCircle, IconCloseCircle } from '@arco-design/web-react/icon';

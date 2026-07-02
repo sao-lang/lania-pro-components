@@ -14,13 +14,11 @@ import {
 } from '@arco-design/web-react';
 import type { TableProps } from '@arco-design/web-react';
 import { IconCopy, IconLink, IconEye } from '@arco-design/web-react/icon';
-import dayjs from 'dayjs';
 import type { TableColumnProps } from '@arco-design/web-react';
 import type {
   ProColumnType,
   ProColumnValueType,
   CellRendererValueType,
-  DateFormatType,
   OprToolConfig,
   CustomCellRenderer,
   CustomRendererRegistry,
@@ -29,153 +27,30 @@ import type {
 } from '../types';
 import { OprActionButtons } from '../features/ActionButtonRenderer';
 import type { OprActionButtonConfig } from '../types-action-button';
+import {
+  formatNumber,
+  formatMoney,
+  formatPercent,
+  formatDate,
+  getNestedValue,
+  copyToClipboard as copyToClipboardPure,
+} from '@lania-pro-components/utils';
 
 const { Text } = Typography;
 
 /**
- * 拷贝文本到剪贴板
+ * 拷贝文本到剪贴板（含 Arco Message 反馈）
  */
-export const copyToClipboard = (text: string) => {
+export const copyToClipboard = async (text: string): Promise<void> => {
   if (!text) {
     return;
   }
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        Message.success('复制成功');
-      })
-      .catch(() => {
-        fallbackCopyToClipboard(text);
-      });
+  const success = await copyToClipboardPure(text);
+  if (success) {
+    Message.success('复制成功');
   } else {
-    fallbackCopyToClipboard(text);
-  }
-};
-
-/**
- * 降级复制方案（兼容旧浏览器）
- */
-const fallbackCopyToClipboard = (text: string) => {
-  const textArea = document.createElement('textarea');
-  textArea.value = text;
-  textArea.style.position = 'fixed';
-  textArea.style.left = '-999999px';
-  textArea.style.top = '-999999px';
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-
-  try {
-    const successful = document.execCommand('copy');
-    if (successful) {
-      Message.success('复制成功');
-    } else {
-      Message.error('复制失败');
-    }
-  } catch {
     Message.error('复制失败');
   }
-
-  document.body.removeChild(textArea);
-};
-
-/**
- * 获取嵌套对象的值
- */
-export const getNestedValue = (obj: Record<string, unknown>, path: string | string[]): unknown => {
-  if (!obj) {
-    return undefined;
-  }
-  const keys = Array.isArray(path) ? path : path.split('.');
-  return keys.reduce(
-    (acc: unknown, key: string) =>
-      acc && typeof acc === 'object' && key in acc ? (acc as Record<string, unknown>)[key] : undefined,
-    obj,
-  );
-};
-
-/**
- * 格式化数字为千分位
- */
-export const formatNumber = (
-  value: number | string,
-  options: {
-    precision?: number;
-    thousandsSeparator?: boolean;
-  } = {},
-): string => {
-  const { precision = 0, thousandsSeparator = true } = options;
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-
-  if (isNaN(num)) {
-    return String(value);
-  }
-
-  let result = num.toFixed(precision);
-
-  if (thousandsSeparator) {
-    const parts = result.split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    result = parts.join('.');
-  }
-
-  return result;
-};
-
-/**
- * 格式化货币
- */
-export const formatMoney = (
-  value: number | string,
-  symbol = '¥',
-  options: {
-    precision?: number;
-    thousandsSeparator?: boolean;
-  } = {},
-): string => {
-  const formatted = formatNumber(value, {
-    precision: 2,
-    thousandsSeparator: true,
-    ...options,
-  });
-  return `${symbol}${formatted}`;
-};
-
-/**
- * 格式化百分比
- */
-export const formatPercent = (
-  value: number | string,
-  options: {
-    precision?: number;
-    showSymbol?: boolean;
-  } = {},
-): string => {
-  const { precision = 2, showSymbol = true } = options;
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-
-  if (isNaN(num)) {
-    return String(value);
-  }
-
-  const result = num.toFixed(precision);
-  return showSymbol ? `${result}%` : result;
-};
-
-/**
- * 格式化日期
- */
-export const formatDate = (value: string | number | Date, format: DateFormatType = 'YYYY-MM-DD'): string => {
-  if (!value) {
-    return '-';
-  }
-  const date = dayjs(value);
-  if (!date.isValid()) {
-    return String(value);
-  }
-  return date.format(format);
 };
 
 /**

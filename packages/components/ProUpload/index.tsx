@@ -11,7 +11,7 @@ import {
   IconArrowDown,
 } from '@arco-design/web-react/icon';
 import type { ProUploadProps, ProUploadInstance, ProUploadFileItem, BeforeUploadResult } from './types';
-import { isVideo } from './utils';
+import { isVideo } from '@lania-pro-components/utils';
 
 /**
  * 默认文件类型配置

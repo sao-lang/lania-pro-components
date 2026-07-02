@@ -12,7 +12,7 @@ const record = {
   department: '技术部',
 };
 
-export default () => {
+export default function Demo7() {
   const viewRef = useRef<ViewButtonRef>(null);
 
   return (
@@ -47,4 +47,4 @@ export default () => {
       </Space>
     </Space>
   );
-};
+}

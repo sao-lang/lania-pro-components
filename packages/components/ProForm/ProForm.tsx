@@ -7,9 +7,8 @@ import { RootContextProvider, LayoutContextProvider, createFormState } from './c
 import { useVirtualScroll } from './hooks/useVirtualScroll';
 import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
 import { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
-import { performanceMonitor } from './utils/performance';
-
-import { setAsyncBatchConfig, clearAsyncBatch } from './utils/reactive';
+import { performanceMonitor } from '@lania-pro-components/utils';
+import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 
 const { Row, Col } = Grid;
 

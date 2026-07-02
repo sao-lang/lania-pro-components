@@ -103,7 +103,7 @@ export const globalTaskQueue = new TaskQueue();
  */
 export class BatchUpdateManager {
   private updates: Map<string, unknown> = new Map();
-  private timeoutId: NodeJS.Timeout | null = null;
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private delay: number;
   private onBatchUpdate: (updates: Map<string, unknown>) => void;
 
@@ -186,7 +186,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
   delay: number,
   immediate = false,
 ): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   return function (this: unknown, ...args: Parameters<T>) {
     const callNow = immediate && !timeoutId;

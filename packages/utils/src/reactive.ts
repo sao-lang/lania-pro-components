@@ -312,7 +312,7 @@ export function ref<T>(value: T): { value: T } {
 /**
  * 判断是否为对象
  */
-function isObject(value: unknown): value is object {
+export function isObject(value: unknown): value is object {
   return value !== null && typeof value === 'object';
 }
 

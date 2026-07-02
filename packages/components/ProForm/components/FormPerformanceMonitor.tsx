@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { performanceMonitor } from '../utils/performance';
+import { performanceMonitor } from '@lania-pro-components/utils';
 
 /**
  * 性能数据接口

@@ -18,7 +18,7 @@ const userSchemas = [
   },
 ];
 
-export default () => {
+export default function Demo5() {
   const editRef = useRef<EditButtonRef>(null);
   const [record, setRecord] = useState({ id: 1, name: '张三', email: 'a@b.com', role: 'admin' });
 
@@ -47,7 +47,9 @@ export default () => {
         />
         <Button onClick={() => editRef.current?.open()}>通过 ref 打开</Button>
       </Space>
-      <div>当前数据：{record.name}（{record.role}）</div>
+      <div>
+        当前数据：{record.name}（{record.role}）
+      </div>
     </Space>
   );
-};
+}

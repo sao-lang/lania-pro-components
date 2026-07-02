@@ -22,7 +22,17 @@ const components = [
 ];
 
 const baseConfig = {
-  external: ['react', 'react-dom', '@arco-design/web-react', '@arco-design/web-react/icon'],
+  external: [
+    'react',
+    'react-dom',
+    '@arco-design/web-react',
+    '@arco-design/web-react/icon',
+    // 工作区内部包：external 化，避免 dts 插件把兄弟包源码打进彼此 dist（类型泄漏）
+    '@lania-pro-components/utils',
+    '@lania-pro-components/theme',
+    // dayjs 由消费者提供（utils 的 formatDate 依赖）
+    'dayjs',
+  ],
   plugins: [
     nodeResolve({ extensions: ['.js', '.jsx', '.ts', '.tsx'] }),
     commonjs(),
@@ -106,6 +116,34 @@ const themeConfig = [
   },
 ];
 
+const utilsConfig = [
+  {
+    ...baseConfig,
+    input: path.resolve(__dirname, 'packages/utils/src/index.ts'),
+    output: [
+      {
+        file: path.resolve(__dirname, 'packages/utils/dist/index.cjs'),
+        format: 'cjs',
+        sourcemap: true,
+        exports: 'named',
+      },
+      {
+        file: path.resolve(__dirname, 'packages/utils/dist/index.mjs'),
+        format: 'esm',
+        sourcemap: true,
+      },
+    ],
+  },
+  {
+    input: path.resolve(__dirname, 'packages/utils/src/index.ts'),
+    output: {
+      file: path.resolve(__dirname, 'packages/utils/dist/index.d.ts'),
+      format: 'esm',
+    },
+    plugins: [dts()],
+  },
+];
+
 export default defineConfig([
   {
     ...baseConfig,
@@ -140,4 +178,5 @@ export default defineConfig([
   },
   ...componentConfigs,
   ...themeConfig,
+  ...utilsConfig,
 ]);

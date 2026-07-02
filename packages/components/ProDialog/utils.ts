@@ -30,20 +30,3 @@ export const getFooterJustify = (position: FooterPosition): string => {
       return 'flex-end';
   }
 };
-
-export function deepMerge<T, U>(target: T, source: U): T & U {
-  const result: Record<string, unknown> = { ...(target as Record<string, unknown>) };
-  Object.keys((source as Record<string, unknown>) || {}).forEach((key) => {
-    const sv = (source as Record<string, unknown>)[key];
-    const tv = (target as Record<string, unknown>)[key];
-    if (sv !== null && typeof sv === 'object' && !Array.isArray(sv)) {
-      result[key] = deepMerge(
-        tv !== null && typeof tv === 'object' ? (tv as Record<string, unknown>) : {},
-        sv as Record<string, unknown>,
-      );
-    } else {
-      result[key] = sv;
-    }
-  });
-  return result as T & U;
-}

@@ -8,7 +8,17 @@ export {
   ImportButton,
   JumpButton,
 } from './ActionButton';
-export type { ActionButtonProps } from './ActionButton/types';
+export type {
+  ActionButtonProps,
+  AddButtonRef,
+  EditButtonRef,
+  DeleteButtonRef,
+  ViewButtonRef,
+  BatchButtonRef,
+  ExportButtonRef,
+  ImportButtonRef,
+  JumpButtonRef,
+} from './ActionButton/types';
 
 export { ProDialog } from './ProDialog';
 export type {

@@ -9,19 +9,23 @@ export {
   registerCellRenderers,
   getCellRenderer,
   hasCellRenderer,
+} from './columnRender';
+
+// copyToClipboard 仍是 Arco 感知包装器，从 columnRender 导出
+export { copyToClipboard } from './columnRender';
+
+// 迁移到 utils 包的纯函数
+export {
   formatNumber,
   formatMoney,
   formatPercent,
   formatDate,
   getNestedValue,
-  copyToClipboard,
-} from './columnRender';
+  defineEnumMap,
+} from '@lania-pro-components/utils';
 
 export type { CustomCellRenderer, CustomRendererRegistry } from '../types';
-
-// 枚举映射
-export { defineEnumMap } from './defineEnumMap';
-export type { EnumItem, EnumHelper } from './defineEnumMap';
+export type { EnumItem, EnumHelper } from '@lania-pro-components/utils';
 
 // 单元格合并
 export { createRowMerge, createColMerge, combineMerge, calculateMergeState, getCellMergeProps } from './cellMerge';

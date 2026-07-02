@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { deepMerge, getSizeWidth, getFooterJustify } from './utils';
+import { getSizeWidth, getFooterJustify } from './utils';
+import { deepMerge } from '@lania-pro-components/utils';
 import { createRoot } from 'react-dom/client';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
 import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
