@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React, { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Select, Spin, Empty, Tag, Checkbox } from '@arco-design/web-react';
-import type { ProSelectProps, ProSelectInstance, ProSelectOption, ProSelectRequestResult, LabeledValue } from './types';
+import type { ProSelectProps, ProSelectInstance, ProSelectOption, ProSelectRequestResult, SelectProps } from './types';
 
 const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props: ProSelectProps, ref) => {
   const {
@@ -52,15 +52,13 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
   const [pageNum, setPageNum] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [innerValue, setInnerValue] = useState<string | number | (string | number | LabeledValue)[]>(
-    (defaultValue as string | number | (string | number | LabeledValue)[]) || (mode === 'multiple' ? [] : ''),
-  );
+  const [innerValue, setInnerValue] = useState<SelectProps['value']>(defaultValue || (mode === 'multiple' ? [] : ''));
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstLoadRef = useRef(true);
   const selectRef = useRef<React.ElementRef<typeof Select>>(null);
 
   const isControlled = value !== undefined;
-  const currentValue = isControlled ? (value as string | number | (string | number | LabeledValue)[]) : innerValue;
+  const currentValue = isControlled ? value : innerValue;
 
   const getFieldName = (field: 'label' | 'value' | 'disabled' | 'group'): string => {
     const names = fieldNames;
@@ -171,7 +169,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
   }, [currentValue, optionsState]);
 
   const handleChange = useCallback(
-    async (newValue: string | number | (string | number | LabeledValue)[], option?: unknown) => {
+    async (newValue: SelectProps['value'], option?: unknown) => {
       if (allowCreate && keyword.trim() && !optionsState.some((opt) => opt.value === keyword.trim())) {
         const selectedValue = Array.isArray(newValue) ? newValue[newValue.length - 1] : newValue;
         const selectedValuePrimitive =
@@ -188,10 +186,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
               if (!isControlled) {
                 setInnerValue(newValue);
               }
-              (onChange as (value: string | number | (string | number | LabeledValue)[], option?: unknown) => void)?.(
-                newValue,
-                option,
-              );
+              (onChange as (value: SelectProps['value'], option?: unknown) => void)?.(newValue, option);
               if (clearSearchOnSelect) {
                 setKeyword('');
               }
@@ -205,7 +200,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
 
           setOptionsState((prev) => [...prev, newOption]);
 
-          let finalValue: string | number | (string | number | LabeledValue)[];
+          let finalValue: SelectProps['value'];
           if (mode === 'multiple') {
             const baseValues = Array.isArray(newValue)
               ? newValue.filter((v) => {
@@ -213,7 +208,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
                   return valToCheck !== trimmedValue;
                 })
               : [];
-            finalValue = [...baseValues, newOption.value];
+            finalValue = [...baseValues, newOption.value] as SelectProps['value'];
           } else {
             finalValue = newOption.value;
           }
@@ -221,10 +216,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
           if (!isControlled) {
             setInnerValue(finalValue);
           }
-          (onChange as (value: string | number | (string | number | LabeledValue)[], option?: unknown) => void)?.(
-            finalValue,
-            newOption,
-          );
+          (onChange as (value: SelectProps['value'], option?: unknown) => void)?.(finalValue, option);
 
           if (clearSearchOnSelect) {
             setKeyword('');
@@ -236,10 +228,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       if (!isControlled) {
         setInnerValue(newValue);
       }
-      (onChange as (value: string | number | (string | number | LabeledValue)[], option?: unknown) => void)?.(
-        newValue,
-        option,
-      );
+      (onChange as (value: SelectProps['value'], option?: unknown) => void)?.(newValue, option);
 
       if (clearSearchOnSelect) {
         setKeyword('');
@@ -262,7 +251,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
     if (mode !== 'multiple') {
       return;
     }
-    const allValues = optionsState.filter((opt) => !opt.disabled).map((opt) => opt.value);
+    const allValues = optionsState.filter((opt) => !opt.disabled).map((opt) => opt.value) as SelectProps['value'];
     await handleChange(allValues);
   }, [mode, optionsState, handleChange]);
 
@@ -308,10 +297,10 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
 
       setOptionsState((prev) => [...prev, newOption]);
 
-      let finalValue: string | number | (string | number | LabeledValue)[];
+      let finalValue: SelectProps['value'];
       if (mode === 'multiple') {
         const newValues = Array.isArray(currentValue) ? [...currentValue, newOption.value] : [newOption.value];
-        finalValue = newValues;
+        finalValue = newValues as SelectProps['value'];
       } else {
         finalValue = newOption.value;
       }
@@ -319,10 +308,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       if (!isControlled) {
         setInnerValue(finalValue);
       }
-      (onChange as (value: string | number | (string | number | LabeledValue)[], option?: unknown) => void)?.(
-        finalValue,
-        newOption,
-      );
+      (onChange as (value: SelectProps['value'], option?: unknown) => void)?.(finalValue, newOption);
 
       if (clearSearchOnSelect) {
         setKeyword('');
@@ -594,7 +580,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       onVisibleChange={handleDropdownVisibleChange}
       dropdownRender={dropdownRender}
       notFoundContent={renderNotFoundContent}
-      renderTag={tagMode && mode === 'multiple' ? renderTag : undefined}
+      renderTag={(tagMode && mode === 'multiple' ? renderTag : undefined) as SelectProps['renderTag']}
       maxTagCount={maxTagCount}
       virtualListProps={
         virtual

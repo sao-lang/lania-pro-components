@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useCallback, useState, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconSelectAll } from '@arco-design/web-react/icon';
 import { ProDialog } from '../ProDialog';
@@ -56,15 +56,17 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
     ref,
   ) => {
     const [loading, setLoading] = useState(false);
+    const [innerSelectedKeys, setInnerSelectedKeys] = useState(selectedKeys);
+    const [innerSelectedRows, setInnerSelectedRows] = useState(selectedRows);
 
     const handleExecute = useCallback(async () => {
       if (needSelection) {
-        if (selectedKeys.length < minSelection) {
+        if (innerSelectedKeys.length < minSelection) {
           ProDialog.message.warning(selectionWarning);
           return;
         }
 
-        if (maxSelection && selectedKeys.length > maxSelection) {
+        if (maxSelection && innerSelectedKeys.length > maxSelection) {
           ProDialog.message.warning(`最多只能选择 ${maxSelection} 条数据`);
           return;
         }
@@ -73,8 +75,8 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       if (needConfirm) {
         const content =
           typeof confirmContent === 'function'
-            ? confirmContent(selectedRows)
-            : confirmContent || `确定要对选中的 ${selectedKeys.length} 条数据进行操作吗？`;
+            ? confirmContent(innerSelectedRows)
+            : confirmContent || `确定要对选中的 ${innerSelectedRows.length} 条数据进行操作吗？`;
 
         ProDialog.confirm({
           title: confirmTitle,
@@ -82,7 +84,7 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
           onConfirm: async () => {
             setLoading(true);
             try {
-              const result = await onAction(selectedRows, selectedKeys);
+              const result = await onAction(innerSelectedRows, innerSelectedKeys);
               return result !== false;
             } finally {
               setLoading(false);
@@ -93,15 +95,15 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       } else {
         setLoading(true);
         try {
-          await onAction(selectedRows, selectedKeys);
+          await onAction(innerSelectedRows, innerSelectedKeys);
         } finally {
           setLoading(false);
         }
       }
     }, [
       needSelection,
-      selectedKeys,
-      selectedRows,
+      innerSelectedKeys,
+      innerSelectedRows,
       minSelection,
       maxSelection,
       selectionWarning,
@@ -112,11 +114,21 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       onAction,
     ]);
 
+    useEffect(() => {
+      setInnerSelectedKeys(selectedKeys);
+    }, [selectedKeys]);
+
+    useEffect(() => {
+      setInnerSelectedRows(selectedRows);
+    }, [selectedRows]);
+
     useImperativeHandle(
       ref,
       () => ({
         execute: handleExecute,
         loading,
+        setSelectedKeys: setInnerSelectedKeys,
+        setSelectedRows: setInnerSelectedRows,
       }),
       [handleExecute, loading],
     );

@@ -275,12 +275,12 @@ import { ProUpload } from '@/pro-components/ProUpload';
 />
 ```
 
-### 与 ProFormN 集成
+### 与 ProForm 集成
 
 在表单 Schema 中使用 ProUpload：
 
 ```tsx
-import { componentRegistry } from '@/pro-components/ProFormN/registry';
+import { componentRegistry } from '@/pro-components/ProForm/registry';
 
 componentRegistry.register('ProUpload', ProUpload);
 

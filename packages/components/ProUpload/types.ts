@@ -1,7 +1,10 @@
 import type { UploadProps, ImageProps } from '@arco-design/web-react';
 import type { UploadItem } from '@arco-design/web-react/es/Upload';
 import type { ReactNode } from 'react';
-import type { UserInfoData } from '@/bam-api/ocean.cloud.community_admin_api';
+
+export interface UserInfoData {
+  [key: string]: unknown;
+}
 
 /**
  * 上传文件类型
@@ -28,7 +31,7 @@ export interface ProUploadFileItem extends UploadItem {
   /**
    * 自定义数据
    */
-  customData?: Record<string, any>;
+  customData?: Record<string, unknown>;
   /**
    * 视频封面图
    */
@@ -412,12 +415,12 @@ export interface ProUploadProps extends Omit<
    * 是否支持排序
    * @default false
    */
-  sortable?: boolean;
+  _sortable?: boolean;
   /**
    * 文件排序回调
    * @param newFileList 排序后的文件列表
    */
-  onSort?: (newFileList: ProUploadFileItem[]) => void;
+  _onSort?: (newFileList: ProUploadFileItem[]) => void;
   /**
    * 是否显示文件计数
    * @default false
@@ -431,7 +434,7 @@ export interface ProUploadProps extends Omit<
   /**
    * 空状态渲染
    */
-  emptyRender?: ReactNode;
+  _emptyRender?: ReactNode;
   /**
    * 错误重试次数
    * @default 0

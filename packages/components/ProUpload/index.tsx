@@ -127,11 +127,11 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
       uploadStyle,
       showTotalProgress = false,
       renderTotalProgress,
-      sortable = false,
-      onSort,
+      _sortable = false,
+      _onSort,
       showCount = false,
       countFormat = '{current}/{max}',
-      emptyRender,
+      _emptyRender,
       retryCount = 0,
       retryInterval = 3000,
       disabled,
@@ -307,48 +307,44 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
         );
 
         const attemptUpload = async (): Promise<string> => {
-          try {
-            let url: string;
+          let url: string;
 
-            if (customUpload) {
-              url = await customUpload(processedFile, (percent) => {
-                updateFileList((prev) => prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)));
-                onProgresChange?.(fileItem, percent);
-              });
-            } else if (type === 'image') {
-              url = await uploadImage(
-                processedFile,
-                {
-                  onProgress: (percent) => {
-                    updateFileList((prev) =>
-                      prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
-                    );
-                    onProgresChange?.(fileItem, percent);
-                  },
+          if (customUpload) {
+            url = await customUpload(processedFile, (percent) => {
+              updateFileList((prev) => prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)));
+              onProgresChange?.(fileItem, percent);
+            });
+          } else if (type === 'image') {
+            url = await uploadImage(
+              processedFile,
+              {
+                onProgress: (percent) => {
+                  updateFileList((prev) =>
+                    prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
+                  );
+                  onProgresChange?.(fileItem, percent);
                 },
-                userInfo,
-              );
-            } else if (type === 'video') {
-              url = await uploadVideo(
-                processedFile,
-                {
-                  onProgress: (percent) => {
-                    updateFileList((prev) =>
-                      prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
-                    );
-                    onProgresChange?.(fileItem, percent);
-                  },
+              },
+              userInfo,
+            );
+          } else if (type === 'video') {
+            url = await uploadVideo(
+              processedFile,
+              {
+                onProgress: (percent) => {
+                  updateFileList((prev) =>
+                    prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
+                  );
+                  onProgresChange?.(fileItem, percent);
                 },
-                userInfo,
-              );
-            } else {
-              throw new Error('暂不支持该类型文件上传');
-            }
-
-            return url;
-          } catch (error) {
-            throw error;
+              },
+              userInfo,
+            );
+          } else {
+            throw new Error('暂不支持该类型文件上传');
           }
+
+          return url;
         };
 
         try {
@@ -422,19 +418,20 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
     );
 
     // 打开文件选择对话框
+    interface UploadRefInternal {
+      uploadRef?: HTMLElement | null;
+    }
+
     const openFileDialog = useCallback(() => {
-      // 通过 Upload 组件的 ref 来打开文件选择对话框
       if (uploadRef.current) {
-        // 尝试直接调用 Upload 组件的内部方法
-        const uploadElement = (uploadRef.current as any)?.uploadRef;
-        if (uploadElement) {
-          uploadElement.click?.();
+        const uploadElement = (uploadRef.current as unknown as UploadRefInternal)?.uploadRef;
+        if (uploadElement?.click) {
+          uploadElement.click();
         }
       }
 
-      // 备用方案：查找组件内的 file input
-      const container = document.querySelector('.arco-upload') as HTMLElement;
-      const input = container?.querySelector('input[type="file"]') as HTMLInputElement;
+      const container = document.querySelector('.arco-upload');
+      const input = container?.querySelector<HTMLInputElement>('input[type="file"]');
       if (input) {
         input.click();
       }
@@ -609,7 +606,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
 
     // 渲染自定义文件列表
     const renderUploadList = useCallback(
-      (files: ProUploadFileItem[], props: any) => {
+      (files: ProUploadFileItem[], _props: object) => {
         if (renderFileList) {
           return renderFileList(files, {
             onRemove: remove,

@@ -1,4 +1,4 @@
-import type { SelectProps, TagProps } from '@arco-design/web-react';
+import type { SelectOptionProps, SelectProps, TagProps } from '@arco-design/web-react';
 import type { ReactNode } from 'react';
 
 export type { SelectProps, TagProps };
@@ -15,7 +15,7 @@ export interface LabeledValue {
 /**
  * 选项数据
  */
-export interface ProSelectOption {
+export interface ProSelectOption extends SelectOptionProps {
   /**
    * 选项标签
    */
@@ -85,7 +85,7 @@ export interface ProSelectRequestResult<T = ProSelectOption> {
 /**
  * ProSelect 组件属性
  */
-export type ProSelectProps = Omit<SelectProps, 'options' | 'onSearch'> & {
+export interface ProSelectProps extends Omit<SelectProps, 'options' | 'onSearch'> {
   /**
    * 选项数据
    */
@@ -254,7 +254,7 @@ export type ProSelectProps = Omit<SelectProps, 'options' | 'onSearch'> & {
    * 自定义下拉框底部
    */
   dropdownFooter?: ReactNode;
-};
+}
 
 /**
  * ProSelect 实例
