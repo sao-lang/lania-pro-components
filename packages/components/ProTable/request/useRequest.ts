@@ -7,7 +7,7 @@ import type { DataStoreState } from '../store/types';
 import type { UseCacheReturn } from '../hooks/useCache';
 
 export interface UseRequestOptions<
-  T extends Record<string, any> = Record<string, any>,
+  T extends Record<string, unknown> = Record<string, unknown>,
 > extends RequestEngineOptions<T> {
   store: DataStoreImpl<T>;
   manual?: boolean;
@@ -18,10 +18,7 @@ export interface UseRequestOptions<
   cacheEnabled?: boolean;
 }
 
-export interface UseRequestReturn<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-  T extends Record<string, any> = Record<string, any>,
-> {
+export interface UseRequestReturn {
   fetchData: () => Promise<void>;
   debouncedFetchData: () => void;
   cancelRequest: () => void;
@@ -29,9 +26,9 @@ export interface UseRequestReturn<
   stopPolling: () => void;
 }
 
-export const useRequest = <T extends Record<string, any> = Record<string, any>>(
+export const useRequest = <T extends Record<string, unknown> = Record<string, unknown>>(
   options: UseRequestOptions<T>,
-): UseRequestReturn<T> => {
+): UseRequestReturn => {
   const {
     store,
     manual = false,
@@ -43,7 +40,7 @@ export const useRequest = <T extends Record<string, any> = Record<string, any>>(
     ...engineOptions
   } = options;
 
-  const engineRef = useRef<RequestEngine<T>>();
+  const engineRef = useRef<RequestEngine<T> | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPollingEnabledRef = useRef(true);

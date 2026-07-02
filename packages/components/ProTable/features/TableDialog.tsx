@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Modal, Button } from '@arco-design/web-react';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import type { OpenDialogConfig, ConfirmDialogConfig, DialogReturnProps, ProTableActionType } from '../types';
@@ -44,7 +45,7 @@ export const openDialog = <
   TRow extends Record<string, unknown> = Record<string, unknown>,
 >(
   config: OpenDialogConfig<TValues, TRow>,
-): DialogReturnProps => {
+): DialogReturnProps<TValues, TRow> => {
   const {
     title,
     content,
@@ -158,7 +159,7 @@ export const openDialog = <
   const renderContent = () => {
     if (content) {
       if (typeof content === 'function') {
-        return (content as Function)({
+        return content({
           close,
           update,
           destroy,
@@ -275,8 +276,8 @@ export const openDialog = <
   container.appendChild(root);
 
   // 使用 React 渲染
-  const ReactDOM = require('react-dom');
-  ReactDOM.render(<DialogComponent />, root);
+  const reactRoot = createRoot(root);
+  reactRoot.render(<DialogComponent />);
 
   return {
     update,
@@ -355,7 +356,7 @@ export const confirm = (config: ConfirmDialogConfig): DialogReturnProps => {
   }, [visible, afterOpen]);
 
   // 更新弹窗配置
-  const update = useCallback((newConfig: Partial<ConfirmDialogConfig>) => {
+  const update = useCallback((_newConfig: Partial<ConfirmDialogConfig>) => {
     // 简化处理
   }, []);
 
@@ -405,45 +406,48 @@ export const confirm = (config: ConfirmDialogConfig): DialogReturnProps => {
   );
 
   // 渲染弹窗
-  const ConfirmComponent = () => (
-    <Modal
-      title={title}
-      visible={visible}
-      onOk={handleConfirm}
-      onCancel={handleCancel}
-      confirmLoading={confirmLoading}
-      mask={mask}
-      maskClosable={maskClosable}
-      closable={closable}
-      alignCenter={alignCenter}
-      style={{
-        width,
-        ...modalStyle,
-      }}
-      className={modalClassName}
-      maskStyle={maskStyle}
-      footer={renderFooter()}
-      getPopupContainer={customGetPopupContainer || (() => container)}
-      mountOnEnter={mountOnEnter}
-      unmountOnExit={unmountOnExit}
-      escToExit={escToExit}
-      autoFocus={autoFocus}
-      focusLock={focusLock}
-      simple={simple}
-      closeIcon={closeIcon}
-      modalRender={modalRender}
-    >
-      {content}
-    </Modal>
-  );
+  const ConfirmComponent = () => {
+    const contentNode = typeof content === 'function' ? content({ close, update: () => {}, destroy }) : content;
+    return (
+      <Modal
+        title={title}
+        visible={visible}
+        onOk={handleConfirm}
+        onCancel={handleCancel}
+        confirmLoading={confirmLoading}
+        mask={mask}
+        maskClosable={maskClosable}
+        closable={closable}
+        alignCenter={alignCenter}
+        style={{
+          width,
+          ...modalStyle,
+        }}
+        className={modalClassName}
+        maskStyle={maskStyle}
+        footer={renderFooter()}
+        getPopupContainer={customGetPopupContainer || (() => container)}
+        mountOnEnter={mountOnEnter}
+        unmountOnExit={unmountOnExit}
+        escToExit={escToExit}
+        autoFocus={autoFocus}
+        focusLock={focusLock}
+        simple={simple}
+        closeIcon={closeIcon}
+        modalRender={modalRender}
+      >
+        {contentNode}
+      </Modal>
+    );
+  };
 
   // 渲染到容器
   const root = document.createElement('div');
   container.appendChild(root);
 
   // 使用 React 渲染
-  const ReactDOM = require('react-dom');
-  ReactDOM.render(<ConfirmComponent />, root);
+  const reactRoot = createRoot(root);
+  reactRoot.render(<ConfirmComponent />);
 
   return {
     update,

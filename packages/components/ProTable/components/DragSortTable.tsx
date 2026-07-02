@@ -4,7 +4,7 @@ import { IconDragArrow } from '@arco-design/web-react/icon';
 import type { TableProps, TableColumnProps } from '@arco-design/web-react';
 import { useDragSort } from '../hooks/useDragSort';
 
-export interface DragSortTableProps<T = any> extends Omit<TableProps<T>, 'data' | 'onChange'> {
+export interface DragSortTableProps<T = Record<string, unknown>> extends Omit<TableProps<T>, 'data' | 'onChange'> {
   /** 数据源 */
   dataSource: T[];
   /** 表格列配置 */
@@ -60,7 +60,7 @@ export interface DragSortTableProps<T = any> extends Omit<TableProps<T>, 'data' 
  * />
  * ```
  */
-export const DragSortTable = <T extends Record<string, any>>({
+export const DragSortTable = <T extends Record<string, unknown>>({
   dataSource,
   columns,
   onDragSortEnd,
@@ -84,7 +84,7 @@ export const DragSortTable = <T extends Record<string, any>>({
       if (typeof rowKey === 'function') {
         return rowKey(record);
       }
-      return record[rowKey];
+      return record[rowKey] as string | number;
     },
     [rowKey],
   );
@@ -126,7 +126,7 @@ export const DragSortTable = <T extends Record<string, any>>({
     width: 60,
     align: 'center',
     fixed: 'left',
-    render: (_: any, record: T, index: number) => {
+    render: (_: unknown, record: T, index: number) => {
       const handleProps = getDragHandleProps(index);
       const isDragging = dragState.draggingIndex === index;
 
@@ -158,7 +158,7 @@ export const DragSortTable = <T extends Record<string, any>>({
           if (index === 0) {
             return {
               ...col,
-              render: (value: any, record: T, rowIndex: number) => {
+              render: (value: unknown, record: T, rowIndex: number) => {
                 const isDragging = dragState.draggingIndex === rowIndex;
                 const dragIcon = (
                   <span
@@ -175,7 +175,9 @@ export const DragSortTable = <T extends Record<string, any>>({
                 );
 
                 const originalRender = col.render;
-                const renderedValue = originalRender ? originalRender(value, record, rowIndex) : value;
+                const renderedValue = originalRender
+                  ? (originalRender(value as unknown, record, rowIndex) as React.ReactNode)
+                  : (value as React.ReactNode);
 
                 return (
                   <Space>
@@ -193,21 +195,21 @@ export const DragSortTable = <T extends Record<string, any>>({
   const handleOnRow = (record: T, index: number) => {
     const dragRowProps = getDragRowProps(index, record);
     const originalOnRow = restProps.onRow;
-    const originalRowProps = originalOnRow?.(record, index);
+    const originalProps = originalOnRow?.(record, index) || {};
 
     return {
-      ...originalRowProps,
+      ...originalProps,
       draggable: dragRowProps.draggable,
       onDragStart: dragRowProps.onDragStart,
       onDragOver: dragRowProps.onDragOver,
       onDragEnd: dragRowProps.onDragEnd,
       onDrop: dragRowProps.onDrop,
       style: {
-        ...originalRowProps?.style,
+        ...(originalProps.style as React.CSSProperties),
         ...dragRowProps.style,
       },
       className: [
-        originalRowProps?.className,
+        originalProps.className,
         dragState.draggingIndex === index ? 'dragging-row' : '',
         dragState.overIndex === index && dragState.draggingIndex !== index ? 'drag-over-row' : '',
       ]

@@ -190,6 +190,104 @@ export class ValidationEngine {
       }
     }
 
+    // len
+    if ('len' in rule) {
+      const lenRule = rule as { len: number; message?: string };
+      let length: number;
+      if (Array.isArray(value)) {
+        length = value.length;
+      } else if (typeof value === 'string') {
+        length = value.length;
+      } else if (typeof value === 'number' || typeof value === 'boolean') {
+        length = String(value).length;
+      } else {
+        length = 0;
+      }
+      if (length !== lenRule.len) {
+        return lenRule.message || `长度必须为 ${lenRule.len} 个字符`;
+      }
+    }
+
+    // precision
+    if ('precision' in rule && typeof value === 'number') {
+      const precisionRule = rule as { precision: number; message?: string };
+      const decimalPart = String(value).split('.')[1];
+      const actualPrecision = decimalPart ? decimalPart.length : 0;
+      if (actualPrecision > precisionRule.precision) {
+        return precisionRule.message || `最多保留 ${precisionRule.precision} 位小数`;
+      }
+    }
+
+    // step
+    if ('step' in rule && typeof value === 'number') {
+      const stepRule = rule as { step: number; message?: string };
+      if (stepRule.step > 0) {
+        const remainder = value % stepRule.step;
+        if (Math.abs(remainder) > Number.EPSILON) {
+          return stepRule.message || `值必须是 ${stepRule.step} 的倍数`;
+        }
+      }
+    }
+
+    // type
+    if ('type' in rule) {
+      const typeRule = rule as { type: 'number' | 'integer' | 'float' | 'string' | 'boolean'; message?: string };
+      let isValid = false;
+      switch (typeRule.type) {
+        case 'number':
+          isValid = typeof value === 'number' && !Number.isNaN(value);
+          break;
+        case 'integer':
+          isValid = Number.isInteger(value);
+          break;
+        case 'float':
+          isValid = typeof value === 'number' && !Number.isNaN(value) && !Number.isInteger(value);
+          break;
+        case 'string':
+          isValid = typeof value === 'string';
+          break;
+        case 'boolean':
+          isValid = typeof value === 'boolean';
+          break;
+      }
+      if (!isValid) {
+        return typeRule.message || `值类型必须为 ${typeRule.type}`;
+      }
+    }
+
+    // sign
+    if ('sign' in rule && typeof value === 'number' && !Number.isNaN(value)) {
+      const signRule = rule as { sign: 'positive' | 'negative' | 'zero'; message?: string };
+      let isValid = false;
+      switch (signRule.sign) {
+        case 'positive':
+          isValid = value > 0;
+          break;
+        case 'negative':
+          isValid = value < 0;
+          break;
+        case 'zero':
+          isValid = value === 0;
+          break;
+      }
+      if (!isValid) {
+        const signLabels: Record<string, string> = {
+          positive: '正数',
+          negative: '负数',
+          zero: '零',
+        };
+        return signRule.message || `值必须为${signLabels[signRule.sign]}`;
+      }
+    }
+
+    // whitespace
+    if ('whitespace' in rule && rule.whitespace) {
+      const whitespaceRule = rule as { whitespace: boolean; message?: string };
+      if (typeof value === 'string' && value.trim() === '') {
+        return whitespaceRule.message || '不允许输入空白字符';
+      }
+    }
+
     // pattern
     if ('pattern' in rule) {
       const patternRule = rule as { pattern: RegExp; message?: string };

@@ -142,7 +142,7 @@ export const optionRenderer: ReadonlyRenderer = (value, options = [], config = {
   }
 
   const option = options.find((o) => o.value === value);
-  const label = option?.label || value;
+  const label = option?.label ?? String(value);
 
   if (config.mode === 'tag') {
     return <Tag color={config.tagColors?.[String(value)]}>{label}</Tag>;
@@ -189,7 +189,7 @@ export const switchRenderer: ReadonlyRenderer = (value, _options, config = {}, c
 
   const isChecked = value === true || value === 'true' || value === 1 || value === '1';
 
-  return <Tag color={isChecked ? 'green' : 'gray'}>{isChecked ? trueLabel : falseLabel}</Tag>;
+  return <Tag color={isChecked ? 'green' : 'gray'}>{(isChecked ? trueLabel : falseLabel) as string}</Tag>;
 };
 
 /**
@@ -630,7 +630,7 @@ export const yesNoRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
     '0': '否',
   };
 
-  const label = map[String(value)] || value;
+  const label = map[String(value)] ?? String(value);
   const isYes = ['yes', 'true', '1'].includes(String(value).toLowerCase());
 
   return <Tag color={isYes ? 'green' : 'red'}>{label}</Tag>;
@@ -654,7 +654,7 @@ export const maleFemaleRenderer: ReadonlyRenderer = (value, _options, config = {
     '0': '女',
   };
 
-  const label = map[String(value).toLowerCase()] || value;
+  const label = map[String(value).toLowerCase()] ?? String(value);
   const isMale = ['male', 'm', '1'].includes(String(value).toLowerCase());
 
   return <Tag color={isMale ? 'blue' : 'pink'}>{label}</Tag>;
@@ -680,7 +680,7 @@ export const enableDisableRenderer: ReadonlyRenderer = (value, _options, config 
     '0': '禁用',
   };
 
-  const label = map[String(value).toLowerCase()] || value;
+  const label = map[String(value).toLowerCase()] ?? String(value);
   const isEnable = ['enable', 'enabled', 'true', '1'].includes(String(value).toLowerCase());
 
   return <Tag color={isEnable ? 'green' : 'red'}>{label}</Tag>;
@@ -706,7 +706,7 @@ export const openCloseRenderer: ReadonlyRenderer = (value, _options, config = {}
     '0': '关闭',
   };
 
-  const label = map[String(value).toLowerCase()] || value;
+  const label = map[String(value).toLowerCase()] ?? String(value);
   const isOpen = ['open', 'opened', 'true', '1'].includes(String(value).toLowerCase());
 
   return <Tag color={isOpen ? 'green' : 'gray'}>{label}</Tag>;

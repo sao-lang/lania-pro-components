@@ -31,7 +31,7 @@ export interface CardGridConfig {
 /**
  * 卡片模式配置
  */
-export interface CardModeConfig<T = any> {
+export interface CardModeConfig<T = Record<string, unknown>> {
   /** 自定义卡片渲染 */
   cardRender?: (record: T, index: number, columns: ProColumnType<T>[]) => React.ReactNode;
   /** 网格配置 */
@@ -41,7 +41,7 @@ export interface CardModeConfig<T = any> {
   /** 卡片内容渲染 */
   contentRender?: (record: T, columns: ProColumnType<T>[]) => React.ReactNode;
   /** 卡片操作渲染 */
-  actionsRender?: (record: T, action: ProTableActionType) => React.ReactNode[];
+  actionsRender?: (record: T, action: ProTableActionType<T>) => React.ReactNode[];
   /** 卡片是否可点击 */
   clickable?: boolean;
   /** 卡片点击回调 */
@@ -61,7 +61,7 @@ export interface CardModeConfig<T = any> {
 /**
  * 卡片视图属性
  */
-export interface CardViewProps<T = any> {
+export interface CardViewProps<T = Record<string, unknown>> {
   /** 数据源 */
   dataSource: T[];
   /** 列配置 */
@@ -69,7 +69,7 @@ export interface CardViewProps<T = any> {
   /** 卡片模式配置 */
   cardMode: CardModeConfig<T> | boolean;
   /** 表格操作实例 */
-  action?: ProTableActionType;
+  action?: ProTableActionType<T>;
   /** 加载状态 */
   loading?: boolean;
   /** 空状态渲染 */
@@ -92,7 +92,7 @@ function defaultCardRender<T>(
   index: number,
   columns: ProColumnType<T>[],
   config: CardModeConfig<T>,
-  action?: ProTableActionType,
+  action?: ProTableActionType<T>,
 ): React.ReactNode {
   const {
     titleRender,
@@ -119,7 +119,7 @@ function defaultCardRender<T>(
   ) : (
     <div className='pro-table-card-content'>
       {dataColumns.slice(0, 4).map((col, idx) => {
-        const value = col.dataIndex ? getNestedValue(record, col.dataIndex) : null;
+        const value = col.dataIndex ? getNestedValue(record as Record<string, unknown>, col.dataIndex) : null;
         return (
           <div key={idx} className='pro-table-card-item'>
             <span className='pro-table-card-label'>{col.title}:</span>
@@ -131,7 +131,7 @@ function defaultCardRender<T>(
   );
 
   // 操作
-  const actions = actionsRender ? actionsRender(record, action!) : null;
+  const actions = actionsRender && action ? actionsRender(record, action) : null;
 
   // 封面
   const cover = coverRender ? coverRender(record) : null;
@@ -150,7 +150,7 @@ function defaultCardRender<T>(
   };
 
   if (cover) {
-    (cardProps as any).cover = cover;
+    cardProps.cover = cover;
   }
 
   return (
@@ -188,7 +188,7 @@ function defaultCardRender<T>(
  * />
  * ```
  */
-export function CardView<T extends Record<string, any> = Record<string, any>>(
+export function CardView<T extends Record<string, unknown> = Record<string, unknown>>(
   props: CardViewProps<T>,
 ): React.ReactElement {
   const {

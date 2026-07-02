@@ -1,42 +1,134 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import type { ProColumnType, TableDensity } from '../types';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import type { ProColumnType, TableDensity, ProTableProps } from '../types';
+import { useResponsive, type Breakpoints } from '../hooks';
 
-/**
- * ColumnContext - 列配置层
- * 管理列配置和表格密度
- */
-export interface ColumnContextValue<T = any> {
-  /** 列配置 */
+export interface ColumnContextValue<T = Record<string, unknown>> {
   columns: ProColumnType<T>[];
-  /** 设置列配置 */
   setColumns: (columns: ProColumnType<T>[]) => void;
-  /** 表格密度 */
   density: TableDensity;
-  /** 设置表格密度 */
   setDensity: (density: TableDensity) => void;
-  /** 处理列变化 */
   handleColumnsChange: (columns: ProColumnType<T>[]) => void;
-  /** 处理密度变化 */
   handleDensityChange: (density: TableDensity) => void;
+  groupColumns?: ProTableProps<T>['groupColumns'];
 }
 
-const ColumnContext = createContext<ColumnContextValue<any> | null>(null);
+const ColumnContext = createContext<ColumnContextValue<Record<string, unknown>> | null>(null);
 
-export interface ColumnProviderProps<T = any> {
+export interface ColumnProviderProps<T = Record<string, unknown>> {
   children: React.ReactNode;
   initialColumns: ProColumnType<T>[];
   onColumnsStateChange?: (columns: ProColumnType<T>[]) => void;
   onDensityChange?: (density: TableDensity) => void;
+  persistenceKey?: string;
+  responsive?: boolean;
+  breakpoints?: Breakpoints;
+  groupColumns?: ProTableProps<T>['groupColumns'];
 }
 
-export const ColumnProvider = <T extends Record<string, any>>({
+function getStoredColumns<T>(persistenceKey: string): ProColumnType<T>[] | null {
+  try {
+    const stored = localStorage.getItem(persistenceKey);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+const getStoredDensity = (persistenceKey: string): TableDensity | null => {
+  try {
+    const stored = localStorage.getItem(`${persistenceKey}_density`);
+    if (stored) {
+      return JSON.parse(stored) as TableDensity;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+function setStoredColumns<T>(persistenceKey: string, columns: ProColumnType<T>[]) {
+  try {
+    localStorage.setItem(persistenceKey, JSON.stringify(columns));
+  } catch {
+    // ignore
+  }
+}
+
+const setStoredDensity = (persistenceKey: string, density: TableDensity) => {
+  try {
+    localStorage.setItem(`${persistenceKey}_density`, JSON.stringify(density));
+  } catch {
+    // ignore
+  }
+};
+
+export const ColumnProvider = <T extends Record<string, unknown>>({
   children,
   initialColumns,
   onColumnsStateChange,
   onDensityChange,
+  persistenceKey,
+  responsive,
+  breakpoints,
+  groupColumns,
 }: ColumnProviderProps<T>) => {
-  const [columns, setColumnsState] = useState<ProColumnType<T>[]>(initialColumns);
-  const [density, setDensityState] = useState<TableDensity>('default');
+  const [columns, setColumnsState] = useState<ProColumnType<T>[]>(() => {
+    if (persistenceKey) {
+      const stored = getStoredColumns<T>(persistenceKey);
+      if (stored && stored.length > 0) {
+        return stored;
+      }
+    }
+    return initialColumns;
+  });
+
+  const [density, setDensityState] = useState<TableDensity>(() => {
+    if (persistenceKey) {
+      const stored = getStoredDensity(persistenceKey);
+      if (stored) {
+        return stored;
+      }
+    }
+    return 'default';
+  });
+
+  const { state: responsiveState } = useResponsive({
+    enabled: responsive,
+    breakpoints,
+  });
+
+  const responsiveColumnCount = useCallback(() => {
+    const bp = breakpoints || {};
+    const map: Record<string, number> = {
+      xs: bp.xs ?? 1,
+      sm: bp.sm ?? 2,
+      md: bp.md ?? 3,
+      lg: bp.lg ?? 4,
+      xl: bp.xl ?? 4,
+      xxl: bp.xxl ?? 6,
+    };
+    return map[responsiveState.breakpoint] ?? 4;
+  }, [responsiveState.breakpoint, breakpoints]);
+
+  useEffect(() => {
+    if (!responsive) {
+      return;
+    }
+
+    const count = responsiveColumnCount();
+    const visibleColumns = columns.filter((col) => col.valueType !== 'opr').slice(0, count);
+    const visibleDataIndexes = new Set(visibleColumns.map((col) => String(col.dataIndex)));
+
+    setColumnsState(
+      columns.map((col) => ({
+        ...col,
+        hideInTable: col.valueType !== 'opr' && !visibleDataIndexes.has(String(col.dataIndex)),
+      })),
+    );
+  }, [responsive, responsiveColumnCount, columns]);
 
   const setColumns = useCallback((newColumns: ProColumnType<T>[]) => {
     setColumnsState(newColumns);
@@ -50,16 +142,22 @@ export const ColumnProvider = <T extends Record<string, any>>({
     (newColumns: ProColumnType<T>[]) => {
       setColumnsState(newColumns);
       onColumnsStateChange?.(newColumns);
+      if (persistenceKey) {
+        setStoredColumns(persistenceKey, newColumns);
+      }
     },
-    [onColumnsStateChange],
+    [onColumnsStateChange, persistenceKey],
   );
 
   const handleDensityChange = useCallback(
     (newDensity: TableDensity) => {
       setDensityState(newDensity);
       onDensityChange?.(newDensity);
+      if (persistenceKey) {
+        setStoredDensity(persistenceKey, newDensity);
+      }
     },
-    [onDensityChange],
+    [onDensityChange, persistenceKey],
   );
 
   const value: ColumnContextValue<T> = {
@@ -69,15 +167,20 @@ export const ColumnProvider = <T extends Record<string, any>>({
     setDensity,
     handleColumnsChange,
     handleDensityChange,
+    groupColumns,
   };
 
-  return <ColumnContext.Provider value={value}>{children}</ColumnContext.Provider>;
+  return (
+    <ColumnContext.Provider value={value as ColumnContextValue<Record<string, unknown>>}>
+      {children}
+    </ColumnContext.Provider>
+  );
 };
 
-export const useColumnContext = () => {
+export const useColumnContext = <T extends Record<string, unknown> = Record<string, unknown>>() => {
   const context = useContext(ColumnContext);
   if (!context) {
     throw new Error('useColumnContext must be used within a ColumnProvider');
   }
-  return context;
+  return context as ColumnContextValue<T>;
 };

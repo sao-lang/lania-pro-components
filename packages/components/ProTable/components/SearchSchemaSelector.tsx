@@ -103,8 +103,8 @@ export const SearchSchemaSelector: React.FC<SearchSchemaSelectorProps> = ({
   };
 
   // 处理删除方案
-  const handleDelete = (key: string, name: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleDelete = (key: string, name: string, e?: Event) => {
+    (e as unknown as React.MouseEvent)?.stopPropagation();
     Modal.confirm({
       title: '确认删除',
       content: `确定要删除查询方案 "${name}" 吗？`,
@@ -116,8 +116,8 @@ export const SearchSchemaSelector: React.FC<SearchSchemaSelectorProps> = ({
   };
 
   // 处理重命名
-  const handleRename = (key: string, currentName: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleRename = (key: string, currentName: string, e?: Event) => {
+    (e as unknown as React.MouseEvent)?.stopPropagation();
     setRenameKey(key);
     setRenameValue(currentName);
     setRenameModalVisible(true);

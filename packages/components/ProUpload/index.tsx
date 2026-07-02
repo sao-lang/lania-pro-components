@@ -1,9 +1,17 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useMemo } from 'react';
 import { Upload, Button, Message, Image, Modal, Progress, Space, Tooltip } from '@arco-design/web-react';
 import type { UploadInstance } from '@arco-design/web-react/es/Upload';
-import { IconPlus, IconDelete, IconEye, IconUpload, IconDownload } from '@arco-design/web-react/icon';
+import {
+  IconPlus,
+  IconDelete,
+  IconEye,
+  IconUpload,
+  IconDownload,
+  IconArrowUp,
+  IconArrowDown,
+} from '@arco-design/web-react/icon';
 import type { ProUploadProps, ProUploadInstance, ProUploadFileItem, BeforeUploadResult } from './types';
-import { uploadImage, uploadVideo, isVideo } from './utils';
+import { isVideo } from './utils';
 
 /**
  * 默认文件类型配置
@@ -102,7 +110,6 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
       type = 'image',
       config = {},
       previewConfig = {},
-      userInfo,
       onChange,
       beforeUpload,
       onSuccess,
@@ -111,6 +118,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
       onRemove,
       onPreview,
       customUpload,
+      onRequest,
       showUploadButton = true,
       uploadButtonText = '上传',
       uploadButtonIcon,
@@ -127,11 +135,11 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
       uploadStyle,
       showTotalProgress = false,
       renderTotalProgress,
-      _sortable = false,
-      _onSort,
+      sortable = false,
+      onSort,
+      emptyRender,
       showCount = false,
       countFormat = '{current}/{max}',
-      _emptyRender,
       retryCount = 0,
       retryInterval = 3000,
       disabled,
@@ -302,49 +310,22 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
           }
         }
 
+        onRequest?.({ file: fileItem, status: 'start', percent: 0 });
+
         updateFileList((prev) =>
           prev.map((item) => (item.uid === fileItem.uid ? { ...item, status: 'uploading', percent: 0 } : item)),
         );
 
         const attemptUpload = async (): Promise<string> => {
-          let url: string;
-
-          if (customUpload) {
-            url = await customUpload(processedFile, (percent) => {
-              updateFileList((prev) => prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)));
-              onProgresChange?.(fileItem, percent);
-            });
-          } else if (type === 'image') {
-            url = await uploadImage(
-              processedFile,
-              {
-                onProgress: (percent) => {
-                  updateFileList((prev) =>
-                    prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
-                  );
-                  onProgresChange?.(fileItem, percent);
-                },
-              },
-              userInfo,
-            );
-          } else if (type === 'video') {
-            url = await uploadVideo(
-              processedFile,
-              {
-                onProgress: (percent) => {
-                  updateFileList((prev) =>
-                    prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)),
-                  );
-                  onProgresChange?.(fileItem, percent);
-                },
-              },
-              userInfo,
-            );
-          } else {
-            throw new Error('暂不支持该类型文件上传');
+          if (!customUpload) {
+            throw new Error('请配置 customUpload 上传函数');
           }
 
-          return url;
+          return customUpload(processedFile, (percent) => {
+            updateFileList((prev) => prev.map((item) => (item.uid === fileItem.uid ? { ...item, percent } : item)));
+            onProgresChange?.(fileItem, percent);
+            onRequest?.({ file: fileItem, status: 'progress', percent });
+          });
         };
 
         try {
@@ -353,6 +334,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
             prev.map((item) => (item.uid === fileItem.uid ? { ...item, status: 'done', url, percent: 100 } : item)),
           );
           retryMapRef.current.delete(fileItem.uid);
+          onRequest?.({ file: fileItem, status: 'success', percent: 100, url });
           onSuccess?.(fileItem, url);
         } catch (error) {
           const currentRetry = retryMapRef.current.get(fileItem.uid) || 0;
@@ -365,6 +347,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
               prev.map((item) => (item.uid === fileItem.uid ? { ...item, status: 'error', errorMessage } : item)),
             );
             retryMapRef.current.delete(fileItem.uid);
+            onRequest?.({ file: fileItem, status: 'error', errorMessage });
             onError?.(fileItem, errorMessage);
           }
         }
@@ -373,7 +356,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
         type,
         compressConfig,
         customUpload,
-        userInfo,
+        onRequest,
         retryCount,
         retryInterval,
         updateFileList,
@@ -415,6 +398,29 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
         retryMapRef.current.delete(uid);
       },
       [finalFileList, onRemove, updateFileList],
+    );
+
+    // 移动文件位置（排序）
+    const moveFile = useCallback(
+      (uid: string, direction: 'up' | 'down') => {
+        updateFileList((prev) => {
+          const newList = [...prev];
+          const index = newList.findIndex((item) => item.uid === uid);
+          if (index === -1) {
+            return prev;
+          }
+
+          if (direction === 'up' && index > 0) {
+            [newList[index], newList[index - 1]] = [newList[index - 1], newList[index]];
+          } else if (direction === 'down' && index < newList.length - 1) {
+            [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
+          }
+
+          onSort?.(newList);
+          return newList;
+        });
+      },
+      [updateFileList, onSort],
     );
 
     // 打开文件选择对话框
@@ -614,6 +620,10 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
           });
         }
 
+        if (files.length === 0 && emptyRender) {
+          return emptyRender;
+        }
+
         if (listType === 'text') {
           return (
             <div style={{ marginTop: 8 }}>
@@ -650,6 +660,24 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
                     </Tooltip>
                   )}
                   <Space size='small' style={{ marginLeft: 8 }}>
+                    {sortable && (
+                      <>
+                        <Button
+                          type='text'
+                          size='small'
+                          icon={<IconArrowUp />}
+                          onClick={() => moveFile(file.uid, 'up')}
+                          disabled={files.indexOf(file) === 0}
+                        />
+                        <Button
+                          type='text'
+                          size='small'
+                          icon={<IconArrowDown />}
+                          onClick={() => moveFile(file.uid, 'down')}
+                          disabled={files.indexOf(file) === files.length - 1}
+                        />
+                      </>
+                    )}
                     {finalPreviewConfig.enable && file.url && (
                       <Button type='text' size='small' icon={<IconEye />} onClick={() => preview(file)} />
                     )}
@@ -673,7 +701,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
 
         return null;
       },
-      [renderFileList, listType, finalPreviewConfig, preview, remove],
+      [renderFileList, listType, finalPreviewConfig, preview, remove, sortable, moveFile, emptyRender],
     );
 
     // 渲染总进度

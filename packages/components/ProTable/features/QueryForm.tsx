@@ -1,11 +1,11 @@
 import React, { useMemo, useCallback, useEffect, useRef } from 'react';
-import { ProForm } from '../../ProFormN';
-import type { ProFormInstance, ProFormSchema, ValidationRule } from '../../ProFormN/types';
+import { ProForm } from '../../ProForm';
+import type { ProFormInstance, ProFormSchema } from '../../ProForm/types';
 import { useDataContext, useColumnContext, useRootContext } from '../context';
 import type { ProColumnType, ProColumnValueType } from '../types';
 
 export interface QueryFormProps {
-  formRef: React.RefObject<ProFormInstance>;
+  formRef: React.RefObject<ProFormInstance | null>;
 }
 
 /**
@@ -39,7 +39,10 @@ const valueTypeToComponent: Record<Exclude<ProColumnValueType, 'opr' | 'proTable
 /**
  * 根据值类型生成表单组件属性
  */
-const getComponentPropsByValueType = (valueType: ProColumnValueType, column: ProColumnType): Record<string, any> => {
+const getComponentPropsByValueType = (
+  valueType: ProColumnValueType,
+  column: ProColumnType,
+): Record<string, unknown> => {
   const { valueEnum, dateFormat } = column;
 
   switch (valueType) {
@@ -64,7 +67,7 @@ const getComponentPropsByValueType = (valueType: ProColumnValueType, column: Pro
       return {
         style: { width: '100%' },
         options: valueEnum
-          ? Object.entries(valueEnum).map(([key, val]: [string, any]) => ({
+          ? Object.entries(valueEnum).map(([key, val]) => ({
               label: val.text,
               value: key,
             }))
@@ -75,7 +78,7 @@ const getComponentPropsByValueType = (valueType: ProColumnValueType, column: Pro
     case 'radio':
       return {
         options: valueEnum
-          ? Object.entries(valueEnum).map(([key, val]: [string, any]) => ({
+          ? Object.entries(valueEnum).map(([key, val]) => ({
               label: val.text,
               value: key,
             }))
@@ -84,7 +87,7 @@ const getComponentPropsByValueType = (valueType: ProColumnValueType, column: Pro
     case 'checkbox':
       return {
         options: valueEnum
-          ? Object.entries(valueEnum).map(([key, val]: [string, any]) => ({
+          ? Object.entries(valueEnum).map(([key, val]) => ({
               label: val.text,
               value: key,
             }))
@@ -110,7 +113,9 @@ const getComponentPropsByValueType = (valueType: ProColumnValueType, column: Pro
 /**
  * 将列配置转换为搜索表单 Schema
  */
-const convertColumnsToSearchSchema = <T extends Record<string, any>>(columns: ProColumnType<T>[]): ProFormSchema[] => {
+const convertColumnsToSearchSchema = <T extends Record<string, unknown>>(
+  columns: ProColumnType<T>[],
+): ProFormSchema[] => {
   const searchColumns = columns
     .filter((col): col is ProColumnType<T> & { dataIndex: string | string[] } => {
       if (col.hideInSearch === true) {
@@ -134,7 +139,9 @@ const convertColumnsToSearchSchema = <T extends Record<string, any>>(columns: Pr
       const component =
         valueType === 'opr' || valueType === 'proTable' ? 'Input' : valueTypeToComponent[valueType] || 'Input';
       const componentProps =
-        valueType === 'opr' || valueType === 'proTable' ? {} : getComponentPropsByValueType(valueType, col);
+        valueType === 'opr' || valueType === 'proTable'
+          ? {}
+          : getComponentPropsByValueType(valueType, col as ProColumnType);
 
       const searchConfig = col.search || {};
 
@@ -156,8 +163,8 @@ const convertColumnsToSearchSchema = <T extends Record<string, any>>(columns: Pr
       return schema;
     })
     .sort((a, b) => {
-      const orderA = (a as any).order ?? Infinity;
-      const orderB = (b as any).order ?? Infinity;
+      const orderA = (a as ProFormSchema & { order?: number }).order ?? Infinity;
+      const orderB = (b as ProFormSchema & { order?: number }).order ?? Infinity;
       return orderA - orderB;
     });
 
@@ -167,8 +174,8 @@ const convertColumnsToSearchSchema = <T extends Record<string, any>>(columns: Pr
 /**
  * 转换搜索参数
  */
-const transformSearchParams = (params: Record<string, any>, columns: ProColumnType[]): Record<string, any> => {
-  const result: Record<string, any> = { ...params };
+const transformSearchParams = (params: Record<string, unknown>, columns: ProColumnType[]): Record<string, unknown> => {
+  const result: Record<string, unknown> = { ...params };
 
   columns.forEach((col) => {
     if (!col.dataIndex) {
@@ -202,7 +209,7 @@ const transformSearchParams = (params: Record<string, any>, columns: ProColumnTy
 
 /**
  * QueryForm - 查询表单组件
- * 根据 columns 配置自动生成查询表单，集成 ProFormN
+ * 根据 columns 配置自动生成查询表单，集成 ProForm
  */
 export const QueryForm: React.FC<QueryFormProps> = ({ formRef }) => {
   const { setQuery, reset, loading, query } = useDataContext();
@@ -232,8 +239,6 @@ export const QueryForm: React.FC<QueryFormProps> = ({ formRef }) => {
     defaultCollapsed = true,
     collapsedRows = 1,
     formProps = {},
-    showSearch = true,
-    showReset = true,
     beforeSearch,
     searchButtonRender,
     resetButtonRender,
@@ -272,7 +277,6 @@ export const QueryForm: React.FC<QueryFormProps> = ({ formRef }) => {
     onDraftChange,
     onPreviewChange,
     showButton: formShowButton,
-    submitLoading,
     resetLoading,
     showSubmitButton,
     showResetButton,
@@ -304,7 +308,7 @@ export const QueryForm: React.FC<QueryFormProps> = ({ formRef }) => {
    * 处理搜索
    */
   const handleSearch = useCallback(
-    (values: Record<string, any>) => {
+    (values: Record<string, unknown>) => {
       isSettingFormRef.current = true;
       let params = transformSearchParams(values, columns);
       if (beforeSearch) {

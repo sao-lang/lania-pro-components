@@ -2,7 +2,7 @@ export interface EnumItem {
   label: string;
   value: string | number;
   children?: EnumItem[];
-  [key: string]: any;
+  [key: string]: string | number | EnumItem[] | undefined;
 }
 
 type EnumMap = Record<string, EnumItem>;
@@ -116,7 +116,8 @@ export function defineEnumMap<T extends EnumMap>(enumMap: T): EnumHelper<T> {
       const excludeSet = new Set(exclude);
       const cacheKey = JSON.stringify({ labelKey, valueKey, exclude });
       if (optionsCache.has(cacheKey)) {
-        return [...prepend, ...optionsCache.get(cacheKey)!, ...append] as BuildOption<LK, VK>[];
+        const cached = optionsCache.get(cacheKey);
+        return [...prepend, ...(cached || []), ...append] as BuildOption<LK, VK>[];
       }
       function build(items: EnumItem[]): BuildOption<LK, VK>[] {
         return items
@@ -173,9 +174,9 @@ export function defineEnumMap<T extends EnumMap>(enumMap: T): EnumHelper<T> {
 
   // 加 Proxy，支持 enumHelper.xxx 访问对应项
   const proxy = new Proxy(baseHelper as EnumHelper<T>, {
-    get(target, prop: string) {
+    get(target: EnumHelper<T>, prop: string) {
       if (prop in target) {
-        return (target as any)[prop];
+        return target[prop as keyof EnumHelper<T>];
       }
       if (prop in enumMap) {
         return enumMap[prop as keyof T];

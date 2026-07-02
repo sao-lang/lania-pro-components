@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React, { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Select, Spin, Empty, Tag, Checkbox } from '@arco-design/web-react';
 import type { ProSelectProps, ProSelectInstance, ProSelectOption, ProSelectRequestResult, SelectProps } from './types';

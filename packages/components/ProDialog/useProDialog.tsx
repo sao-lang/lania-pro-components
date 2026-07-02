@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { deepMerge, getSizeWidth, getFooterJustify } from './utils';
 import { createRoot } from 'react-dom/client';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
+import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
 import type {
   ProDialogInstance,
   ProDialogProps,
@@ -10,10 +11,9 @@ import type {
   UseProDialogReturn,
   DialogButtonContext,
   DialogButtonConfig,
-  ConfirmDialogConfig,
   OpenDialogParams,
 } from './types';
-import { ProForm, ProFormInstance } from '../ProFormN';
+import { ProForm, ProFormInstance, ProFormSchema } from '../ProForm';
 import { ProTable, ProTableActionType } from '../ProTable';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import { instanceRegistry as dialogInstanceRegistry } from './instanceRegistry';
@@ -26,7 +26,7 @@ interface InternalDialogProps<TValues, T> extends ProDialogProps<TValues, T> {
   onInstanceReady?: (instance: ProDialogInstance<TValues, T>) => void;
 }
 
-const InternalDialog = <TValues extends Record<string, any>, T extends Record<string, any>>(
+const InternalDialog = <TValues extends Record<string, unknown>, T extends Record<string, unknown>>(
   props: InternalDialogProps<TValues, T>,
 ) => {
   const { defaultOptions, onInstanceReady, ...restProps } = props;
@@ -35,7 +35,10 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
   const [dynamicConfig, setDynamicConfig] = useState<OpenDialogParams<TValues>>({});
 
   // 合并默认配置、组件属性配置和动态配置
-  const mergedProps = deepMerge(deepMerge(defaultOptions || {}, restProps), dynamicConfig);
+  const mergedProps = deepMerge(
+    deepMerge(defaultOptions || ({} as Record<string, unknown>), restProps as unknown as Record<string, unknown>),
+    dynamicConfig as unknown as Record<string, unknown>,
+  ) as unknown as UseProDialogOptions<TValues, T>;
 
   const {
     // 基础配置
@@ -75,7 +78,6 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
     onVisibleChange,
     onOk,
     onCancel,
-    onClose,
     escToExit = true,
     mountOnEnter = true,
     unmountOnExit = false,
@@ -93,8 +95,6 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
     confirmTitle = '确认关闭',
     confirmContent = '确定要关闭弹窗吗？未保存的数据将丢失。',
     isEditing,
-    draggable = false,
-    resizable = false,
     // 表单配置
     schemas,
     formProps,
@@ -252,8 +252,11 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
       setLoading: (loading) => setState((prev) => ({ ...prev, contentLoading: loading })),
       getFormInstance: () => formRef.current || undefined,
       getTableAction: () => tableActionRef.current || undefined,
-      update: (config) => {
-        setDynamicConfig((prev) => deepMerge(prev, config as any));
+      update: (config: Partial<ProDialogProps<TValues, T>>) => {
+        setDynamicConfig(
+          (prev) =>
+            deepMerge(prev as Record<string, unknown>, config as Record<string, unknown>) as OpenDialogParams<TValues>,
+        );
         if (config.title !== undefined) {
           setState((prev) => ({ ...prev, title: config.title }));
         }
@@ -266,27 +269,30 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
         handleDestroy();
       },
 
-      // 表单快捷操作方法
-      setFormValues: (values) => formRef.current?.setFieldsValue(values),
-      getFormValues: (nameList) => (formRef.current?.getFieldsValue(nameList) as TValues) || ({} as TValues),
-      setFormFieldValue: (name, value) => formRef.current?.setFieldValue(name, value),
-      getFormFieldValue: (name) => formRef.current?.getFieldValue(name),
-      resetForm: (nameList) => formRef.current?.resetFields(nameList),
-      validateForm: () => (formRef.current?.validate() as Promise<TValues>) || Promise.resolve({} as TValues),
-      clearFormValidate: (name) => formRef.current?.clearValidate(name),
-      setFormProps: (props) => formRef.current?.setProps(props),
-      setFormSchemas: (newSchemas) => formRef.current?.setSchemas(newSchemas),
-      submitForm: () => (formRef.current?.submit() as unknown as Promise<void>) || Promise.resolve(),
+      setFormValues: (values: Partial<TValues>) => formRef.current?.setFieldsValue(values),
+      getFormValues: (nameList?: string[]): TValues =>
+        (formRef.current?.getFieldsValue(nameList) as TValues) || ({} as TValues),
+      setFormFieldValue: <K extends keyof TValues>(name: K, value: TValues[K]) =>
+        formRef.current?.setFieldValue(name, value),
+      getFormFieldValue: <K extends keyof TValues>(name: K) => formRef.current?.getFieldValue(name),
+      resetForm: (nameList?: string[]) => formRef.current?.resetFields(nameList),
+      validateForm: (): Promise<TValues> =>
+        (formRef.current?.validate() as Promise<TValues>) || Promise.resolve({} as TValues),
+      clearFormValidate: (name?: string | string[]) => formRef.current?.clearValidate(name),
+      setFormProps: (props: Partial<import('../ProForm/types').ProFormProps<TValues>>) =>
+        formRef.current?.setProps(props),
+      setFormSchemas: (newSchemas: import('../ProForm/types').ProFormSchema<TValues>[]) =>
+        formRef.current?.setSchemas(newSchemas),
+      submitForm: (): Promise<void> => (formRef.current?.submit() as unknown as Promise<void>) || Promise.resolve(),
 
-      // 表格快捷操作方法
-      reloadTable: (resetPageIndex) => tableActionRef.current?.reload(resetPageIndex),
+      reloadTable: (resetPageIndex?: boolean) => tableActionRef.current?.reload(resetPageIndex),
       reloadAndRestTable: () => tableActionRef.current?.reloadAndRest(),
       resetTable: () => tableActionRef.current?.reset(),
       clearTableSelection: () => tableActionRef.current?.clearSelected(),
-      setTableSelectedRows: (rows) => tableActionRef.current?.setSelectedRows(rows),
-      setTableSelectedRowKeys: (keys) => tableActionRef.current?.setSelectedRowKeys(keys),
-      getTableSelectedRows: () => tableActionRef.current?.getSelectedRows() || [],
-      getTableSelectedRowKeys: () => tableActionRef.current?.getSelectedRowKeys() || [],
+      setTableSelectedRows: (rows: T[]) => tableActionRef.current?.setSelectedRows(rows),
+      setTableSelectedRowKeys: (keys: (string | number)[]) => tableActionRef.current?.setSelectedRowKeys(keys),
+      getTableSelectedRows: (): T[] => (tableActionRef.current?.getSelectedRows() as T[]) || ([] as T[]),
+      getTableSelectedRowKeys: (): (string | number)[] => tableActionRef.current?.getSelectedRowKeys() || [],
       getTablePagination: () =>
         tableActionRef.current?.getPagination() || {
           current: 1,
@@ -317,18 +323,18 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
       setConfirmLoading: (loading) => setState((prev) => ({ ...prev, confirmLoading: loading })),
       setConfirmDisabled: (disabled) => setState((prev) => ({ ...prev, confirmDisabled: disabled })),
       setLoading: (loading) => setState((prev) => ({ ...prev, contentLoading: loading })),
-      confirm: (config) =>
-        new Promise((resolve) => {
+      confirm: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) =>
+        new Promise<boolean>((resolve) => {
           Modal.confirm({
             ...config,
             onOk: () => resolve(true),
             onCancel: () => resolve(false),
-          } as any);
+          } as ConfirmProps);
         }),
-      info: (config) => Modal.info(config as any),
-      success: (config) => Modal.success(config as any),
-      warning: (config) => Modal.warning(config as any),
-      error: (config) => Modal.error(config as any),
+      info: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
+      success: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
+      warning: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),
+      error: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.error(config as ConfirmProps),
     }),
     [handleOpen, handleClose],
   );
@@ -484,15 +490,13 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
       const context = createButtonContext();
 
       buttons.forEach((btn) => {
-        // 处理 visible
-        const isVisible = typeof btn.visible === 'function' ? (btn.visible as any)(context) : btn.visible !== false;
+        const isVisible = typeof btn.visible === 'function' ? btn.visible(context) : btn.visible !== false;
 
         if (!isVisible) {
           return;
         }
 
-        // 处理 disabled
-        const isDisabled = typeof btn.disabled === 'function' ? (btn.disabled as any)(context) : !!btn.disabled;
+        const isDisabled = typeof btn.disabled === 'function' ? btn.disabled(context) : !!btn.disabled;
 
         buttonList.push(
           <Button
@@ -512,8 +516,9 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
       // 默认按钮组
       // 额外按钮
       extraButtons.forEach((btn) => {
+        const btnContext = createButtonContext();
         const disabledVal =
-          typeof btn.disabled === 'function' ? (btn.disabled as any)(createButtonContext()) : !!btn.disabled;
+          typeof btn.disabled === 'function' ? btn.disabled(btnContext as DialogButtonContext) : !!btn.disabled;
         buttonList.push(
           <Button
             key={btn.key}
@@ -521,7 +526,7 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
             status={btn.status}
             loading={btn.loading}
             disabled={disabledVal}
-            onClick={() => (btn.onClick as any)?.(createButtonContext())}
+            onClick={() => btn.onClick?.(btnContext as DialogButtonContext)}
             {...btn.props}
           >
             {btn.text}
@@ -582,12 +587,11 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
   };
 
   // 计算表单初始值 - 合并默认 initialValues 和动态 data
-  const computedInitialValues: Partial<TValues> = useMemo(
-    () =>
-      ({
-        ...(initialValues as any),
-        ...(dynamicConfig.data as any),
-      }) as Partial<TValues>,
+  const computedInitialValues = useMemo(
+    () => ({
+      ...(initialValues as Partial<TValues>),
+      ...(dynamicConfig.data as Partial<TValues>),
+    }),
     [initialValues, dynamicConfig.data],
   );
 
@@ -596,16 +600,20 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
     if (schemas) {
       const body = (
         <ProForm
-          ref={formRef}
-          schemas={schemas}
+          ref={formRef as unknown as React.RefObject<ProFormInstance<Record<string, unknown>>>}
+          schemas={schemas as unknown as ProFormSchema<Record<string, unknown>>[]}
           initialValues={computedInitialValues}
-          onValuesChange={onValuesChange}
+          onValuesChange={
+            onValuesChange as
+              | ((changedValues: Partial<Record<string, unknown>>, allValues: Record<string, unknown>) => void)
+              | undefined
+          }
           showButton={false}
-          {...formProps}
+          {...((formProps as Record<string, unknown>) || {})}
           labelCol={formProps?.labelCol || (formProps?.layout === 'horizontal' ? { span: 4 } : undefined)}
           wrapperCol={formProps?.wrapperCol || (formProps?.layout === 'horizontal' ? { span: 20 } : undefined)}
         />
-      );
+      ) as React.ReactElement;
       return (
         <div style={{ position: 'relative' }}>
           {body}
@@ -678,43 +686,40 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
     );
   };
 
-  // 渲染弹窗
   if (mode === 'drawer') {
     return (
       <Drawer
-        {...({
-          visible,
-          title: renderTitle(),
-          footer: renderFooter(),
-          closable,
-          closeIcon,
-          mask,
-          maskClosable,
-          maskStyle,
-          style: {
-            ...style,
-            maxWidth: '100vw',
-            maxHeight: '100vh',
-          },
-          className,
-          bodyStyle,
-          headerStyle,
-          escToExit,
-          mountOnEnter,
-          unmountOnExit,
-          focusLock,
-          autoFocus,
-          getPopupContainer,
-          getChildrenPopupContainer,
-          afterOpen,
-          afterClose,
-          onCancel: handleClose,
-          confirmLoading: state.confirmLoading,
-          width: finalWidth,
-          height: finalHeight,
-          placement,
-          zIndex,
-        } as any)}
+        visible={visible}
+        title={renderTitle()}
+        footer={renderFooter()}
+        closable={closable}
+        closeIcon={closeIcon}
+        mask={mask}
+        maskClosable={maskClosable}
+        maskStyle={maskStyle}
+        style={{
+          ...style,
+          maxWidth: '100vw',
+          maxHeight: '100vh',
+        }}
+        className={className}
+        bodyStyle={bodyStyle}
+        headerStyle={headerStyle}
+        escToExit={escToExit}
+        mountOnEnter={mountOnEnter}
+        unmountOnExit={unmountOnExit}
+        focusLock={focusLock}
+        autoFocus={autoFocus}
+        getPopupContainer={getPopupContainer}
+        getChildrenPopupContainer={getChildrenPopupContainer}
+        afterOpen={afterOpen}
+        afterClose={afterClose}
+        onCancel={handleClose}
+        confirmLoading={state.confirmLoading}
+        width={finalWidth}
+        height={finalHeight}
+        placement={placement}
+        zIndex={zIndex}
       >
         {renderContent()}
       </Drawer>
@@ -723,40 +728,38 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
 
   return (
     <Modal
-      {...({
-        visible,
-        title: renderTitle(),
-        footer: renderFooter(),
-        closable,
-        closeIcon,
-        mask,
-        maskClosable,
-        maskStyle,
-        style: {
-          ...style,
-          maxWidth: '100vw',
-          maxHeight: '100vh',
-        },
-        className,
-        wrapStyle,
-        wrapClassName,
-        escToExit,
-        mountOnEnter,
-        unmountOnExit,
-        focusLock,
-        autoFocus,
-        getPopupContainer,
-        getChildrenPopupContainer,
-        afterOpen,
-        afterClose,
-        onCancel: handleClose,
-        confirmLoading: state.confirmLoading,
+      visible={visible}
+      title={renderTitle()}
+      footer={renderFooter()}
+      closable={closable}
+      closeIcon={closeIcon}
+      mask={mask}
+      maskClosable={maskClosable}
+      maskStyle={maskStyle}
+      style={{
+        ...style,
+        maxWidth: '100vw',
+        maxHeight: '100vh',
         width: finalWidth,
-        simple,
-        alignCenter,
-        modalRender: dialogRender as any,
-        onOk: handleOk,
-      } as any)}
+      }}
+      className={className}
+      wrapStyle={wrapStyle}
+      wrapClassName={wrapClassName}
+      escToExit={escToExit}
+      mountOnEnter={mountOnEnter}
+      unmountOnExit={unmountOnExit}
+      focusLock={focusLock}
+      autoFocus={autoFocus}
+      getPopupContainer={getPopupContainer}
+      getChildrenPopupContainer={getChildrenPopupContainer}
+      afterOpen={afterOpen}
+      afterClose={afterClose}
+      onCancel={handleClose}
+      confirmLoading={state.confirmLoading}
+      simple={simple}
+      alignCenter={alignCenter}
+      modalRender={dialogRender}
+      onOk={handleOk}
     >
       {bodyStyle ? <div style={bodyStyle}>{renderContent()}</div> : renderContent()}
     </Modal>
@@ -787,8 +790,8 @@ const InternalDialog = <TValues extends Record<string, any>, T extends Record<st
  * ```
  */
 export function useProDialog<
-  TValues extends Record<string, any> = Record<string, any>,
-  T extends Record<string, any> = Record<string, any>,
+  TValues extends Record<string, unknown> = Record<string, unknown>,
+  T extends Record<string, unknown> = Record<string, unknown>,
 >(options: UseProDialogOptions<TValues, T> = {}): UseProDialogReturn<TValues, T> {
   const { name, fullscreen: fullscreenProp, ...dialogProps } = options;
 
@@ -816,7 +819,7 @@ export function useProDialog<
             instance.open(params);
             setVisible(true);
             if (name) {
-              dialogInstanceRegistry.register(name, instance);
+              dialogInstanceRegistry.register(name, instance as ProDialogInstance);
             }
           }}
         />,
@@ -885,14 +888,14 @@ export function useProDialog<
       setFullscreenState(fs);
       dialogRef.current?.update({ fullscreen: fs });
     },
-    dialogInstance: dialogRef.current!,
+    dialogInstance: dialogRef.current ?? ({} as ProDialogInstance<TValues, T>),
     dialogProps: {
       ...dialogProps,
       fullscreen,
       visible: false,
       onVisibleChange: () => {},
     },
-    dialog: dialogRef.current!,
+    dialog: dialogRef.current ?? ({} as ProDialogInstance<TValues, T>),
     form: dialogRef.current?.getFormInstance(),
     table: dialogRef.current?.getTableAction(),
   };

@@ -12,7 +12,7 @@ ProDialog
 │
 ├── 内容类型
 │   ├── 自定义内容 - 通过 children 传入任意 ReactNode
-│   ├── 表单模式 - 传入 schemas 自动渲染 ProFormN
+│   ├── 表单模式 - 传入 schemas 自动渲染 ProForm
 │   └── 表格模式 - 传入 columns + request 自动渲染 ProTable
 │
 ├── 实例管理

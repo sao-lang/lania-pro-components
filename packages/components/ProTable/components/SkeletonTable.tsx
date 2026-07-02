@@ -5,7 +5,7 @@ import type { ProColumnType } from '../types';
 /**
  * 骨架屏表格属性
  */
-export interface SkeletonTableProps<T = any> {
+export interface SkeletonTableProps<T = Record<string, unknown>> {
   /** 列配置 */
   columns: ProColumnType<T>[];
   /** 行数 */
@@ -77,7 +77,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
         acc[`skeleton_${colIndex}`] = '';
         return acc;
       },
-      {} as Record<string, any>,
+      {} as Record<string, string>,
     ),
   }));
 

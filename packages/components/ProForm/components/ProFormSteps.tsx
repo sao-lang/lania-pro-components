@@ -1,7 +1,7 @@
 import React, { FC, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Steps, Button, Space } from '@arco-design/web-react';
 import { ProForm } from '../index';
-import { useFormStore } from '../useProForm';
+import { useProFormContext } from '../useProForm';
 import type { ProFormStepsProps, ProFormStepsInstance } from './types';
 
 const { Step } = Steps;
@@ -28,7 +28,7 @@ const ProFormStepsComponent = () => {
       ref,
     ) => {
       const [innerCurrent, setInnerCurrent] = useState(defaultCurrent);
-      const formStore = useFormStore();
+      const { formStore } = useProFormContext();
 
       const isControlled = typeof controlledCurrent !== 'undefined';
       const current = isControlled ? controlledCurrent : innerCurrent;

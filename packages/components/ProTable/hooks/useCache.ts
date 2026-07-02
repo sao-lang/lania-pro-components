@@ -25,7 +25,7 @@ interface CacheEntry<T> {
 /**
  * 缓存存储
  */
-class CacheStorage<T = any> {
+class CacheStorage<T = Record<string, unknown>> {
   private cache: Map<string, CacheEntry<T>>;
   private maxAge: number;
   private maxSize: number;
@@ -183,7 +183,7 @@ class CacheStorage<T = any> {
 /**
  * 缓存 Hook 返回类型
  */
-export interface UseCacheReturn<T = any> {
+export interface UseCacheReturn<T = Record<string, unknown>> {
   /** 获取缓存数据 */
   getCache: (params: Record<string, unknown> | string) => T | null;
   /** 设置缓存数据 */
@@ -223,7 +223,7 @@ export interface UseCacheReturn<T = any> {
  * setCache(params, data);
  * ```
  */
-export function useCache<T = any>(config?: CacheConfig): UseCacheReturn<T> {
+export function useCache<T = Record<string, unknown>>(config?: CacheConfig): UseCacheReturn<T> {
   // 使用 ref 保持缓存实例的稳定性
   const cacheRef = useRef<CacheStorage<T>>(new CacheStorage<T>(config));
 
@@ -278,16 +278,16 @@ export function useCache<T = any>(config?: CacheConfig): UseCacheReturn<T> {
 /**
  * 创建全局缓存实例
  */
-const globalCacheMap = new Map<string, CacheStorage<any>>();
+const globalCacheMap = new Map<string, CacheStorage<Record<string, unknown>>>();
 
 /**
  * 获取或创建全局缓存实例
  */
-export function getGlobalCache<T = any>(key: string, config?: CacheConfig): CacheStorage<T> {
+export function getGlobalCache<T = Record<string, unknown>>(key: string, config?: CacheConfig): CacheStorage<T> {
   if (!globalCacheMap.has(key)) {
-    globalCacheMap.set(key, new CacheStorage<T>(config));
+    globalCacheMap.set(key, new CacheStorage<Record<string, unknown>>(config));
   }
-  return globalCacheMap.get(key)!;
+  return globalCacheMap.get(key) as CacheStorage<T>;
 }
 
 /**

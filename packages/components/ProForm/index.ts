@@ -33,7 +33,7 @@ export { ProForm } from './ProForm';
 export { FormField } from './FormField';
 
 // Hook
-export { useProForm, useFormStore, ProFormContext } from './useProForm';
+export { useProForm, useProFormContext, ProFormContext } from './useProForm';
 
 // Provider
 export { ProFormProvider } from './ProFormProvider';
@@ -70,9 +70,6 @@ export {
   ValidationEngine,
   createValidationEngine,
 } from './core';
-
-// 实例注册表
-export { instanceRegistry, getProFormInstance } from './registry/instanceRegistry';
 
 // 响应式系统
 export {

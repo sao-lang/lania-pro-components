@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Space, Button, Dropdown, Menu } from '@arco-design/web-react';
 import {
   IconPlus,
@@ -13,7 +13,6 @@ import {
 import { ProDialog } from '../../ProDialog';
 import type { ProTableActionType } from '../types';
 import type { OprActionButtonConfig, ToolbarActionButtonConfig, ProTableNEventHandlers } from '../types-action-button';
-import type { ProFormSchema } from '../../ProFormN/types';
 
 const { Item: MenuItem } = Menu;
 
@@ -116,14 +115,13 @@ const renderAddButton = (
  */
 const renderEditButton = (
   config: Extract<OprActionButtonConfig, { type: 'edit' }>,
-  record: any,
+  record: Record<string, unknown>,
   handlers: ProTableNEventHandlers,
   action: ProTableActionType,
   refreshTable: () => void,
 ) => {
   const handleClick = () => {
-    // 处理数据映射
-    let initialValues = record;
+    let initialValues: Record<string, unknown> = record;
     if (config.dataMap) {
       initialValues = {};
       Object.entries(config.dataMap).forEach(([formField, dataField]) => {
@@ -131,7 +129,8 @@ const renderEditButton = (
       });
     }
 
-    const id = record.id || record.key;
+    const id = ((record.id as string | number | undefined) || (record.key as string | number | undefined)) as
+      string | number;
 
     ProDialog.form({
       title: config.title || '编辑',
@@ -176,11 +175,11 @@ const renderEditButton = (
  */
 const renderViewButton = (
   config: Extract<OprActionButtonConfig, { type: 'view' }> & {
-    schemas?: any[];
+    schemas?: unknown[];
     dataMap?: Record<string, string>;
     formProps?: Record<string, unknown>;
   },
-  record: any,
+  record: Record<string, unknown>,
   handlers: ProTableNEventHandlers,
 ) => {
   const handleClick = () => {
@@ -188,8 +187,7 @@ const renderViewButton = (
       handlers.onView(record);
     }
 
-    // 处理数据映射
-    let initialValues = record;
+    let initialValues: Record<string, unknown> = record;
     if (config.dataMap) {
       initialValues = {};
       Object.entries(config.dataMap).forEach(([formField, dataField]) => {
@@ -245,13 +243,13 @@ const renderViewButton = (
  */
 const renderDeleteButton = (
   config: Extract<OprActionButtonConfig, { type: 'delete' }>,
-  record: any,
+  record: Record<string, unknown>,
   handlers: ProTableNEventHandlers,
   refreshTable: () => void,
 ) => {
   const handleClick = () => {
     const idField = config.idField || 'id';
-    const id = record[idField];
+    const id = record[idField] as string | number;
     const content =
       typeof config.confirmContent === 'function'
         ? config.confirmContent(record)
@@ -375,19 +373,17 @@ const renderImportButton = (
  */
 const renderJumpButton = (
   config: Extract<OprActionButtonConfig | ToolbarActionButtonConfig, { type: 'jump' }>,
-  record?: any,
+  record?: Record<string, unknown>,
 ) => {
   const handleClick = () => {
     let url = config.to;
 
-    // 处理路径参数
     if (config.paramsMap && record) {
       Object.entries(config.paramsMap).forEach(([param, field]) => {
-        url = url.replace(`{${param}}`, record[field] || '');
+        url = url.replace(`{${param}}`, String((record as Record<string, unknown>)[field] || ''));
       });
     } else if (record) {
-      // 自动替换 {id} 等常见参数
-      url = url.replace(/{(\w+)}/g, (match, key) => record[key] || match);
+      url = url.replace(/{(\w+)}/g, (match, key: string) => String((record as Record<string, unknown>)[key] || match));
     }
 
     if (config.target === '_blank') {
@@ -417,7 +413,7 @@ const renderJumpButton = (
  */
 const renderCustomButton = (
   config: Extract<OprActionButtonConfig | ToolbarActionButtonConfig, { type: 'custom' }>,
-  record: any,
+  record: Record<string, unknown>,
   index: number,
   action: ProTableActionType,
 ) => <React.Fragment key={config.key}>{config.render(record, index, action)}</React.Fragment>;
@@ -427,7 +423,7 @@ const renderCustomButton = (
  */
 const renderMoreButton = (
   config: Extract<OprActionButtonConfig | ToolbarActionButtonConfig, { type: 'more' }>,
-  record: any,
+  record: Record<string, unknown>,
   index: number,
   action: ProTableActionType,
   handlers: ProTableNEventHandlers,
@@ -478,7 +474,7 @@ const renderMoreButton = (
  */
 export const renderOprActionButton = (
   config: OprActionButtonConfig,
-  record: any,
+  record: Record<string, unknown>,
   index: number,
   action: ProTableActionType,
   handlers: ProTableNEventHandlers,
@@ -570,7 +566,7 @@ export const renderToolbarActionButton = (
  */
 export interface OprActionButtonsProps {
   actions: OprActionButtonConfig[];
-  record: any;
+  record: Record<string, unknown>;
   index: number;
   action: ProTableActionType;
   handlers: ProTableNEventHandlers;

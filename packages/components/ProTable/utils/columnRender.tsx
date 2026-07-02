@@ -12,20 +12,23 @@ import {
   Table,
   Empty,
 } from '@arco-design/web-react';
+import type { TableProps } from '@arco-design/web-react';
 import { IconCopy, IconLink, IconEye } from '@arco-design/web-react/icon';
 import dayjs from 'dayjs';
 import type { TableColumnProps } from '@arco-design/web-react';
 import type {
   ProColumnType,
   ProColumnValueType,
+  CellRendererValueType,
   DateFormatType,
   OprToolConfig,
-  ProTableProps,
   CustomCellRenderer,
   CustomRendererRegistry,
   ProTableNEventHandlers,
+  ProTableActionType,
 } from '../types';
 import { OprActionButtons } from '../features/ActionButtonRenderer';
+import type { OprActionButtonConfig } from '../types-action-button';
 
 const { Text } = Typography;
 
@@ -71,7 +74,7 @@ const fallbackCopyToClipboard = (text: string) => {
     } else {
       Message.error('复制失败');
     }
-  } catch (err) {
+  } catch {
     Message.error('复制失败');
   }
 
@@ -81,12 +84,16 @@ const fallbackCopyToClipboard = (text: string) => {
 /**
  * 获取嵌套对象的值
  */
-export const getNestedValue = (obj: any, path: string | string[]): any => {
+export const getNestedValue = (obj: Record<string, unknown>, path: string | string[]): unknown => {
   if (!obj) {
     return undefined;
   }
   const keys = Array.isArray(path) ? path : path.split('.');
-  return keys.reduce((acc, key) => (acc ? acc[key] : undefined), obj);
+  return keys.reduce(
+    (acc: unknown, key: string) =>
+      acc && typeof acc === 'object' && key in acc ? (acc as Record<string, unknown>)[key] : undefined,
+    obj,
+  );
 };
 
 /**
@@ -174,15 +181,42 @@ export const formatDate = (value: string | number | Date, format: DateFormatType
 /**
  * 获取空值显示文本
  */
-const getEmptyText = (column: ProColumnType): ReactNode => column.emptyText ?? '--';
+const getEmptyText = <T = Record<string, unknown>,>(column: ProColumnType<T>): ReactNode => column.emptyText ?? '--';
+
+/**
+ * 用复制图标包裹内容
+ */
+const wrapWithCopy = <T = Record<string, unknown>,>(
+  content: ReactNode,
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
+): ReactNode => {
+  const { copyable, copyText } = column;
+  if (!copyable || !text) {
+    return content;
+  }
+
+  const handleCopy = () => {
+    const copyContent = copyText && record ? copyText(text, record) : String(text);
+    copyToClipboard(copyContent);
+  };
+
+  return (
+    <Space size={4} style={{ margin: 0, padding: 0 }}>
+      {content}
+      <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={handleCopy} />
+    </Space>
+  );
+};
 
 /**
  * 渲染文本类型
  */
-const renderText = (text: any, column: ProColumnType): ReactNode => {
-  const { ellipsis, copyable } = column;
+const renderText = (text: unknown, column: ProColumnType): ReactNode => {
+  const { ellipsis } = column;
   const emptyText = getEmptyText(column);
-  let content: ReactNode = text ?? emptyText;
+  let content: ReactNode = text !== null && text !== undefined ? (text as ReactNode) : emptyText;
 
   if (ellipsis) {
     content = (
@@ -194,22 +228,13 @@ const renderText = (text: any, column: ProColumnType): ReactNode => {
     );
   }
 
-  if (copyable && text) {
-    content = (
-      <Space size={4} style={{ margin: 0, padding: 0 }}>
-        {content}
-        <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={() => copyToClipboard(String(text))} />
-      </Space>
-    );
-  }
-
   return content;
 };
 
 /**
  * 渲染数字类型
  */
-const renderNumber = (text: any, column: ProColumnType): ReactNode => {
+const renderNumber = (text: unknown, column: ProColumnType): ReactNode => {
   const { precision = 0, thousandsSeparator = true } = column;
   const emptyText = getEmptyText(column);
 
@@ -217,13 +242,13 @@ const renderNumber = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  return formatNumber(text, { precision, thousandsSeparator });
+  return formatNumber(text as string | number, { precision, thousandsSeparator });
 };
 
 /**
  * 渲染货币类型
  */
-const renderMoney = (text: any, column: ProColumnType): ReactNode => {
+const renderMoney = (text: unknown, column: ProColumnType): ReactNode => {
   const { moneySymbol = '¥', precision = 2, thousandsSeparator = true } = column;
   const emptyText = getEmptyText(column);
 
@@ -233,7 +258,7 @@ const renderMoney = (text: any, column: ProColumnType): ReactNode => {
 
   return (
     <Text style={{ fontFamily: 'monospace', margin: 0, padding: 0 }}>
-      {formatMoney(text, moneySymbol, { precision, thousandsSeparator })}
+      {formatMoney(text as string | number, moneySymbol, { precision, thousandsSeparator })}
     </Text>
   );
 };
@@ -241,7 +266,7 @@ const renderMoney = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染百分比类型
  */
-const renderPercent = (text: any, column: ProColumnType): ReactNode => {
+const renderPercent = (text: unknown, column: ProColumnType): ReactNode => {
   const { precision = 2 } = column;
   const emptyText = getEmptyText(column);
 
@@ -249,7 +274,7 @@ const renderPercent = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  const num = typeof text === 'string' ? parseFloat(text) : text;
+  const num = typeof text === 'string' ? parseFloat(text) : (text as number);
   let color: string | undefined;
 
   if (num > 0) {
@@ -259,39 +284,32 @@ const renderPercent = (text: any, column: ProColumnType): ReactNode => {
   }
 
   return (
-    <Text style={{ color, fontFamily: 'monospace', margin: 0, padding: 0 }}>{formatPercent(text, { precision })}</Text>
+    <Text style={{ color, fontFamily: 'monospace', margin: 0, padding: 0 }}>
+      {formatPercent(text as string | number, { precision })}
+    </Text>
   );
 };
 
 /**
  * 渲染日期类型
  */
-const renderDate = (text: any, column: ProColumnType): ReactNode => {
-  const { dateFormat = 'YYYY-MM-DD', ellipsis, copyable } = column;
+const renderDate = (text: unknown, column: ProColumnType): ReactNode => {
+  const { dateFormat = 'YYYY-MM-DD', ellipsis } = column;
   const emptyText = getEmptyText(column);
 
   if (!text) {
     return emptyText;
   }
 
-  let content: ReactNode = formatDate(text, dateFormat);
+  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
 
   if (ellipsis) {
     content = (
-      <Tooltip content={formatDate(text, dateFormat)}>
+      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
         <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
           {content}
         </Text>
       </Tooltip>
-    );
-  }
-
-  if (copyable && text) {
-    content = (
-      <Space size={4} style={{ margin: 0, padding: 0 }}>
-        {content}
-        <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={() => copyToClipboard(String(text))} />
-      </Space>
     );
   }
 
@@ -301,32 +319,23 @@ const renderDate = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染日期时间类型
  */
-const renderDateTime = (text: any, column: ProColumnType): ReactNode => {
-  const { dateFormat = 'YYYY-MM-DD HH:mm:ss', ellipsis, copyable } = column;
+const renderDateTime = (text: unknown, column: ProColumnType): ReactNode => {
+  const { dateFormat = 'YYYY-MM-DD HH:mm:ss', ellipsis } = column;
   const emptyText = getEmptyText(column);
 
   if (!text) {
     return emptyText;
   }
 
-  let content: ReactNode = formatDate(text, dateFormat);
+  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
 
   if (ellipsis) {
     content = (
-      <Tooltip content={formatDate(text, dateFormat)}>
+      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
         <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
           {content}
         </Text>
       </Tooltip>
-    );
-  }
-
-  if (copyable && text) {
-    content = (
-      <Space size={4} style={{ margin: 0, padding: 0 }}>
-        {content}
-        <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={() => copyToClipboard(String(text))} />
-      </Space>
     );
   }
 
@@ -336,32 +345,23 @@ const renderDateTime = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染时间类型
  */
-const renderTime = (text: any, column: ProColumnType): ReactNode => {
-  const { dateFormat = 'HH:mm:ss', ellipsis, copyable } = column;
+const renderTime = (text: unknown, column: ProColumnType): ReactNode => {
+  const { dateFormat = 'HH:mm:ss', ellipsis } = column;
   const emptyText = getEmptyText(column);
 
   if (!text) {
     return emptyText;
   }
 
-  let content: ReactNode = formatDate(text, dateFormat);
+  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
 
   if (ellipsis) {
     content = (
-      <Tooltip content={formatDate(text, dateFormat)}>
+      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
         <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
           {content}
         </Text>
       </Tooltip>
-    );
-  }
-
-  if (copyable && text) {
-    content = (
-      <Space size={4} style={{ margin: 0, padding: 0 }}>
-        {content}
-        <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={() => copyToClipboard(String(text))} />
-      </Space>
     );
   }
 
@@ -371,15 +371,15 @@ const renderTime = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染日期范围类型
  */
-const renderDateRange = (text: any, column: ProColumnType): ReactNode => {
-  const { dateFormat = 'YYYY-MM-DD', ellipsis, copyable } = column;
+const renderDateRange = (text: unknown, column: ProColumnType): ReactNode => {
+  const { dateFormat = 'YYYY-MM-DD', ellipsis } = column;
   const emptyText = getEmptyText(column);
 
   if (!Array.isArray(text) || text.length < 2) {
     return emptyText;
   }
 
-  let content: ReactNode = `${formatDate(text[0], dateFormat)} ~ ${formatDate(text[1], dateFormat)}`;
+  let content: ReactNode = `${formatDate(text[0] as string | number | Date, dateFormat)} ~ ${formatDate(text[1] as string | number | Date, dateFormat)}`;
 
   if (ellipsis) {
     content = (
@@ -391,22 +391,13 @@ const renderDateRange = (text: any, column: ProColumnType): ReactNode => {
     );
   }
 
-  if (copyable && text) {
-    content = (
-      <Space size={4} style={{ margin: 0, padding: 0 }}>
-        {content}
-        <IconCopy style={{ cursor: 'pointer', color: '#86909c' }} onClick={() => copyToClipboard(String(content))} />
-      </Space>
-    );
-  }
-
   return content;
 };
 
 /**
  * 渲染日期时间范围类型
  */
-const renderDateTimeRange = (text: any, column: ProColumnType): ReactNode => {
+const renderDateTimeRange = (text: unknown, column: ProColumnType): ReactNode => {
   const { dateFormat = 'YYYY-MM-DD HH:mm:ss', ellipsis, copyable } = column;
   const emptyText = getEmptyText(column);
 
@@ -414,7 +405,7 @@ const renderDateTimeRange = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  let content: ReactNode = `${formatDate(text[0], dateFormat)} ~ ${formatDate(text[1], dateFormat)}`;
+  let content: ReactNode = `${formatDate(text[0] as string | number | Date, dateFormat)} ~ ${formatDate(text[1] as string | number | Date, dateFormat)}`;
 
   if (ellipsis) {
     content = (
@@ -441,19 +432,19 @@ const renderDateTimeRange = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染选择类型
  */
-const renderSelect = (text: any, column: ProColumnType): ReactNode => {
+const renderSelect = (text: unknown, column: ProColumnType): ReactNode => {
   const { valueEnum } = column;
   const emptyText = getEmptyText(column);
 
   if (valueEnum) {
-    const config = valueEnum[text];
+    const config = valueEnum[text as string | number];
     if (!config) {
-      return text ?? emptyText;
+      return text !== null && text !== undefined ? (text as ReactNode) : emptyText;
     }
     return <span style={{ color: config.color }}>{config.text}</span>;
   }
 
-  return text ?? emptyText;
+  return text !== null && text !== undefined ? (text as ReactNode) : emptyText;
 };
 
 /**
@@ -521,12 +512,12 @@ const getTagColor = (colorOrStatus?: string): string | undefined => {
 /**
  * 渲染标签类型
  */
-const renderTag = (text: any, column: ProColumnType): ReactNode => {
+const renderTag = (text: unknown, column: ProColumnType): ReactNode => {
   const { valueEnum } = column;
   const emptyText = getEmptyText(column);
 
   if (valueEnum && text) {
-    const config = valueEnum[text];
+    const config = valueEnum[text as string | number];
     if (config) {
       const color = getTagColor(config.color || config.status);
       return <Tag color={color}>{config.text}</Tag>;
@@ -537,13 +528,13 @@ const renderTag = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  return <Tag>{text}</Tag>;
+  return <Tag>{text as ReactNode}</Tag>;
 };
 
 /**
  * 渲染头像类型
  */
-const renderAvatar = (text: any, column: ProColumnType): ReactNode => {
+const renderAvatar = (text: unknown, column: ProColumnType): ReactNode => {
   const { componentProps } = column;
   const [visible, setVisible] = useState(false);
   const emptyText = getEmptyText(column);
@@ -570,13 +561,13 @@ const renderAvatar = (text: any, column: ProColumnType): ReactNode => {
     );
   }
 
-  return <Avatar size={componentProps?.size || 32}>{text}</Avatar>;
+  return <Avatar size={componentProps?.size || 32}>{text as ReactNode}</Avatar>;
 };
 
 /**
  * 渲染图片类型
  */
-const renderImage = (text: any, column: ProColumnType): ReactNode => {
+const renderImage = (text: unknown, column: ProColumnType): ReactNode => {
   const { componentProps } = column;
   const [visible, setVisible] = useState(false);
   const emptyText = getEmptyText(column);
@@ -585,7 +576,10 @@ const renderImage = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  const src = typeof text === 'string' ? text : text?.url || text?.src;
+  const src =
+    typeof text === 'string'
+      ? text
+      : (text as { url?: string; src?: string })?.url || (text as { url?: string; src?: string })?.src;
 
   if (!src) {
     return emptyText;
@@ -653,7 +647,7 @@ const renderImage = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染链接类型
  */
-const renderLink = (text: any, column: ProColumnType): ReactNode => {
+const renderLink = (text: unknown, column: ProColumnType): ReactNode => {
   const { componentProps } = column;
   const emptyText = getEmptyText(column);
 
@@ -670,7 +664,7 @@ const renderLink = (text: any, column: ProColumnType): ReactNode => {
       rel='noopener noreferrer'
       style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
     >
-      {componentProps?.text || text}
+      {componentProps?.text || (text as ReactNode)}
       <IconLink />
     </a>
   );
@@ -679,7 +673,7 @@ const renderLink = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染进度条类型
  */
-const renderProgress = (text: any, column: ProColumnType): ReactNode => {
+const renderProgress = (text: unknown, column: ProColumnType): ReactNode => {
   const { componentProps } = column;
   const emptyText = getEmptyText(column);
 
@@ -687,21 +681,22 @@ const renderProgress = (text: any, column: ProColumnType): ReactNode => {
     return emptyText;
   }
 
-  const percent = typeof text === 'number' ? text : parseFloat(text);
+  const percent = typeof text === 'number' ? text : parseFloat(text as string);
 
   if (isNaN(percent)) {
     return emptyText;
   }
 
-  const { size: _size, ...restComponentProps } = componentProps || {};
+  const { size, ...restComponentProps } = componentProps || {};
+  const progressSize = typeof size === 'string' ? size : 'small';
 
-  return <Progress percent={Math.min(100, Math.max(0, percent))} size='small' {...restComponentProps} />;
+  return <Progress percent={Math.min(100, Math.max(0, percent))} size={progressSize} {...restComponentProps} />;
 };
 
 /**
  * 渲染代码类型
  */
-const renderCode = (text: any, column: ProColumnType): ReactNode => {
+const renderCode = (text: unknown, column: ProColumnType): ReactNode => {
   const emptyText = getEmptyText(column);
 
   if (!text) {
@@ -729,14 +724,14 @@ const renderCode = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染 JSON 类型
  */
-const renderJson = (text: any, column: ProColumnType): ReactNode => {
+const renderJson = (text: unknown, column: ProColumnType): ReactNode => {
   const emptyText = getEmptyText(column);
 
   if (!text) {
     return emptyText;
   }
 
-  const jsonStr = typeof text === 'object' ? JSON.stringify(text, null, 2) : text;
+  const jsonStr = typeof text === 'object' ? JSON.stringify(text, null, 2) : String(text);
 
   return (
     <Tooltip content={jsonStr}>
@@ -758,7 +753,7 @@ const renderJson = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染文本域类型
  */
-const renderTextarea = (text: any, column: ProColumnType): ReactNode => {
+const renderTextarea = (text: unknown, column: ProColumnType): ReactNode => {
   const { ellipsis } = column;
   const emptyText = getEmptyText(column);
 
@@ -770,7 +765,7 @@ const renderTextarea = (text: any, column: ProColumnType): ReactNode => {
     return (
       <Tooltip content={String(text)}>
         <Text ellipsis style={{ maxWidth: column.width || 300, margin: 0, padding: 0 }}>
-          {text}
+          {text as ReactNode}
         </Text>
       </Tooltip>
     );
@@ -785,7 +780,7 @@ const renderTextarea = (text: any, column: ProColumnType): ReactNode => {
         wordBreak: 'break-word',
       }}
     >
-      {text}
+      {text as ReactNode}
     </div>
   );
 };
@@ -793,46 +788,44 @@ const renderTextarea = (text: any, column: ProColumnType): ReactNode => {
 /**
  * 渲染操作按钮组类型
  */
-const renderOpr = (
-  text: any,
-  column: ProColumnType,
-  record?: any,
+const renderOpr = <T = Record<string, unknown>,>(
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
   index?: number,
-  action?: any,
-  handlers?: ProTableNEventHandlers,
+  action?: ProTableActionType<T>,
+  handlers?: ProTableNEventHandlers<T>,
   refreshTable?: () => void,
 ): ReactNode => {
   const { oprTools, actions } = column;
 
-  // 优先使用新的 actions 配置
   if (actions?.length) {
     return (
       <OprActionButtons
-        actions={actions}
-        record={record}
+        actions={actions as OprActionButtonConfig[]}
+        record={record as Record<string, unknown>}
         index={index ?? 0}
-        action={action}
-        handlers={handlers || {}}
+        action={action as ProTableActionType<Record<string, unknown>>}
+        handlers={(handlers as ProTableNEventHandlers<Record<string, unknown>>) || {}}
         refreshTable={refreshTable || (() => action?.reload())}
       />
     );
   }
 
-  // 兼容旧的 oprTools 配置
   if (!oprTools?.length) {
     return null;
   }
 
   return (
     <Space size={8} style={{ margin: 0, padding: 0 }}>
-      {oprTools.map((tool: OprToolConfig) => {
-        const visible = typeof tool.visible === 'function' ? tool.visible(record) : tool.visible !== false;
+      {oprTools.map((tool: OprToolConfig<T>) => {
+        const visible = typeof tool.visible === 'function' && record ? tool.visible(record) : tool.visible !== false;
 
         if (!visible) {
           return null;
         }
 
-        const disabled = typeof tool.disabled === 'function' ? tool.disabled(record) : tool.disabled === true;
+        const disabled = typeof tool.disabled === 'function' && record ? tool.disabled(record) : tool.disabled === true;
 
         return (
           <Button
@@ -841,7 +834,9 @@ const renderOpr = (
             type={tool.type || 'text'}
             status={tool.status}
             disabled={disabled}
-            onClick={() => tool.onClick?.(record, index ?? 0, action)}
+            onClick={() =>
+              record && tool.onClick?.(record, index ?? 0, action as ProTableActionType<Record<string, unknown>>)
+            }
           >
             {tool.text}
           </Button>
@@ -854,7 +849,11 @@ const renderOpr = (
 /**
  * 渲染子表格类型
  */
-const renderProTable = (text: any, column: ProColumnType, record?: any): ReactNode => {
+const renderProTable = <T = Record<string, unknown>,>(
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
+): ReactNode => {
   const { proTableConfig } = column;
   const emptyText = getEmptyText(column);
 
@@ -866,7 +865,7 @@ const renderProTable = (text: any, column: ProColumnType, record?: any): ReactNo
     columns,
     dataSource,
     dataPath,
-    tableProps = {},
+    tableProps,
     title,
     bordered = true,
     size = 'small',
@@ -874,46 +873,60 @@ const renderProTable = (text: any, column: ProColumnType, record?: any): ReactNo
     emptyText: tableEmptyText = '暂无数据',
   } = proTableConfig;
 
-  let subTableData: any[] = [];
+  let subTableData: unknown[] = [];
   if (dataPath) {
-    subTableData = getNestedValue(record, dataPath) || [];
+    const nestedValue = getNestedValue(record as Record<string, unknown>, dataPath);
+    subTableData = Array.isArray(nestedValue) ? nestedValue : [];
   } else if (typeof dataSource === 'function') {
-    subTableData = dataSource(record) || [];
+    const result = record !== undefined ? dataSource(record) : undefined;
+    subTableData = Array.isArray(result) ? result : [];
   } else if (Array.isArray(dataSource)) {
     subTableData = dataSource;
   } else if (Array.isArray(text)) {
     subTableData = text;
   }
 
-  const tableColumns: TableColumnProps<any>[] = columns.map((col) => ({
-    title: col.title,
-    dataIndex: Array.isArray(col.dataIndex) ? col.dataIndex.join('.') : col.dataIndex,
-    key: col.key || (Array.isArray(col.dataIndex) ? col.dataIndex.join('.') : col.dataIndex),
-    width: col.width,
-    align: col.align,
-    fixed: col.fixed,
-    ellipsis: col.ellipsis,
-    render: (value: any, row: any, idx: number) => {
-      if (col.render) {
-        return col.render(value, row, idx, {} as any, col);
-      }
-      return value ?? col.emptyText ?? '-';
-    },
-  }));
+  const tableColumns: TableColumnProps<unknown>[] = columns.map((col, colIdx) => {
+    const dataIndexStr = Array.isArray(col.dataIndex) ? col.dataIndex.join('.') : col.dataIndex;
+    const colKey = typeof col.key === 'string' ? col.key : undefined;
+    return {
+      title: col.title,
+      dataIndex: dataIndexStr,
+      key: colKey || dataIndexStr || `col-${colIdx}`,
+      width: col.width,
+      align: col.align,
+      fixed: col.fixed,
+      ellipsis: col.ellipsis,
+      render: (value: unknown, row: unknown, idx: number) => {
+        if (col.render) {
+          return col.render(
+            value !== null && value !== undefined ? (value as ReactNode) : '-',
+            row as Record<string, unknown>,
+            idx,
+            {} as ProTableActionType<Record<string, unknown>>,
+            col,
+          );
+        }
+        return value !== null && value !== undefined ? (value as ReactNode) : (col.emptyText ?? '-');
+      },
+    };
+  });
 
-  const renderTitle = () => {
+  const renderTitle = (): ReactNode => {
     if (!title) {
       return null;
     }
-    if (typeof title === 'function') {
+    if (typeof title === 'function' && record) {
       return title(record);
     }
-    return title;
+    return title as ReactNode;
   };
+
+  const resolvedTitle = renderTitle();
 
   return (
     <div style={{ width: '100%' }}>
-      {title && <div style={{ marginBottom: 8, fontWeight: 500 }}>{renderTitle()}</div>}
+      {resolvedTitle && <div style={{ marginBottom: 8, fontWeight: 500 }}>{resolvedTitle}</div>}
       <Table
         columns={tableColumns}
         data={subTableData}
@@ -921,7 +934,7 @@ const renderProTable = (text: any, column: ProColumnType, record?: any): ReactNo
         size={size}
         pagination={pagination}
         noDataElement={<Empty description={tableEmptyText} />}
-        {...tableProps}
+        {...(tableProps as TableProps<unknown>)}
       />
     </div>
   );
@@ -930,7 +943,12 @@ const renderProTable = (text: any, column: ProColumnType, record?: any): ReactNo
 /**
  * 渲染序号类型
  */
-const renderIndex = (text: any, column: ProColumnType, record?: any, index?: number): ReactNode => {
+const renderIndex = <T = Record<string, unknown>,>(
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
+  index?: number,
+): ReactNode => {
   const { valueType } = column;
   const currentIndex = (index ?? 0) + 1;
 
@@ -969,12 +987,25 @@ const renderIndex = (text: any, column: ProColumnType, record?: any, index?: num
 };
 
 /**
- * 值类型渲染器映射
+ * 将 ProColumnValueType 转换为单元格渲染器类型
+ * radio/checkbox 映射到 select，switch 映射到 tag
  */
-const valueTypeRenderers: Record<
-  Exclude<ProColumnValueType, 'opr' | 'proTable'>,
-  (text: any, column: ProColumnType) => ReactNode
-> = {
+const toCellRendererType = (valueType: ProColumnValueType): CellRendererValueType => {
+  switch (valueType) {
+    case 'radio':
+    case 'checkbox':
+      return 'select';
+    case 'switch':
+      return 'tag';
+    default:
+      return valueType as CellRendererValueType;
+  }
+};
+
+/**
+ * 值类型渲染器映射 - 使用 CellRendererValueType 去除渲染层面重复的类型
+ */
+const valueTypeRenderers: Record<CellRendererValueType, (text: unknown, column: ProColumnType) => ReactNode> = {
   text: renderText,
   number: renderNumber,
   money: renderMoney,
@@ -985,9 +1016,6 @@ const valueTypeRenderers: Record<
   dateRange: renderDateRange,
   dateTimeRange: renderDateTimeRange,
   select: renderSelect,
-  radio: renderSelect,
-  checkbox: renderSelect,
-  switch: renderTag,
   tag: renderTag,
   avatar: renderAvatar,
   image: renderImage,
@@ -1106,7 +1134,7 @@ export const hasCellRenderer = (type: string): boolean => customRendererRegistry
 /**
  * 根据 valueType 格式化 tooltip 内容
  */
-const getTooltipContentByValueType = (text: any, column: ProColumnType): ReactNode => {
+const getTooltipContentByValueType = (text: unknown, column: ProColumnType): ReactNode => {
   const { valueType = 'text', valueEnum } = column;
 
   if (text === null || text === undefined || text === '') {
@@ -1116,39 +1144,39 @@ const getTooltipContentByValueType = (text: any, column: ProColumnType): ReactNo
   switch (valueType) {
     case 'number': {
       const { precision = 0, thousandsSeparator = true } = column;
-      return formatNumber(text, { precision, thousandsSeparator });
+      return formatNumber(text as string | number, { precision, thousandsSeparator });
     }
     case 'money': {
       const { moneySymbol = '¥', precision = 2, thousandsSeparator = true } = column;
-      return formatMoney(text, moneySymbol, { precision, thousandsSeparator });
+      return formatMoney(text as string | number, moneySymbol, { precision, thousandsSeparator });
     }
     case 'percent': {
       const { precision = 2 } = column;
-      return formatPercent(text, { precision });
+      return formatPercent(text as string | number, { precision });
     }
     case 'date': {
       const { dateFormat = 'YYYY-MM-DD' } = column;
-      return formatDate(text, dateFormat);
+      return formatDate(text as string | number | Date, dateFormat);
     }
     case 'dateTime': {
       const { dateFormat = 'YYYY-MM-DD HH:mm:ss' } = column;
-      return formatDate(text, dateFormat);
+      return formatDate(text as string | number | Date, dateFormat);
     }
     case 'time': {
       const { dateFormat = 'HH:mm:ss' } = column;
-      return formatDate(text, dateFormat);
+      return formatDate(text as string | number | Date, dateFormat);
     }
     case 'dateRange': {
       const { dateFormat = 'YYYY-MM-DD' } = column;
       if (Array.isArray(text) && text.length >= 2) {
-        return `${formatDate(text[0], dateFormat)} ~ ${formatDate(text[1], dateFormat)}`;
+        return `${formatDate(text[0] as string | number | Date, dateFormat)} ~ ${formatDate(text[1] as string | number | Date, dateFormat)}`;
       }
       break;
     }
     case 'dateTimeRange': {
       const { dateFormat = 'YYYY-MM-DD HH:mm:ss' } = column;
       if (Array.isArray(text) && text.length >= 2) {
-        return `${formatDate(text[0], dateFormat)} ~ ${formatDate(text[1], dateFormat)}`;
+        return `${formatDate(text[0] as string | number | Date, dateFormat)} ~ ${formatDate(text[1] as string | number | Date, dateFormat)}`;
       }
       break;
     }
@@ -1157,8 +1185,8 @@ const getTooltipContentByValueType = (text: any, column: ProColumnType): ReactNo
     case 'checkbox':
     case 'tag':
     case 'switch': {
-      if (valueEnum?.[text]) {
-        return valueEnum[text].text;
+      if (valueEnum?.[text as string | number]) {
+        return valueEnum[text as string | number].text;
       }
       break;
     }
@@ -1178,11 +1206,11 @@ const getTooltipContentByValueType = (text: any, column: ProColumnType): ReactNo
 /**
  * 为内容添加 tooltip 包装
  */
-const wrapWithTooltip = (
+const wrapWithTooltip = <T = Record<string, unknown>,>(
   content: ReactNode,
-  text: any,
-  column: ProColumnType,
-  record?: any,
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
   index?: number,
 ): ReactNode => {
   const { cellTooltip } = column;
@@ -1198,7 +1226,7 @@ const wrapWithTooltip = (
   } else if (typeof cellTooltip === 'string') {
     tooltipContent = cellTooltip;
   } else {
-    tooltipContent = getTooltipContentByValueType(text, column);
+    tooltipContent = getTooltipContentByValueType(text, column as ProColumnType);
   }
 
   return <Tooltip content={tooltipContent}>{content}</Tooltip>;
@@ -1207,13 +1235,13 @@ const wrapWithTooltip = (
 /**
  * 根据值类型渲染单元格内容
  */
-export const renderColumnByValueType = (
-  text: any,
-  column: ProColumnType,
-  record?: any,
+export const renderColumnByValueType = <T = Record<string, unknown>,>(
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
   index?: number,
-  action?: any,
-  handlers?: ProTableNEventHandlers,
+  action?: ProTableActionType<T>,
+  handlers?: ProTableNEventHandlers<T>,
   refreshTable?: () => void,
 ): ReactNode => {
   const { valueType = 'text' } = column;
@@ -1221,8 +1249,14 @@ export const renderColumnByValueType = (
   if (customRendererRegistry.has(valueType)) {
     const customRenderer = customRendererRegistry.get(valueType);
     if (customRenderer) {
-      const content = customRenderer(text, column, record, index, action);
-      return wrapWithTooltip(content, text, column, record, index);
+      const content = customRenderer(
+        text,
+        column as ProColumnType,
+        record as Record<string, unknown>,
+        index,
+        action as ProTableActionType,
+      );
+      return wrapWithTooltip(content, text, column as ProColumnType, record as Record<string, unknown>, index);
     }
   }
 
@@ -1240,41 +1274,42 @@ export const renderColumnByValueType = (
     return wrapWithTooltip(content, text, column, record, index);
   }
 
-  const renderer = valueTypeRenderers[valueType];
+  const renderer = valueTypeRenderers[toCellRendererType(valueType)];
 
   if (renderer) {
-    const content = renderer(text, column);
-    return wrapWithTooltip(content, text, column, record, index);
+    const content = renderer(text, column as ProColumnType);
+    return wrapWithTooltip(content, text, column as ProColumnType, record as Record<string, unknown>, index);
   }
 
-  const content = text ?? '-';
-  return wrapWithTooltip(content, text, column, record, index);
+  const content = text !== null && text !== undefined ? (text as ReactNode) : '-';
+  return wrapWithTooltip(content, text, column as ProColumnType, record as Record<string, unknown>, index);
 };
 
 /**
  * 生成列的渲染函数
  */
 export const createColumnRender =
-  <T extends Record<string, any>>(
+  <T extends Record<string, unknown>>(
     column: ProColumnType<T>,
-    action: any,
-    handlers?: ProTableNEventHandlers,
+    action: ProTableActionType<T>,
+    handlers?: ProTableNEventHandlers<T>,
     refreshTable?: () => void,
-  ): ((value: any, record: T, index: number) => ReactNode) =>
-  (value: any, record: T, index: number) => {
-    let text = value;
+  ): ((value: unknown, record: T, index: number) => ReactNode) =>
+  (value: unknown, record: T, index: number) => {
+    let text: unknown = value;
     if ((text === undefined || text === null) && column.dataIndex) {
-      text = getNestedValue(record, column.dataIndex);
+      text = getNestedValue(record as Record<string, unknown>, column.dataIndex);
     }
 
     if (column.renderText) {
       text = column.renderText(text, record, index);
     }
 
-    const dom = renderColumnByValueType(text, column as ProColumnType, record, index, action, handlers, refreshTable);
+    const content = renderColumnByValueType(text, column, record, index, action, handlers, refreshTable);
+    const dom = wrapWithCopy(content, text, column, record);
 
     if (column.render) {
-      return column.render(dom, record, index, action, column);
+      return column.render(dom, record, index, action as ProTableActionType<Record<string, unknown>>, column);
     }
 
     return dom;
@@ -1283,34 +1318,16 @@ export const createColumnRender =
 /**
  * 转换列为 Arco Table 的 columns 格式
  */
-export const convertColumns = <T extends Record<string, any>>(
+export const convertColumns = <T extends Record<string, unknown>>(
   columns: ProColumnType<T>[],
-  action: any,
-  handlers?: ProTableNEventHandlers,
+  action: ProTableActionType<T>,
+  handlers?: ProTableNEventHandlers<T>,
   refreshTable?: () => void,
 ): TableColumnProps<T>[] =>
   columns
     .filter((col) => !col.hideInTable)
     .map((column) => {
-      const {
-        children,
-        renderText,
-        valueType,
-        valueEnum,
-        dateFormat,
-        moneySymbol,
-        precision,
-        thousandsSeparator,
-        copyable,
-        ellipsis,
-        hideInSearch,
-        hideInTable,
-        disableInSetting,
-        search,
-        onFilter,
-        dataIndex,
-        ...rest
-      } = column;
+      const { children, valueType, dataIndex, ...rest } = column;
 
       const converted: TableColumnProps<T> = {
         ...rest,

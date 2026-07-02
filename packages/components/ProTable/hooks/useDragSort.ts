@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 /**
  * 拖拽排序配置
  */
-export interface DragSortConfig<T = any> {
+export interface DragSortConfig<T = Record<string, unknown>> {
   /** 拖拽类型：handle（拖拽句柄）或 row（整行拖拽） */
   type?: 'handle' | 'row';
   /** 自定义拖拽句柄渲染 */
@@ -30,7 +30,7 @@ export interface DragState {
 /**
  * 拖拽排序 Hook 返回类型
  */
-export interface UseDragSortReturn<T = any> {
+export interface UseDragSortReturn<T = Record<string, unknown>> {
   /** 拖拽状态 */
   dragState: DragState;
   /** 排序后的数据源 */
@@ -88,7 +88,7 @@ export interface UseDragSortReturn<T = any> {
  * </tr>
  * ```
  */
-export function useDragSort<T = any>(options: {
+export function useDragSort<T = Record<string, unknown>>(options: {
   /** 数据源 */
   dataSource: T[];
   /** 拖拽排序配置 */

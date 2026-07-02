@@ -99,7 +99,7 @@ export function showPopconfirm(config: PopconfirmConfig): void {
     ),
     okText,
     cancelText,
-    onOk: onConfirm,
+    onOk: onConfirm as ((e?: MouseEvent) => void | Promise<any>) | undefined,
     onCancel,
   });
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ButtonProps } from '@arco-design/web-react';
-import type { ProFormSchema } from '../ProFormN/types';
+import type { ProFormSchema } from '../ProForm/types';
 import type { ProDialogProps } from '../ProDialog/types';
 import type { ProTableActionType } from './types';
 
@@ -12,7 +12,7 @@ export type ActionButtonType = 'add' | 'edit' | 'view' | 'delete' | 'export' | '
 /**
  * 基础 ActionButton 配置
  */
-export interface ActionButtonBaseConfig {
+export interface ActionButtonBaseConfig<T = Record<string, unknown>> {
   /** 按钮类型 */
   type?: ActionButtonType;
   /** 按钮唯一标识 */
@@ -26,9 +26,9 @@ export interface ActionButtonBaseConfig {
   /** 按钮状态 */
   status?: ButtonProps['status'];
   /** 是否显示 */
-  visible?: boolean | ((record?: any) => boolean);
+  visible?: boolean | ((record?: T) => boolean);
   /** 是否禁用 */
-  disabled?: boolean | ((record?: any) => boolean);
+  disabled?: boolean | ((record?: T) => boolean);
   /** 自定义类名 */
   className?: string;
   /** 自定义样式 */
@@ -38,7 +38,7 @@ export interface ActionButtonBaseConfig {
 /**
  * 新增按钮配置
  */
-export interface AddButtonConfig extends ActionButtonBaseConfig {
+export interface AddButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'add';
   /** 弹窗标题 */
   title?: string;
@@ -55,7 +55,7 @@ export interface AddButtonConfig extends ActionButtonBaseConfig {
 /**
  * 编辑按钮配置
  */
-export interface EditButtonConfig extends ActionButtonBaseConfig {
+export interface EditButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'edit';
   /** 弹窗标题 */
   title?: string;
@@ -74,7 +74,7 @@ export interface EditButtonConfig extends ActionButtonBaseConfig {
 /**
  * 查看按钮配置
  */
-export interface ViewButtonConfig extends ActionButtonBaseConfig {
+export interface ViewButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'view';
   /** 弹窗标题 */
   title?: string;
@@ -83,7 +83,7 @@ export interface ViewButtonConfig extends ActionButtonBaseConfig {
   /** 弹窗属性 */
   dialogProps?: Omit<ProDialogProps, 'children'>;
   /** 自定义内容渲染函数 */
-  renderContent?: (record: any) => ReactNode;
+  renderContent?: (record: T) => ReactNode;
   /** 表单字段配置（readonly 模式） */
   schemas?: ProFormSchema[];
   /** 表单属性 */
@@ -95,12 +95,12 @@ export interface ViewButtonConfig extends ActionButtonBaseConfig {
 /**
  * 删除按钮配置
  */
-export interface DeleteButtonConfig extends ActionButtonBaseConfig {
+export interface DeleteButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'delete';
   /** 确认弹窗标题 */
   confirmTitle?: string;
   /** 确认弹窗内容，可以是字符串或函数 */
-  confirmContent?: string | ((record: any) => string);
+  confirmContent?: string | ((record: T) => string);
   /** 确认按钮文本 */
   okText?: string;
   /** 取消按钮文本 */
@@ -114,7 +114,7 @@ export interface DeleteButtonConfig extends ActionButtonBaseConfig {
 /**
  * 导出按钮配置
  */
-export interface ExportButtonConfig extends ActionButtonBaseConfig {
+export interface ExportButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'export';
   /** 导出接口地址 */
   exportUrl?: string;
@@ -127,7 +127,7 @@ export interface ExportButtonConfig extends ActionButtonBaseConfig {
 /**
  * 导入按钮配置
  */
-export interface ImportButtonConfig extends ActionButtonBaseConfig {
+export interface ImportButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'import';
   /** 上传接口地址 */
   uploadUrl?: string;
@@ -146,7 +146,7 @@ export interface ImportButtonConfig extends ActionButtonBaseConfig {
 /**
  * 跳转按钮配置
  */
-export interface JumpButtonConfig extends ActionButtonBaseConfig {
+export interface JumpButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'jump';
   /** 跳转路径，支持模板字符串如 /users/{id} */
   to: string;
@@ -159,19 +159,19 @@ export interface JumpButtonConfig extends ActionButtonBaseConfig {
 /**
  * 自定义按钮配置
  */
-export interface CustomButtonConfig extends ActionButtonBaseConfig {
+export interface CustomButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'custom';
   /** 自定义渲染 */
-  render: (record: any, index: number, action: ProTableActionType) => ReactNode;
+  render: (record: T, index: number, action: ProTableActionType<T>) => ReactNode;
 }
 
 /**
  * 更多按钮配置 - 用于操作列和工具栏
  */
-export interface MoreButtonConfig extends ActionButtonBaseConfig {
+export interface MoreButtonConfig<T = Record<string, unknown>> extends ActionButtonBaseConfig<T> {
   type: 'more';
   /** 下拉菜单中的按钮列表 */
-  actions: OprActionButtonConfig[];
+  actions: OprActionButtonConfig<T>[];
   /** 更多按钮文本 */
   text?: string;
   /** 下拉菜单触发方式 */
@@ -183,42 +183,47 @@ export interface MoreButtonConfig extends ActionButtonBaseConfig {
 /**
  * 操作列按钮配置联合类型
  */
-export type OprActionButtonConfig<T = any> =
-  | (EditButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+export type OprActionButtonConfig<T = Record<string, unknown>> =
+  | (EditButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     })
-  | (ViewButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+  | (ViewButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     })
-  | (DeleteButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+  | (DeleteButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     })
-  | (JumpButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+  | (JumpButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     })
-  | (CustomButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+  | (CustomButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     })
-  | (MoreButtonConfig & {
-      onClick?: (record: T, index: number, action: ProTableActionType) => void;
+  | (MoreButtonConfig<T> & {
+      onClick?: (record: T, index: number, action: ProTableActionType<T>) => void;
     });
 
 /**
  * 工具栏按钮配置联合类型
  */
-export type ToolbarActionButtonConfig =
-  AddButtonConfig | ExportButtonConfig | ImportButtonConfig | JumpButtonConfig | CustomButtonConfig | MoreButtonConfig;
+export type ToolbarActionButtonConfig<T = Record<string, unknown>> =
+  | AddButtonConfig<T>
+  | ExportButtonConfig<T>
+  | ImportButtonConfig<T>
+  | JumpButtonConfig<T>
+  | CustomButtonConfig<T>
+  | MoreButtonConfig<T>;
 
 /**
  * ProTable 事件回调配置
  */
-export interface ProTableNEventHandlers {
+export interface ProTableNEventHandlers<T = Record<string, unknown>> {
   /** 新增事件 */
   onCreate?: (values: Record<string, unknown>) => Promise<boolean | void> | boolean | void;
   /** 编辑事件 */
   onEdit?: (id: string | number, values: Record<string, unknown>) => Promise<boolean | void> | boolean | void;
   /** 查看事件 */
-  onView?: (record: any) => void;
+  onView?: (record: T) => void;
   /** 删除事件 */
   onDelete?: (id: string | number) => Promise<boolean | void> | boolean | void;
   /** 导出事件 */
@@ -230,7 +235,7 @@ export interface ProTableNEventHandlers {
 /**
  * 扩展的操作列配置
  */
-export interface OprColumnConfig<T = any> {
+export interface OprColumnConfig<T = Record<string, unknown>> {
   /** 操作按钮列表 */
   actions: OprActionButtonConfig<T>[];
   /** 最多显示多少个按钮，超出显示更多 */

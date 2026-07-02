@@ -1,9 +1,28 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-magic-numbers */
-import { useRef, useImperativeHandle, useCallback, useMemo, useState } from 'react';
+import { useRef, useImperativeHandle, useCallback, useMemo, useState, createContext, useContext } from 'react';
 import type { DataStoreImpl } from '../store/DataStore';
+import { createDataStore } from '../store/DataStore';
 import type { EditableTableInstance } from '../editable/types';
 import type { ProTableProps, ProColumnType } from '../types';
+
+export interface ProTableContextValue<T = Record<string, unknown>> {
+  instance: ProTableInstance;
+  store: DataStoreImpl<T>;
+  dataSource: T[];
+  loading: boolean;
+  pagination: { current: number; pageSize: number };
+  selectedRowKeys: (string | number)[];
+  selectedRows: T[];
+  query: Record<string, unknown>;
+}
+
+export const ProTableContext = createContext<ProTableContextValue<Record<string, unknown>> | null>(null);
+
+export const useProTableContext = <T extends Record<string, unknown> = Record<string, unknown>>() => {
+  const context = useContext(ProTableContext);
+  return context as ProTableContextValue<T> | null;
+};
 
 /**
  * 表格实例方法
@@ -57,7 +76,7 @@ export interface ProTableInstance {
 
 export interface UseProTableOptions<T = Record<string, unknown>> {
   /** 表格 store */
-  store: DataStoreImpl<T>;
+  store?: DataStoreImpl<T>;
   /** 可编辑表格实例 */
   editableInstance?: EditableTableInstance<T>;
   /** 展开控制 */
@@ -65,9 +84,9 @@ export interface UseProTableOptions<T = Record<string, unknown>> {
   /** 设置展开 keys */
   setExpandedRowKeys?: (keys: (string | number)[]) => void;
   /** 获取行 key */
-  getRowKey: (record: T) => string | number;
+  getRowKey?: (record: T) => string | number;
   /** 数据源 */
-  dataSource: T[];
+  dataSource?: T[];
   /** 列配置 */
   columns?: ProColumnType<T>[];
   /** 请求函数 */
@@ -120,7 +139,7 @@ export interface UseProTableOptions<T = Record<string, unknown>> {
 
 export interface UseProTableReturn<T = Record<string, unknown>> {
   /** 表格实例 ref */
-  tableRef: React.RefObject<ProTableInstance>;
+  tableRef: React.RefObject<ProTableInstance | null>;
   /** 表格实例方法 */
   instance: ProTableInstance;
   /** 可直接绑定到 ProTable 组件的 props */
@@ -140,6 +159,8 @@ export interface UseProTableReturn<T = Record<string, unknown>> {
   selectedRows: T[];
   /** 查询参数 */
   query: Record<string, unknown>;
+  /** Provider 组件，用于包裹子组件实现跨组件访问 */
+  Provider: React.FC<{ children: React.ReactNode }>;
 }
 
 /**
@@ -150,10 +171,10 @@ export const useProTable = <T extends Record<string, unknown>>(
   options: UseProTableOptions<T>,
 ): UseProTableReturn<T> => {
   const {
-    store,
+    store: propStore,
     expandedRowKeys,
     setExpandedRowKeys,
-    getRowKey,
+    getRowKey: propGetRowKey,
     dataSource: propDataSource,
     columns,
     request,
@@ -183,12 +204,25 @@ export const useProTable = <T extends Record<string, unknown>>(
 
   const tableRef = useRef<ProTableInstance>(null);
 
+  const defaultStoreRef = useRef<DataStoreImpl<T>>(createDataStore<T>());
+  const store = propStore ?? defaultStoreRef.current;
+
+  const getRowKey = useCallback(
+    (record: T): string | number => {
+      if (propGetRowKey) {
+        return propGetRowKey(record);
+      }
+      return (record as Record<string, unknown>).id as string | number;
+    },
+    [propGetRowKey],
+  );
+
   // 本地状态（用于受控模式）
-  const [localDataSource, setLocalDataSource] = useState<T[]>(propDataSource || []);
+  const [, setLocalDataSource] = useState<T[]>(propDataSource || []);
   const [localLoading] = useState(false);
 
-  // 使用外部或本地数据
-  const dataSource = propDataSource !== undefined ? propDataSource : localDataSource;
+  // 使用外部或本地数据，默认从 store 获取
+  const dataSource = propDataSource !== undefined ? propDataSource : store.dataSource;
   const loading = propLoading !== undefined ? propLoading : localLoading;
 
   // 重新加载数据
@@ -415,6 +449,28 @@ export const useProTable = <T extends Record<string, unknown>>(
     ],
   );
 
+  const Provider = useMemo(() => {
+    function ProviderComponent({ children }: { children: React.ReactNode }) {
+      return (
+        <ProTableContext.Provider
+          value={{
+            instance,
+            store: store as DataStoreImpl<Record<string, unknown>>,
+            dataSource: dataSource as Record<string, unknown>[],
+            loading: store.loading,
+            pagination: store.pagination,
+            selectedRowKeys: store.selectedRowKeys,
+            selectedRows: store.selectedRows as Record<string, unknown>[],
+            query: store.query,
+          }}
+        >
+          {children}
+        </ProTableContext.Provider>
+      );
+    }
+    return ProviderComponent;
+  }, [instance, store, dataSource]);
+
   return {
     tableRef,
     instance,
@@ -425,6 +481,7 @@ export const useProTable = <T extends Record<string, unknown>>(
     selectedRowKeys: store.selectedRowKeys,
     selectedRows: store.selectedRows,
     query: store.query,
+    Provider,
   };
 };
 

@@ -2,6 +2,7 @@ import { deepMerge } from './utils';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Modal } from '@arco-design/web-react';
+import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
 import { IconInfoCircle, IconCheckCircle, IconExclamationCircle, IconCloseCircle } from '@arco-design/web-react/icon';
 import type {
   OpenDialogConfig,
@@ -29,12 +30,20 @@ function DialogHolder<TValues, T>({ config, onClose }: DialogHolderProps<TValues
   }, [currentConfig, onClose]);
 
   const handleOk = useCallback(() => {
-    if (currentConfig.onSubmit || currentConfig.onOk) {
+    const instance = dialogRef.current;
+    if (instance) {
+      instance.submitForm?.();
     }
   }, [currentConfig]);
 
   const handleUpdate = useCallback((newConfig: Partial<ProDialogProps<TValues, T>>) => {
-    setCurrentConfig((prev) => deepMerge(prev, newConfig));
+    setCurrentConfig(
+      (prev) =>
+        deepMerge(prev as Record<string, unknown>, newConfig as Record<string, unknown>) as OpenDialogConfig<
+          TValues,
+          T
+        >,
+    );
   }, []);
 
   useEffect(() => {
@@ -136,7 +145,7 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
     }
   };
 
-  const handleConfirm = async (e?: MouseEvent) => {
+  const handleConfirm = async () => {
     if (onConfirm) {
       await onConfirm();
     }
@@ -172,10 +181,9 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
     ),
     okText,
     cancelText,
-    onOk: handleConfirm as (e?: MouseEvent) => void | Promise<any>,
+    onOk: handleConfirm as (e?: MouseEvent) => void | Promise<void>,
     onCancel: close,
-    ...restConfig,
-  };
+  } as const;
 
   interface ModalResult {
     update: (config: unknown) => void;
@@ -186,28 +194,32 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
 
   switch (type) {
     case 'info':
-      modalResult = Modal.info(modalConfig) as ModalResult;
+      modalResult = Modal.info({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
       break;
     case 'success':
-      modalResult = Modal.success(modalConfig) as ModalResult;
+      modalResult = Modal.success({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
       break;
     case 'warning':
-      modalResult = Modal.warning(modalConfig) as ModalResult;
+      modalResult = Modal.warning({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
       break;
     case 'error':
-      modalResult = Modal.error(modalConfig) as ModalResult;
+      modalResult = Modal.error({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
       break;
     default:
-      modalResult = Modal.confirm(modalConfig) as ModalResult;
+      modalResult = Modal.confirm({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
   }
 
   return {
-    update: (newConfig: Partial<ConfirmDialogConfig>) => {
-      const merged = deepMerge(modalConfig, newConfig);
+    update: (newConfig: Partial<OpenDialogConfig>) => {
+      const merged = deepMerge(
+        { ...modalConfig, ...restConfig } as Record<string, unknown>,
+        newConfig as Record<string, unknown>,
+      );
+      const confirmNewConfig = newConfig as Partial<ConfirmDialogConfig>;
       modalResult.update({
         ...merged,
         content:
-          newConfig.content !== undefined || newConfig.icon !== undefined ? (
+          confirmNewConfig.content !== undefined || confirmNewConfig.icon !== undefined ? (
             <div
               style={{
                 display: 'flex',
@@ -225,7 +237,9 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
                   alignItems: 'center',
                 }}
               >
-                {newConfig.icon || modalConfig.icon || getDefaultIcon()}
+                {confirmNewConfig.icon ||
+                  ((merged as Record<string, unknown>).icon as React.ReactNode) ||
+                  getDefaultIcon()}
               </div>
               <div
                 style={{
@@ -234,13 +248,13 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
                   alignItems: 'center',
                 }}
               >
-                {newConfig.content !== undefined ? newConfig.content : modalConfig.content}
+                {confirmNewConfig.content !== undefined ? confirmNewConfig.content : modalConfig.content}
               </div>
             </div>
           ) : (
             modalConfig.content
           ),
-      });
+      } as ConfirmProps);
     },
     close: () => {
       modalResult.close();

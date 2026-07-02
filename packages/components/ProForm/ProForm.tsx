@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema } from './types';
+import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions } from './types';
 import { useProForm } from './useProForm';
 import { FormField } from './FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
@@ -8,6 +8,8 @@ import { useVirtualScroll } from './hooks/useVirtualScroll';
 import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
 import { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
 import { performanceMonitor } from './utils/performance';
+
+import { setAsyncBatchConfig, clearAsyncBatch } from './utils/reactive';
 
 const { Row, Col } = Grid;
 
@@ -51,6 +53,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       collapseText = '收起',
       collapsedRows = 1,
       onCollapseChange,
+      rows,
       buttons,
       buttonList,
       okButtonProps,
@@ -68,12 +71,13 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       wrapperColProps,
       cardContainer,
       performance,
+      schemaProcessOptions,
       keyboardNavigation,
     } = props;
 
     const {
       arcoForm,
-      formInstance,
+      instance,
       setComponentRef,
       isDraftState,
       setIsDraftState,
@@ -88,20 +92,82 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       keyboardNavigation,
     });
 
-    // 直接使用 schemas
-    const processedSchemas = schemas;
+    const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
+      const {
+        autoLabel = false,
+        autoPlaceholder = false,
+        autoAllowClear = false,
+        autoRules = false,
+        autoDefaultValue = false,
+        autoRangePickerName = false,
+      } = options;
+
+      const processed: ProFormSchema = { ...schema };
+
+      if (autoLabel && !processed.label) {
+        const name = Array.isArray(schema.name) ? schema.name.join('.') : schema.name;
+        processed.label = name.replace(/([A-Z])/g, ' $1').trim();
+      }
+
+      if (autoPlaceholder && !processed.placeholder) {
+        processed.placeholder = processed.label ? `请输入${processed.label}` : '请输入';
+      }
+
+      if (autoAllowClear && processed.componentProps) {
+        processed.componentProps = { ...processed.componentProps, allowClear: true };
+      } else if (autoAllowClear && !processed.componentProps) {
+        processed.componentProps = { allowClear: true };
+      }
+
+      if (autoRules && !processed.rules && processed.required) {
+        processed.rules = [{ required: true, message: `${processed.label || schema.name} 不能为空` }];
+      }
+
+      if (autoDefaultValue && processed.initialValue === undefined) {
+        const component = processed.component || 'Input';
+        if (component === 'Input' || component === 'TextArea') {
+          processed.initialValue = '';
+        } else if (component === 'Select' || component === 'Cascader') {
+          processed.initialValue = undefined;
+        } else if (component === 'Checkbox' || component === 'Switch') {
+          processed.initialValue = false;
+        } else if (component === 'InputNumber') {
+          processed.initialValue = undefined;
+        } else if (component === 'DatePicker' || component === 'TimePicker') {
+          processed.initialValue = undefined;
+        }
+      }
+
+      if (autoRangePickerName && processed.component?.toLowerCase().includes('rangepicker')) {
+        const baseName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
+        processed.name = [`${baseName}_start`, `${baseName}_end`];
+        (processed as ProFormSchema & { _rangePickerNames?: [string, string] })._rangePickerNames = [
+          `${baseName}_start`,
+          `${baseName}_end`,
+        ];
+      }
+
+      return processed;
+    }, []);
+
+    const processedSchemas = useMemo(() => {
+      if (!schemaProcessOptions || Object.keys(schemaProcessOptions).length === 0) {
+        return schemas;
+      }
+      return schemas.map((schema) => processSchema(schema, schemaProcessOptions));
+    }, [schemas, schemaProcessOptions, processSchema]);
 
     // 暴露实例
-    useImperativeHandle(ref, () => formInstance, [formInstance]);
+    useImperativeHandle(ref, () => instance, [instance]);
 
     // 同步 formRef
     useEffect(() => {
       if (formRef && typeof formRef === 'function') {
-        formRef(formInstance);
+        formRef(instance);
       } else if (formRef && typeof formRef === 'object' && formRef !== null) {
-        (formRef as React.MutableRefObject<ProFormInstance<Record<string, unknown>>>).current = formInstance;
+        (formRef as React.MutableRefObject<ProFormInstance<Record<string, unknown>>>).current = instance;
       }
-    }, [formInstance, formRef]);
+    }, [instance, formRef]);
 
     // 同步 draft 状态
     useEffect(() => {
@@ -122,15 +188,27 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     // 初始化表单值
     useEffect(() => {
       if (initialValues && arcoForm && formStore) {
-        // 延迟一点时间，确保所有 FieldNode 都已注册
         const timer = setTimeout(() => {
-          // 设置到 formStore 和 arcoForm
           formStore.setValues(initialValues);
           arcoForm.setFieldsValue(initialValues);
         }, 0);
         return () => clearTimeout(timer);
       }
     }, [initialValues, arcoForm, formStore]);
+
+    // 设置批量更新配置
+    useEffect(() => {
+      const batchUpdateConfig = performance?.batchUpdate;
+      if (batchUpdateConfig?.enabled) {
+        setAsyncBatchConfig({
+          delay: batchUpdateConfig.delay,
+          maxBatchSize: batchUpdateConfig.maxBatchSize,
+        });
+      }
+      return () => {
+        clearAsyncBatch();
+      };
+    }, [performance?.batchUpdate]);
 
     // 折叠状态
     const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);
@@ -155,7 +233,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     const rootContextValue = useMemo(
       () => ({
         formState,
-        formInstance: formInstance,
+        instance: instance,
         arcoForm,
         layout: layout === 'compact' ? 'inline' : layout,
         size,
@@ -164,7 +242,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         onFinish: onFinish,
         onFinishFailed: onFinishFailed,
       }),
-      [formState, formInstance, arcoForm, layout, size, onValuesChange, onFieldsChange, onFinish, onFinishFailed],
+      [formState, instance, arcoForm, layout, size, onValuesChange, onFieldsChange, onFinish, onFinishFailed],
     );
 
     // 构建 LayoutContext
@@ -328,7 +406,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
                 loading={button.loading}
                 disabled={button.disabled}
                 htmlType={button.htmlType}
-                onClick={() => button.onClick?.(formInstance.getFieldsValue(), formInstance)}
+                onClick={() => button.onClick?.(instance.getFieldsValue(), instance)}
                 {...button.props}
               >
                 {button.text}
@@ -388,7 +466,12 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         });
 
         // 如果是折叠状态，计算可以显示的字段总数（按钮组占1个位置）
-        const maxFields = collapsible && finalCollapsed ? columns * collapsedRows - 1 : filteredSchemas.length;
+        let maxFields = collapsible && finalCollapsed ? columns * collapsedRows - 1 : filteredSchemas.length;
+
+        // 如果设置了 rows，限制显示的行数
+        if (rows !== undefined && !collapsible) {
+          maxFields = Math.min(maxFields, rows * columns);
+        }
 
         // 限制显示的字段数量
         const schemasToRender = filteredSchemas.slice(0, maxFields);

@@ -69,8 +69,10 @@ export const useEditableTable = <T extends Record<string, unknown>>(
       }
 
       setEditableRows((prev) => {
-        // 如果是单行编辑模式，先清除其他编辑行
-        const newMap = type === 'single' ? new Map() : new Map(prev);
+        const newMap =
+          type === 'single'
+            ? new Map<string | number, EditableRowState<T>>()
+            : new Map<string | number, EditableRowState<T>>(prev);
 
         newMap.set(rowKey, {
           rowKey,
@@ -80,7 +82,6 @@ export const useEditableTable = <T extends Record<string, unknown>>(
           deleting: false,
         });
 
-        // 触发 onChange 回调
         const newKeys = Array.from(newMap.keys());
         const newRows = Array.from(newMap.values()).map((s) => s.currentData);
         callbacksRef.current.onChange?.(newKeys, newRows);
@@ -112,10 +113,9 @@ export const useEditableTable = <T extends Record<string, unknown>>(
       }
 
       setEditableRows((prev) => {
-        const newMap = new Map(prev);
+        const newMap = new Map<string | number, EditableRowState<T>>(prev);
         newMap.delete(rowKey);
 
-        // 触发 onChange 回调
         const newKeys = Array.from(newMap.keys());
         const newRows = Array.from(newMap.values()).map((s) => s.currentData);
         callbacksRef.current.onChange?.(newKeys, newRows);
@@ -168,10 +168,9 @@ export const useEditableTable = <T extends Record<string, unknown>>(
 
         // 保存成功，移除编辑状态
         setEditableRows((prev) => {
-          const newMap = new Map(prev);
+          const newMap = new Map<string | number, EditableRowState<T>>(prev);
           newMap.delete(rowKey);
 
-          // 触发 onChange 回调
           const newKeys = Array.from(newMap.keys());
           const newRows = Array.from(newMap.values()).map((s) => s.currentData);
           callbacksRef.current.onChange?.(newKeys, newRows);
@@ -242,10 +241,9 @@ export const useEditableTable = <T extends Record<string, unknown>>(
 
         // 删除成功，移除编辑状态
         setEditableRows((prev) => {
-          const newMap = new Map(prev);
+          const newMap = new Map<string | number, EditableRowState<T>>(prev);
           newMap.delete(rowKey);
 
-          // 触发 onChange 回调
           const newKeys = Array.from(newMap.keys());
           const newRows = Array.from(newMap.values()).map((s) => s.currentData);
           callbacksRef.current.onChange?.(newKeys, newRows);
@@ -304,7 +302,7 @@ export const useEditableTable = <T extends Record<string, unknown>>(
    * 获取编辑中的行
    */
   const getEditableRows = useCallback(
-    (): T[] => Array.from(editableRows.values()).map((s) => s.currentData),
+    (): T[] => Array.from(editableRows.values()).map((s) => s.currentData as T),
     [editableRows],
   );
 

@@ -226,10 +226,80 @@ export function batchUpdate(fn: () => void): void {
     fn();
   } finally {
     isBatching = false;
-    // 执行所有队列中的 effect
     batchQueue.forEach((effect) => effect());
     batchQueue.clear();
   }
+}
+
+let asyncBatchQueue: Set<() => void> = new Set();
+let asyncBatchTimer: ReturnType<typeof setTimeout> | null = null;
+let asyncBatchDelay = 16;
+let asyncBatchMaxSize = 100;
+
+/**
+ * 设置异步批量更新配置
+ */
+export function setAsyncBatchConfig(config: { delay?: number; maxBatchSize?: number }): void {
+  if (config.delay !== undefined) {
+    asyncBatchDelay = config.delay;
+  }
+  if (config.maxBatchSize !== undefined) {
+    asyncBatchMaxSize = config.maxBatchSize;
+  }
+}
+
+/**
+ * 异步批量更新
+ */
+export function asyncBatchUpdate(fn: () => void): void {
+  isBatching = true;
+  try {
+    fn();
+  } finally {
+    isBatching = false;
+    batchQueue.forEach((effect) => {
+      asyncBatchQueue.add(effect);
+    });
+    batchQueue.clear();
+
+    if (asyncBatchQueue.size >= asyncBatchMaxSize) {
+      flushAsyncBatch();
+    } else if (!asyncBatchTimer) {
+      asyncBatchTimer = setTimeout(flushAsyncBatch, asyncBatchDelay);
+    }
+  }
+}
+
+/**
+ * 刷新异步批量更新队列
+ */
+export function flushAsyncBatch(): void {
+  if (asyncBatchTimer) {
+    clearTimeout(asyncBatchTimer);
+    asyncBatchTimer = null;
+  }
+
+  const currentQueue = asyncBatchQueue;
+  asyncBatchQueue = new Set();
+
+  currentQueue.forEach((effect) => {
+    try {
+      effect();
+    } catch {
+      // ignore
+    }
+  });
+}
+
+/**
+ * 清除异步批量更新队列
+ */
+export function clearAsyncBatch(): void {
+  if (asyncBatchTimer) {
+    clearTimeout(asyncBatchTimer);
+    asyncBatchTimer = null;
+  }
+  asyncBatchQueue.clear();
 }
 
 /**

@@ -1,10 +1,6 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable @typescript-eslint/no-invalid-void-type */
-/* eslint-disable max-lines */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import type { ReactNode, CSSProperties, MouseEvent } from 'react';
+import type { ReactNode, CSSProperties } from 'react';
 import type { ButtonProps } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema } from '../ProFormN/types';
+import type { ProFormProps, ProFormInstance, ProFormSchema } from '../ProForm/types';
 import type { ProTableProps, ProTableActionType, ProColumnType } from '../ProTable/types';
 
 type Key = string | number;
@@ -46,32 +42,20 @@ export type FooterPosition = 'left' | 'center' | 'right';
 /**
  * 打开弹窗配置
  */
-export interface OpenDialogParams<TValues = Record<string, any>> {
-  /**
-   * 弹窗标题
-   */
+export interface OpenDialogParams<TValues = Record<string, unknown>> {
   title?: ReactNode;
-
-  /**
-   * 表单数据（表单模式下）
-   */
   data?: Partial<TValues>;
-
-  /**
-   * 其他配置覆盖
-   */
-  [key: string]: any;
 }
 
 /**
  * 弹窗实例对象，提供弹窗操作方法
  */
-export interface ProDialogInstance<TValues = Record<string, any>, TRow = any, TKey extends Key = Key> {
+export interface ProDialogInstance<TValues = Record<string, unknown>, TRow = unknown, TKey extends Key = Key> {
   /**
    * 打开弹窗
    * @param params 可选配置参数，可传入 title、data（表单数据）等
    */
-  open: (params?: any) => void;
+  open: (params?: OpenDialogParams<TValues>) => void;
 
   /**
    * 关闭弹窗
@@ -115,7 +99,7 @@ export interface ProDialogInstance<TValues = Record<string, any>, TRow = any, TK
   /**
    * 更新弹窗配置
    */
-  update: (config: Partial<ProDialogProps<any, any>>) => void;
+  update: (config: Partial<ProDialogProps<TValues, TRow>>) => void;
 
   /**
    * 销毁弹窗
@@ -211,7 +195,7 @@ export interface ProDialogInstance<TValues = Record<string, any>, TRow = any, TK
    * 设置表格选中行（表格模式下）
    * @param rows 选中行数据
    */
-  setTableSelectedRows: (rows: any[]) => void;
+  setTableSelectedRows: (rows: TRow[]) => void;
 
   /**
    * 设置表格选中行 keys（表格模式下）
@@ -222,7 +206,7 @@ export interface ProDialogInstance<TValues = Record<string, any>, TRow = any, TK
   /**
    * 获取表格选中行（表格模式下）
    */
-  getTableSelectedRows: () => any[];
+  getTableSelectedRows: () => TRow[];
 
   /**
    * 获取表格选中行 keys（表格模式下）
@@ -457,7 +441,7 @@ export interface BaseDialogProps {
   /**
    * 点击确认按钮回调
    */
-  onOk?: ((e?: MouseEvent) => Promise<any>) | ((e?: MouseEvent) => void);
+  onOk?: ((e?: React.MouseEvent<Element>) => Promise<unknown>) | ((e?: React.MouseEvent<Element>) => void);
 
   /**
    * 点击取消按钮回调
@@ -529,7 +513,7 @@ export interface BaseDialogProps {
  * 弹窗按钮上下文
  * 提供给按钮点击回调使用
  */
-export interface DialogButtonContext<TValues = Record<string, any>, TRow = any, TKey extends Key = Key> {
+export interface DialogButtonContext<TValues = Record<string, unknown>, TRow = unknown, TKey extends Key = Key> {
   /**
    * 弹窗实例
    */
@@ -603,7 +587,7 @@ export interface DialogButtonContext<TValues = Record<string, any>, TRow = any, 
 /**
  * 按钮配置
  */
-export interface DialogButtonConfig<TValues = Record<string, any>, TRow = any, TKey extends Key = Key> {
+export interface DialogButtonConfig<TValues = Record<string, unknown>, TRow = unknown, TKey extends Key = Key> {
   /**
    * 按钮唯一标识
    */
@@ -643,7 +627,7 @@ export interface DialogButtonConfig<TValues = Record<string, any>, TRow = any, T
    * 点击事件，支持异步，自动处理 loading 状态
    * 返回 true 时自动关闭弹窗
    */
-  onClick?: (context: DialogButtonContext<TValues, TRow, TKey>) => any;
+  onClick?: (context: DialogButtonContext<TValues, TRow, TKey>) => boolean | void | Promise<boolean | void>;
 
   /**
    * 其他按钮属性
@@ -663,46 +647,19 @@ export interface DialogButtonConfig<TValues = Record<string, any>, TRow = any, T
  * 表单弹窗属性
  */
 export interface FormDialogProps<TValues = Record<string, unknown>> {
-  /**
-   * 表单配置
-   */
   formProps?: Omit<ProFormProps<TValues>, 'onFinish'>;
-
-  /**
-   * 表单字段配置
-   */
   schemas?: ProFormSchema<TValues>[];
-
-  /**
-   * 表单初始值
-   */
   initialValues?: Partial<TValues>;
-
-  /**
-   * 表单提交回调
-   */
   onFinish?: ((values: TValues) => Promise<void>) | ((values: TValues) => void);
-
-  /**
-   * 表单提交成功回调（返回 true 时自动关闭弹窗）
-   */
-  onSubmit?: (values: TValues) => any;
-
-  /**
-   * 表单提交前校验
-   */
+  onSubmit?: (values: TValues) => boolean | void | Promise<boolean | void>;
   beforeSubmit?: (values: TValues) => Promise<boolean> | boolean;
-
-  /**
-   * 表单值变化回调
-   */
   onValuesChange?: (changedValues: Partial<TValues>, allValues: TValues) => void;
 }
 
 /**
  * 表格弹窗属性
  */
-export interface TableDialogProps<TRow = any, TKey extends Key = Key> {
+export interface TableDialogProps<TRow = unknown, TKey extends Key = Key> {
   /**
    * 表格配置
    */
@@ -747,7 +704,7 @@ export interface TableDialogProps<TRow = any, TKey extends Key = Key> {
   /**
    * 确认选择回调（返回 true 时自动关闭弹窗）
    */
-  onSelect?: (selectedKeys: TKey[], selectedRows: TRow[]) => any;
+  onSelect?: (selectedKeys: TKey[], selectedRows: TRow[]) => boolean | void | Promise<boolean | void>;
 
   /**
    * 表格行 key
@@ -758,7 +715,7 @@ export interface TableDialogProps<TRow = any, TKey extends Key = Key> {
 /**
  * ProDialog 完整属性
  */
-export interface ProDialogProps<TValues = Record<string, any>, TRow = any>
+export interface ProDialogProps<TValues = Record<string, unknown>, TRow = unknown>
   extends BaseDialogProps, FormDialogProps<TValues>, TableDialogProps<TRow> {
   /**
    * Drawer 模式下的位置
@@ -861,7 +818,7 @@ export interface ProDialogProps<TValues = Record<string, any>, TRow = any>
 /**
  * 命令式打开弹窗配置
  */
-export interface OpenDialogConfig<TValues = Record<string, any>, TRow = any> extends Omit<
+export interface OpenDialogConfig<TValues = Record<string, unknown>, TRow = unknown> extends Omit<
   ProDialogProps<TValues, TRow>,
   'visible' | 'defaultVisible' | 'dialogRef'
 > {
@@ -941,7 +898,7 @@ export interface PopconfirmConfig {
   /**
    * 确认回调，返回 true 时自动关闭
    */
-  onConfirm?: (e?: any) => void | Promise<any>;
+  onConfirm?: (e?: React.MouseEvent<Element>) => void | Promise<void>;
 
   /**
    * 取消回调
@@ -1182,13 +1139,15 @@ export interface ProNotifyStatic {
 /**
  * ProDialog 组件类型
  */
-export type ProDialogComponent = (<TValues = Record<string, any>, TRow = any>(
+export type ProDialogComponent = (<TValues = Record<string, unknown>, TRow = unknown>(
   props: ProDialogProps<TValues, TRow> & React.RefAttributes<ProDialogInstance<TValues, TRow>>,
 ) => React.ReactElement) & {
   /**
    * 命令式打开弹窗
    */
-  open: <TValues = Record<string, any>, TRow = any>(config: OpenDialogConfig<TValues, TRow>) => DialogReturnProps;
+  open: <TValues = Record<string, unknown>, TRow = unknown>(
+    config: OpenDialogConfig<TValues, TRow>,
+  ) => DialogReturnProps;
 
   /**
    * 确认对话框
@@ -1218,16 +1177,17 @@ export type ProDialogComponent = (<TValues = Record<string, any>, TRow = any>(
   /**
    * 表单弹窗
    */
-  form: <TValues = Record<string, any>>(
-    config: Omit<OpenDialogConfig<TValues, any>, 'schemas' | 'formProps'> &
+  form: <TValues = Record<string, unknown>>(
+    config: Omit<OpenDialogConfig<TValues, unknown>, 'schemas' | 'formProps'> &
       FormDialogProps<TValues> & { title: ReactNode },
   ) => DialogReturnProps;
 
   /**
    * 表格选择弹窗
    */
-  table: <TRow = any>(
-    config: Omit<OpenDialogConfig<any, TRow>, 'columns' | 'tableProps'> & TableDialogProps<TRow> & { title: ReactNode },
+  table: <TRow = unknown>(
+    config: Omit<OpenDialogConfig<unknown, TRow>, 'columns' | 'tableProps'> &
+      TableDialogProps<TRow> & { title: ReactNode },
   ) => DialogReturnProps;
 
   /**
@@ -1284,7 +1244,7 @@ export type DialogEventListener = (type: DialogEventType, payload?: unknown) => 
 /**
  * ProDialog Hook 配置选项
  */
-export interface UseProDialogOptions<TValues = Record<string, any>, TRow = any> extends Omit<
+export interface UseProDialogOptions<TValues = Record<string, unknown>, TRow = unknown> extends Omit<
   ProDialogProps<TValues, TRow>,
   'visible' | 'defaultVisible' | 'dialogRef'
 > {
@@ -1313,7 +1273,7 @@ export interface UseProDialogOptions<TValues = Record<string, any>, TRow = any> 
 /**
  * ProDialog Hook 返回值
  */
-export interface UseProDialogReturn<TValues = Record<string, any>, TRow = any> {
+export interface UseProDialogReturn<TValues = Record<string, unknown>, TRow = unknown> {
   /**
    * 弹窗可见性
    */

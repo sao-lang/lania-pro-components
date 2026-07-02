@@ -4,7 +4,7 @@ import type { ProColumnType } from '../types';
 /**
  * 单元格合并配置
  */
-export interface CellMergeConfig<T = any> {
+export interface CellMergeConfig<T = Record<string, unknown>> {
   /** 行合并配置 */
   rowSpan?: (
     record: T,
@@ -52,9 +52,17 @@ export function createRowMerge<T>(
     // 获取字段值
     const getValue = (r: T) => {
       if (Array.isArray(dataIndex)) {
-        return dataIndex.reduce((obj, key) => obj?.[key], r as any);
+        return dataIndex.reduce(
+          (obj: Record<string, unknown> | unknown, key: string) => {
+            if (obj && typeof obj === 'object') {
+              return (obj as Record<string, unknown>)[key];
+            }
+            return undefined;
+          },
+          r as Record<string, unknown>,
+        );
       }
-      return (r as any)[dataIndex];
+      return (r as Record<string, unknown>)[dataIndex];
     };
 
     const currentValue = getValue(record);

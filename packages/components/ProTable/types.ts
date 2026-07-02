@@ -2,12 +2,12 @@
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import type { ReactNode } from 'react';
 import type { TableProps, TableColumnProps, PaginationProps, ButtonProps } from '@arco-design/web-react';
-import type { ProFormSchema, ProFormInstance, ProFormProps } from '../ProFormN/types';
+import type { ProFormSchema, ProFormInstance, ProFormProps } from '../ProForm/types';
 
 /**
  * 操作按钮配置
  */
-export interface OprToolConfig<T = any> {
+export interface OprToolConfig<T = Record<string, unknown>> {
   /** 按钮唯一标识 */
   key: string;
   /** 按钮文本 */
@@ -59,23 +59,27 @@ export type ProColumnValueType =
   | string;
 
 /**
+ * 单元格渲染器值类型 - 去除在渲染层面重复的类型（radio/checkbox→select, switch→tag）
+ */
+export type CellRendererValueType = Exclude<ProColumnValueType, 'radio' | 'checkbox' | 'switch'>;
+/**
  * 自定义单元格渲染器类型
  */
-export type CustomCellRenderer = (
-  text: any,
-  column: ProColumnType,
-  record?: any,
+export type CustomCellRenderer<T = Record<string, unknown>> = (
+  text: unknown,
+  column: ProColumnType<T>,
+  record?: T,
   index?: number,
-  action?: any,
+  action?: ProTableActionType<T>,
 ) => ReactNode;
 
 /**
  * 自定义渲染器注册类型
  */
-export interface CustomRendererRegistry {
-  register: (type: string, renderer: CustomCellRenderer) => void;
+export interface CustomRendererRegistry<T = Record<string, unknown>> {
+  register: (type: string, renderer: CustomCellRenderer<T>) => void;
   unregister: (type: string) => void;
-  get: (type: string) => CustomCellRenderer | undefined;
+  get: (type: string) => CustomCellRenderer<T> | undefined;
   has: (type: string) => boolean;
 }
 
@@ -121,7 +125,7 @@ export interface ProTableRequestParams {
 /**
  * 请求响应
  */
-export interface ProTableRequestResponse<T = any> {
+export interface ProTableRequestResponse<T = Record<string, unknown>> {
   /** 数据列表 */
   data: T[];
   /** 总条数 */
@@ -133,7 +137,7 @@ export interface ProTableRequestResponse<T = any> {
 /**
  * 请求函数类型
  */
-export type ProTableRequest<T = any> = (
+export type ProTableRequest<T = Record<string, unknown>> = (
   params: ProTableRequestParams,
   sort?: Record<string, 'ascend' | 'descend'>,
   filter?: Record<string, string[]>,
@@ -142,7 +146,7 @@ export type ProTableRequest<T = any> = (
 /**
  * 列配置 - 扩展 Arco TableColumnProps
  */
-export interface ProColumnType<T = any> extends Omit<
+export interface ProColumnType<T = Record<string, unknown>> extends Omit<
   TableColumnProps<T>,
   'render' | 'title' | 'dataIndex' | 'filters' | 'onFilter' | 'sorter'
 > {
@@ -181,11 +185,11 @@ export interface ProColumnType<T = any> extends Omit<
    */
   proTableConfig?: {
     /** 子表格列配置 */
-    columns: ProColumnType<any>[];
+    columns: ProColumnType<Record<string, unknown>>[];
     /** 子表格数据源，可以是数据数组或函数 */
-    dataSource?: any[] | ((record: T) => any[]);
+    dataSource?: Record<string, unknown>[] | ((record: T) => Record<string, unknown>[]);
     /** 子表格其他配置 - 使用 Arco Table 的原生属性 */
-    tableProps?: Omit<TableProps<any>, 'columns' | 'data'>;
+    tableProps?: Omit<TableProps<Record<string, unknown>>, 'columns' | 'data'>;
     /** 从当前行数据中获取子表格数据的路径 */
     dataPath?: string;
     /** 子表格标题 */
@@ -227,6 +231,14 @@ export interface ProColumnType<T = any> extends Omit<
    * 是否可拷贝
    */
   copyable?: boolean;
+
+  /**
+   * 自定义复制内容的回调函数
+   * @param text 当前单元格显示的文本
+   * @param record 当前行数据
+   * @returns 要复制的内容
+   */
+  copyText?: (text: unknown, record: T) => string;
 
   /**
    * 是否可省略
@@ -363,7 +375,7 @@ export interface ProColumnType<T = any> extends Omit<
   /**
    * 单元格 tooltip 配置
    */
-  cellTooltip?: boolean | string | ((text: any, record?: any, index?: number) => ReactNode);
+  cellTooltip?: boolean | string | ((text: unknown, record?: T, index?: number) => ReactNode);
 
   /**
    * 列宽
@@ -452,7 +464,7 @@ export interface ProColumnType<T = any> extends Omit<
  * 打开弹窗配置
  * 支持 Modal 组件的所有属性透传
  */
-export interface OpenDialogConfig<TValues = Record<string, any>, TRow = any> {
+export interface OpenDialogConfig<TValues = Record<string, unknown>, TRow = Record<string, unknown>> {
   /**
    * 表格列配置
    */
@@ -472,7 +484,13 @@ export interface OpenDialogConfig<TValues = Record<string, any>, TRow = any> {
   /**
    * 弹窗内容
    */
-  content?: ReactNode;
+  content?:
+    | ReactNode
+    | ((props: {
+        close: () => void;
+        update: (config: Partial<OpenDialogConfig<TValues, TRow>>) => void;
+        destroy: () => void;
+      }) => ReactNode);
   /**
    * 弹窗宽度
    */
@@ -624,7 +642,13 @@ export interface ConfirmDialogConfig {
   /**
    * 内容
    */
-  content?: ReactNode;
+  content?:
+    | ReactNode
+    | ((props: {
+        close: () => void;
+        update: (config: Partial<ConfirmDialogConfig>) => void;
+        destroy: () => void;
+      }) => ReactNode);
   /**
    * 确认回调
    */
@@ -762,11 +786,11 @@ export interface ConfirmDialogConfig {
 /**
  * 弹窗返回对象
  */
-export interface DialogReturnProps {
+export interface DialogReturnProps<TValues = Record<string, unknown>, TRow = Record<string, unknown>> {
   /**
    * 更新弹窗配置
    */
-  update: (config: Partial<OpenDialogConfig>) => void;
+  update: (config: Partial<OpenDialogConfig<TValues, TRow>>) => void;
   /**
    * 关闭弹窗
    */
@@ -780,7 +804,7 @@ export interface DialogReturnProps {
 /**
  * 表格操作类型
  */
-export interface ProTableActionType {
+export interface ProTableActionType<T = Record<string, unknown>> {
   /** 重新加载数据 */
   reload: (resetPageIndex?: boolean) => void;
   /** 刷新并清空选中 */
@@ -790,11 +814,11 @@ export interface ProTableActionType {
   /** 清空选中 */
   clearSelected: () => void;
   /** 设置选中行 */
-  setSelectedRows: (rows: any[]) => void;
+  setSelectedRows: (rows: T[]) => void;
   /** 设置选中行 keys */
   setSelectedRowKeys: (keys: (string | number)[]) => void;
   /** 获取选中行 */
-  getSelectedRows: () => any[];
+  getSelectedRows: () => T[];
   /** 获取选中行 keys */
   getSelectedRowKeys: () => (string | number)[];
   /** 开始编辑行 */
@@ -831,7 +855,9 @@ export interface ProTableActionType {
    * @param config 弹窗配置
    * @returns 弹窗控制对象
    */
-  openDialog: <TValues = Record<string, any>, TRow = any>(config: OpenDialogConfig<TValues, TRow>) => DialogReturnProps;
+  openDialog: <TValues = Record<string, unknown>, TRow = Record<string, unknown>>(
+    config: OpenDialogConfig<TValues, TRow>,
+  ) => DialogReturnProps<TValues, TRow>;
   /**
    * 打开确认对话框
    * @param config 确认对话框配置
@@ -921,7 +947,7 @@ export interface ProTableBatchOperationConfig {
 /**
  * 行选择配置
  */
-export interface ProTableRowSelectionConfig {
+export interface ProTableRowSelectionConfig<T = Record<string, unknown>> {
   /** 是否显示选择列 */
   show?: boolean;
   /** 选择类型 */
@@ -929,9 +955,9 @@ export interface ProTableRowSelectionConfig {
   /** 受控的选中行 keys */
   selectedRowKeys?: (string | number)[];
   /** 受控的选中行 */
-  selectedRows?: any[];
+  selectedRows?: T[];
   /** 选中变化回调 */
-  onChange?: (selectedRowKeys: (string | number)[], selectedRows: any[]) => void;
+  onChange?: (selectedRowKeys: (string | number)[], selectedRows: T[]) => void;
   /** 是否跨页选择 - 切换分页时保留已选项 */
   preserveSelectedRowKeys?: boolean;
   /** 多选模式下是否跨分页选择（只在非受控模式下生效） */
@@ -943,7 +969,7 @@ export interface ProTableRowSelectionConfig {
   /** 选择框是否固定 */
   fixed?: boolean | 'left' | 'right';
   /** 获取行数据的 key */
-  getCheckboxProps?: (record: any) => {
+  getCheckboxProps?: (record: T) => {
     disabled?: boolean;
     indeterminate?: boolean;
   };
@@ -960,7 +986,7 @@ export interface ProTableRowSelectionConfig {
 /**
  * 表格实例
  */
-export interface ProTableInstance<T = any> {
+export interface ProTableInstance<T = Record<string, unknown>> {
   /** 表格操作 */
   action: ProTableActionType;
   /** 表单实例 */
@@ -982,7 +1008,10 @@ export interface ProTableInstance<T = any> {
 /**
  * ProTable 组件属性
  */
-export interface ProTableProps<T = any> extends Omit<TableProps, 'columns' | 'pagination' | 'rowSelection'> {
+export interface ProTableProps<T = Record<string, unknown>> extends Omit<
+  TableProps<T>,
+  'columns' | 'pagination' | 'rowSelection'
+> {
   /** 表格列配置 */
   columns: ProColumnType<T>[];
   /** 操作实例引用（示例用） */
@@ -1041,7 +1070,7 @@ export interface ProTableProps<T = any> extends Omit<TableProps, 'columns' | 'pa
       };
 
   /** 行选择配置 */
-  rowSelection?: ProTableRowSelectionConfig | boolean;
+  rowSelection?: ProTableRowSelectionConfig<T> | boolean;
 
   /** 批量操作配置 */
   batchOperation?: ProTableBatchOperationConfig;
@@ -1069,7 +1098,7 @@ export interface ProTableProps<T = any> extends Omit<TableProps, 'columns' | 'pa
 
   /** 展开图标属性 */
   expandProps?: {
-    icon?: (props: { expanded: boolean; record: Record<string, any> }) => ReactNode;
+    icon?: (props: { expanded: boolean; record: Record<string, unknown> }) => ReactNode;
     width?: number;
     columnTitle?: ReactNode;
     rowExpandable?: (record: T) => boolean;
@@ -1286,9 +1315,9 @@ export interface ProTableProps<T = any> extends Omit<TableProps, 'columns' | 'pa
         /** 排除的参数名 */
         exclude?: string[];
         /** 自定义序列化 */
-        serialize?: (params: Record<string, any>) => string;
+        serialize?: (params: Record<string, unknown>) => string;
         /** 自定义反序列化 */
-        deserialize?: (search: string) => Record<string, any>;
+        deserialize?: (search: string) => Record<string, unknown>;
       };
 
   /** 查询方案配置 */
@@ -1303,7 +1332,7 @@ export interface ProTableProps<T = any> extends Omit<TableProps, 'columns' | 'pa
     schemas?: Array<{
       key: string;
       name: string;
-      params: Record<string, any>;
+      params: Record<string, unknown>;
     }>;
   };
 

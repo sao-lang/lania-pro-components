@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Space, Button, Tooltip, Trigger, Checkbox, Radio, Divider, Typography } from '@arco-design/web-react';
+import { Space, Button, Tooltip, Trigger, Checkbox, Radio, Divider } from '@arco-design/web-react';
 import {
   IconRefresh,
   IconSettings,
@@ -9,7 +9,7 @@ import {
   IconDragDotVertical,
 } from '@arco-design/web-react/icon';
 import { useDataContext, useColumnContext, useRootContext } from '../context';
-import type { ProColumnType, TableDensity, ProTableNEventHandlers } from '../types';
+import type { TableDensity, ProTableNEventHandlers } from '../types';
 import { ToolbarActionButtons } from './ActionButtonRenderer';
 
 const RadioGroup = Radio.Group;
@@ -60,14 +60,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ extraRender, handlers, refresh
   // 刷新
   const handleRefresh = () => {
     action.reload();
-  };
-
-  // 切换密度
-  const handleDensityToggle = () => {
-    const densities: TableDensity[] = ['default', 'middle', 'compact'];
-    const currentIndex = densities.indexOf(density);
-    const nextDensity = densities[(currentIndex + 1) % densities.length];
-    handleDensityChange(nextDensity);
   };
 
   // 设置密度

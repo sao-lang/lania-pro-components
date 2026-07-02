@@ -60,15 +60,15 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   const getComponentValue = useCallback(() => {
     if (isRangePickerArray && rangePickerNames) {
       const [startName, endName] = rangePickerNames;
-      const startValue = rootContext.formInstance.getFieldValue(startName);
-      const endValue = rootContext.formInstance.getFieldValue(endName);
+      const startValue = rootContext.instance.getFieldValue(startName);
+      const endValue = rootContext.instance.getFieldValue(endName);
       if (startValue || endValue) {
         return [startValue, endValue];
       }
       return undefined;
     }
     return value;
-  }, [isRangePickerArray, rangePickerNames, value, rootContext.formInstance]);
+  }, [isRangePickerArray, rangePickerNames, value, rootContext.instance]);
 
   useEffect(() => {
     setValueState(fieldNode.value);
@@ -110,17 +110,17 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         arcoForm.setFieldValue(startName, startValue);
         arcoForm.setFieldValue(endName, endValue);
 
-        onFieldChange?.(newValue, rootContext.formInstance.getFieldsValue());
+        onFieldChange?.(newValue, rootContext.instance.getFieldsValue());
         rootContext.onValuesChange?.(
           { [startName]: startValue, [endName]: endValue },
-          rootContext.formInstance.getFieldsValue(),
+          rootContext.instance.getFieldsValue(),
         );
       } else {
         fieldNode.setValue(newValue);
         arcoForm.setFieldValue(fieldName, newValue);
 
-        onFieldChange?.(newValue, rootContext.formInstance.getFieldsValue());
-        rootContext.onValuesChange?.({ [fieldName]: newValue }, rootContext.formInstance.getFieldsValue());
+        onFieldChange?.(newValue, rootContext.instance.getFieldsValue());
+        rootContext.onValuesChange?.({ [fieldName]: newValue }, rootContext.instance.getFieldsValue());
       }
     },
     [fieldNode, arcoForm, rootContext, onFieldChange, isRangePickerArray, rangePickerNames, fieldName],
@@ -131,7 +131,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       name: fieldName,
       label: fieldNode.schema.label,
       value,
-      values: rootContext.formInstance.getFieldsValue(),
+      values: rootContext.instance.getFieldsValue(),
       status,
       focused,
       computedBehavior: fieldNode.computedBehavior,
@@ -146,17 +146,17 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       validate: async () => {
         const err = await fieldNode.validate();
         setErrorState(err);
-        arcoForm.setFieldError(fieldName, err);
+        arcoForm.setFields({ [fieldName]: { error: err ? { message: err } : undefined } });
       },
       setError: (err?: string) => {
         fieldNode.setError(err);
         setErrorState(err);
-        arcoForm.setFieldError(fieldName, err);
+        arcoForm.setFields({ [fieldName]: { error: err ? { message: err } : undefined } });
       },
       clearError: () => {
         fieldNode.setError(undefined);
         setErrorState(undefined);
-        arcoForm.setFieldError(fieldName, undefined);
+        arcoForm.setFields({ [fieldName]: { error: undefined } });
       },
       fieldNode,
     }),
@@ -172,15 +172,15 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   const displayValue = useMemo(() => {
     if (isRangePickerArray && rangePickerNames) {
       const [startName, endName] = rangePickerNames;
-      const startValue = rootContext.formInstance.getFieldValue(startName);
-      const endValue = rootContext.formInstance.getFieldValue(endName);
+      const startValue = rootContext.instance.getFieldValue(startName);
+      const endValue = rootContext.instance.getFieldValue(endName);
       if (startValue || endValue) {
         return [startValue, endValue];
       }
       return undefined;
     }
-    return rootContext.formInstance.getFieldValue(fieldName);
-  }, [isRangePickerArray, rangePickerNames, fieldName, rootContext.formInstance]);
+    return rootContext.instance.getFieldValue(fieldName);
+  }, [isRangePickerArray, rangePickerNames, fieldName, rootContext.instance]);
 
   const renderReadonlyContent = useMemo(() => {
     const readonlyComponentName =

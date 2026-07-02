@@ -9,22 +9,22 @@ import { useFieldNavigation, type UseFieldNavigationReturn } from './hooks/useFi
  */
 export interface ProFormContextValue<TValues = Record<string, unknown>> {
   formStore: FormStore | null;
-  formInstance: ProFormInstance<TValues> | null;
+  instance: ProFormInstance<TValues> | null;
   arcoForm: ArcoFormInstance | null;
 }
 
 export const ProFormContext = createContext<ProFormContextValue>({
   formStore: null,
-  formInstance: null,
+  instance: null,
   arcoForm: null,
 });
 
 /**
- * 使用 FormStore 的 Hook
+ * 使用 ProFormContext 的 Hook
+ * 与 ProTable 的 useProTableContext 保持一致的 API 风格
  */
-export const useFormStore = (): FormStore | null => {
-  const context = useContext(ProFormContext);
-  return context?.formStore || null;
+export const useProFormContext = <TValues = Record<string, unknown>,>(): ProFormContextValue<TValues> => {
+  return useContext(ProFormContext) as ProFormContextValue<TValues>;
 };
 
 /**
@@ -42,7 +42,7 @@ export interface UseProFormOptions<TValues = Record<string, unknown>> extends Om
  */
 export interface UseProFormReturn<TValues = Record<string, unknown>> {
   arcoForm: ArcoFormInstance;
-  formInstance: ProFormInstance<TValues>;
+  instance: ProFormInstance<TValues>;
   schemas: ProFormSchema<TValues>[];
   setSchemas: (schemas: ProFormSchema<TValues>[]) => void;
   formProps: Partial<ProFormProps<TValues>>;
@@ -116,7 +116,6 @@ export const useProForm = <TValues = Record<string, unknown>,>(
     validateTrigger,
     labelColProps,
     wrapperColProps,
-    instance,
     cardContainer,
     keyboardNavigation,
   } = options;
@@ -185,10 +184,10 @@ export const useProForm = <TValues = Record<string, unknown>,>(
     (name?: string | string[]) => {
       if (name) {
         const names = Array.isArray(name) ? name : [name];
-        names.forEach((n) => arcoForm.setFieldError(n, undefined));
+        names.forEach((n) => arcoForm.setFields({ [n]: { error: undefined } }));
       } else {
         const fields = arcoForm.getFields();
-        Object.keys(fields).forEach((n) => arcoForm.setFieldError(n, undefined));
+        Object.keys(fields).forEach((n) => arcoForm.setFields({ [n]: { error: undefined } }));
       }
     },
     [arcoForm],
@@ -342,7 +341,7 @@ export const useProForm = <TValues = Record<string, unknown>,>(
   /**
    * ProForm 实例对象
    */
-  const formInstance: ProFormInstance<TValues> = {
+  const instance: ProFormInstance<TValues> = {
     validate,
     validateField,
     clearValidate,
@@ -428,7 +427,6 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       validateTrigger,
       labelColProps,
       wrapperColProps,
-      instance,
       cardContainer,
       keyboardNavigation,
     }),
@@ -480,7 +478,6 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       validateTrigger,
       labelColProps,
       wrapperColProps,
-      instance,
       cardContainer,
       keyboardNavigation,
     ],
@@ -492,7 +489,7 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       <ProFormContext.Provider
         value={{
           formStore,
-          formInstance: formInstance as ProFormInstance,
+          instance: instance as ProFormInstance,
           arcoForm,
         }}
       >
@@ -500,11 +497,11 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       </ProFormContext.Provider>
     );
     return ProviderComponent;
-  }, [formStore, formInstance, arcoForm]);
+  }, [formStore, instance, arcoForm]);
 
   return {
     arcoForm,
-    formInstance,
+    instance,
     schemas,
     setSchemas,
     formProps,

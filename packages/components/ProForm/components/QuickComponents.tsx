@@ -4,8 +4,8 @@ import { IconEye, IconEyeInvisible } from '@arco-design/web-react/icon';
 import { registerComponent } from '../registry/componentRegistry';
 
 interface QuickInputWithSuffixProps {
-  value?: string | number;
-  onChange?: (value: string | number) => void;
+  value?: string;
+  onChange?: (value: string) => void;
   suffix?: string;
   prefix?: string;
   [key: string]: unknown;
@@ -31,7 +31,15 @@ const QuickInputWithSuffix: FC<QuickInputWithSuffixProps> = ({
   );
 };
 
-const QuickInputNumberWithSuffix: FC<QuickInputWithSuffixProps> = ({
+interface QuickInputNumberWithSuffixProps {
+  value?: number;
+  onChange?: (value: number) => void;
+  suffix?: string;
+  prefix?: string;
+  [key: string]: unknown;
+}
+
+const QuickInputNumberWithSuffix: FC<QuickInputNumberWithSuffixProps> = ({
   value,
   onChange,
   suffix,
@@ -295,9 +303,13 @@ interface YearPickerProps {
   [key: string]: unknown;
 }
 
-const YearPicker: FC<YearPickerProps> = ({ value, onChange, ...props }) => (
-  <DatePicker.YearPicker {...props} value={value} onChange={onChange} />
-);
+const YearPicker: FC<YearPickerProps> = ({ value, onChange, ...props }) => {
+  const handleChange = (_dateString: string, date: unknown) => {
+    const dateObj = (date as { toDate?: () => Date })?.toDate?.() || new Date(String(date));
+    onChange?.(dateObj);
+  };
+  return <DatePicker.YearPicker {...props} value={value} onChange={handleChange} />;
+};
 
 interface MonthPickerProps {
   value?: Date;
@@ -305,9 +317,13 @@ interface MonthPickerProps {
   [key: string]: unknown;
 }
 
-const MonthPicker: FC<MonthPickerProps> = ({ value, onChange, ...props }) => (
-  <DatePicker.MonthPicker {...props} value={value} onChange={onChange} />
-);
+const MonthPicker: FC<MonthPickerProps> = ({ value, onChange, ...props }) => {
+  const handleChange = (_dateString: string, date: unknown) => {
+    const dateObj = (date as { toDate?: () => Date })?.toDate?.() || new Date(String(date));
+    onChange?.(dateObj);
+  };
+  return <DatePicker.MonthPicker {...props} value={value} onChange={handleChange} />;
+};
 
 interface WeekPickerProps {
   value?: Date;
@@ -315,9 +331,13 @@ interface WeekPickerProps {
   [key: string]: unknown;
 }
 
-const WeekPicker: FC<WeekPickerProps> = ({ value, onChange, ...props }) => (
-  <DatePicker.WeekPicker {...props} value={value} onChange={onChange} />
-);
+const WeekPicker: FC<WeekPickerProps> = ({ value, onChange, ...props }) => {
+  const handleChange = (_dateString: string, date: unknown) => {
+    const dateObj = (date as { toDate?: () => Date })?.toDate?.() || new Date(String(date));
+    onChange?.(dateObj);
+  };
+  return <DatePicker.WeekPicker {...props} value={value} onChange={handleChange} />;
+};
 
 interface QuarterPickerProps {
   value?: Date;
@@ -325,9 +345,13 @@ interface QuarterPickerProps {
   [key: string]: unknown;
 }
 
-const QuarterPicker: FC<QuarterPickerProps> = ({ value, onChange, ...props }) => (
-  <DatePicker.QuarterPicker {...props} value={value} onChange={onChange} />
-);
+const QuarterPicker: FC<QuarterPickerProps> = ({ value, onChange, ...props }) => {
+  const handleChange = (_dateString: string, date: unknown) => {
+    const dateObj = (date as { toDate?: () => Date })?.toDate?.() || new Date(String(date));
+    onChange?.(dateObj);
+  };
+  return <DatePicker.QuarterPicker {...props} value={value} onChange={handleChange} />;
+};
 
 interface RangePickerProps {
   value?: [Date, Date];
@@ -336,11 +360,16 @@ interface RangePickerProps {
 }
 
 const RangePicker: FC<RangePickerProps> = ({ value, onChange, style, ...restProps }) => {
+  const handleChange = (_dateString: string[], date: unknown[]) => {
+    const dateObj1 = (date[0] as { toDate?: () => Date })?.toDate?.() || new Date(String(date[0]));
+    const dateObj2 = (date[1] as { toDate?: () => Date })?.toDate?.() || new Date(String(date[1]));
+    onChange?.([dateObj1, dateObj2]);
+  };
   return (
     <DatePicker.RangePicker
       {...restProps}
       value={value}
-      onChange={onChange}
+      onChange={handleChange}
       style={{ width: '100%', ...(style as Record<string, unknown>) }}
     />
   );
@@ -352,9 +381,14 @@ interface TimeRangePickerProps {
   [key: string]: unknown;
 }
 
-const TimeRangePicker: FC<TimeRangePickerProps> = ({ value, onChange, ...props }) => (
-  <TimePicker.RangePicker {...props} value={value} onChange={onChange} />
-);
+const TimeRangePicker: FC<TimeRangePickerProps> = ({ value, onChange, ...props }) => {
+  const handleChange = (_dateString: string[], date: unknown[]) => {
+    const dateObj1 = (date[0] as { toDate?: () => Date })?.toDate?.() || new Date(String(date[0]));
+    const dateObj2 = (date[1] as { toDate?: () => Date })?.toDate?.() || new Date(String(date[1]));
+    onChange?.([dateObj1, dateObj2]);
+  };
+  return <TimePicker.RangePicker {...props} value={value} onChange={handleChange} />;
+};
 
 // 注册所有快速组件
 registerComponent('Password', PasswordInput);

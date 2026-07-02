@@ -6,7 +6,7 @@
 
 ```
 ActionButton
-├── 表单类按钮（内嵌 ProDialog + ProFormN）
+├── 表单类按钮（内嵌 ProDialog + ProForm）
 │   ├── AddButton     - 新增按钮（表单弹窗 + 提交）
 │   ├── EditButton    - 编辑按钮（表单弹窗 + 回填数据 + 提交）
 │   └── ViewButton    - 查看按钮（弹窗 + 只读展示）

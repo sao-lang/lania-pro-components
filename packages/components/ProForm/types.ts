@@ -11,6 +11,12 @@ export interface ValidationRule {
   max?: number;
   minLength?: number;
   maxLength?: number;
+  len?: number;
+  precision?: number;
+  step?: number;
+  type?: 'number' | 'integer' | 'float' | 'string' | 'boolean';
+  sign?: 'positive' | 'negative' | 'zero';
+  whitespace?: boolean;
   pattern?: RegExp | string;
   validator?: (value: unknown, values: Record<string, unknown>) => string | undefined | Promise<string | undefined>;
   message?: string;
@@ -434,8 +440,7 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
   labelColProps?: ColProps;
   /** 全局内容列配置（别名） */
   wrapperColProps?: ColProps;
-  /** 实例名称 */
-  instance?: string;
+
   /** 卡片容器模式 */
   cardContainer?:
     | boolean
@@ -589,6 +594,7 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
  * 组件注册表
  */
 export interface ComponentRegistry {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: React.ComponentType<any>;
 }
 

@@ -3,7 +3,7 @@ import { Button, Card } from '@arco-design/web-react';
 import { IconPlus, IconDelete } from '@arco-design/web-react/icon';
 import { useRootContext } from '../context/RootContext';
 import { FormField } from '../FormField';
-import { useFormStore } from '../useProForm';
+import { useProFormContext } from '../useProForm';
 
 import type { ProFormListProps } from './types';
 
@@ -27,7 +27,7 @@ export const ProFormList: FC<ProFormListProps> = ({
   cardProps,
 }) => {
   const { onValuesChange, arcoForm } = useRootContext();
-  const formStore = useFormStore();
+  const { formStore } = useProFormContext();
 
   const listValue = useMemo(() => {
     const value = formStore?.getValue(name);

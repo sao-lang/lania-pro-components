@@ -2,39 +2,34 @@ import React, { createContext, useContext, useMemo, useEffect, useRef, useState 
 import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState, DataStoreActions } from '../store/types';
 import type { ProTableActionType } from '../types';
-import type { ProFormInstance } from '../../ProFormN/types';
-import { useRootContext } from './RootContext';
+import type { ProFormInstance } from '../../ProForm/types';
 
-/**
- * DataContext - 数据状态层
- * 从 DataStore 读取状态，提供 action 方法
- */
-export interface DataContextValue<T = Record<string, any>> extends DataStoreState<T>, DataStoreActions<T> {
-  /** 表格操作方法 */
-  action: ProTableActionType;
-  /** 表单 ref */
+export interface DataContextValue<T = Record<string, unknown>> extends DataStoreState<T>, DataStoreActions<T> {
+  action: ProTableActionType<T>;
   formRef: React.RefObject<ProFormInstance | null>;
+  onDataSourceChange?: (dataSource: T[]) => void;
 }
 
-const DataContext = createContext<DataContextValue<any> | null>(null);
+const DataContext = createContext<DataContextValue<Record<string, unknown>> | null>(null);
 
-export interface DataProviderProps<T extends Record<string, any> = Record<string, any>> {
+export interface DataProviderProps<T extends Record<string, unknown> = Record<string, unknown>> {
   children: React.ReactNode;
   store: DataStoreImpl<T>;
   formRef: React.RefObject<ProFormInstance | null>;
-  action: ProTableActionType;
+  action: ProTableActionType<T>;
+  onDataSourceChange?: (dataSource: T[]) => void;
 }
 
-export const DataProvider = <T extends Record<string, any>>({
+export const DataProvider = <T extends Record<string, unknown>>({
   children,
   store,
   formRef,
   action,
+  onDataSourceChange,
 }: DataProviderProps<T>) => {
   const [, forceUpdate] = useState({});
   const prevTotalRef = useRef(store.total);
 
-  // 订阅 Store 状态变化
   useEffect(() => {
     const unsubscribe = store.subscribe(() => {
       forceUpdate({});
@@ -42,12 +37,14 @@ export const DataProvider = <T extends Record<string, any>>({
     return unsubscribe;
   }, [store]);
 
-  // 处理删除最后一页数据后的分页调整
+  useEffect(() => {
+    onDataSourceChange?.(store.dataSource);
+  }, [store.dataSource, onDataSourceChange]);
+
   useEffect(() => {
     const { total } = store;
     const { current, pageSize } = store.pagination;
 
-    // 只有 total 变化时才检查
     if (total !== prevTotalRef.current) {
       prevTotalRef.current = total;
 
@@ -73,7 +70,6 @@ export const DataProvider = <T extends Record<string, any>>({
 
   const value = useMemo<DataContextValue<T>>(
     () => ({
-      // 状态
       dataSource: store.dataSource,
       loading: store.loading,
       error: store.error,
@@ -86,7 +82,6 @@ export const DataProvider = <T extends Record<string, any>>({
       selectedRows: store.selectedRows,
       isPolling: store.isPolling,
       pollingInterval: store.pollingInterval,
-      // 方法
       setDataSource: store.setDataSource.bind(store),
       setLoading: store.setLoading.bind(store),
       setError: store.setError.bind(store),
@@ -103,14 +98,15 @@ export const DataProvider = <T extends Record<string, any>>({
       stopPolling: store.stopPolling.bind(store),
       reload: store.reload.bind(store),
       reset: store.reset.bind(store),
-      // action 和 formRef
       action,
       formRef,
+      onDataSourceChange,
     }),
     [
       store,
       action,
       formRef,
+      onDataSourceChange,
       store.dataSource,
       store.loading,
       store.error,
@@ -126,13 +122,17 @@ export const DataProvider = <T extends Record<string, any>>({
     ],
   );
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={value as unknown as DataContextValue<Record<string, unknown>>}>
+      {children}
+    </DataContext.Provider>
+  );
 };
 
-export const useDataContext = () => {
+export const useDataContext = <T extends Record<string, unknown> = Record<string, unknown>>() => {
   const context = useContext(DataContext);
   if (!context) {
     throw new Error('useDataContext must be used within a DataProvider');
   }
-  return context;
+  return context as DataContextValue<T>;
 };

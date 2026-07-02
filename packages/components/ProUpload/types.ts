@@ -2,10 +2,6 @@ import type { UploadProps, ImageProps } from '@arco-design/web-react';
 import type { UploadItem } from '@arco-design/web-react/es/Upload';
 import type { ReactNode } from 'react';
 
-export interface UserInfoData {
-  [key: string]: unknown;
-}
-
 /**
  * 上传文件类型
  */
@@ -279,10 +275,6 @@ export interface ProUploadProps extends Omit<
    */
   previewConfig?: PreviewConfig;
   /**
-   * 用户信息
-   */
-  userInfo?: UserInfoData;
-  /**
    * 文件列表变化回调
    * @param fileList 文件列表
    */
@@ -329,6 +321,17 @@ export interface ProUploadProps extends Omit<
    * @returns 上传后的URL
    */
   customUpload?: (file: File, onProgress: (percent: number) => void) => Promise<string>;
+  /**
+   * 上传过程中的回调钩子
+   * @param options 上传状态信息
+   */
+  onRequest?: (options: {
+    file: ProUploadFileItem;
+    status: 'start' | 'progress' | 'success' | 'error';
+    percent?: number;
+    url?: string;
+    errorMessage?: string;
+  }) => void;
   /**
    * 是否显示上传按钮
    * @default true
@@ -415,12 +418,16 @@ export interface ProUploadProps extends Omit<
    * 是否支持排序
    * @default false
    */
-  _sortable?: boolean;
+  sortable?: boolean;
   /**
    * 文件排序回调
    * @param newFileList 排序后的文件列表
    */
-  _onSort?: (newFileList: ProUploadFileItem[]) => void;
+  onSort?: (newFileList: ProUploadFileItem[]) => void;
+  /**
+   * 空状态渲染
+   */
+  emptyRender?: ReactNode;
   /**
    * 是否显示文件计数
    * @default false
@@ -431,10 +438,6 @@ export interface ProUploadProps extends Omit<
    * @default '{current}/{max}'
    */
   countFormat?: string;
-  /**
-   * 空状态渲染
-   */
-  _emptyRender?: ReactNode;
   /**
    * 错误重试次数
    * @default 0

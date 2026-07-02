@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useCallback } from 'react';
-import type { ProTableProps, ProColumnType } from '../types';
+import type { ProTableProps } from '../types';
 
 /**
  * 表格全局配置类型
@@ -63,6 +63,8 @@ export interface TableConfig {
   emptyRender?: ProTableProps['emptyRender'];
   /** 错误状态渲染 */
   errorRender?: ProTableProps['errorRender'];
+  /** 弹窗默认配置 */
+  dialogConfig?: ProTableProps['dialogConfig'];
 }
 
 /**

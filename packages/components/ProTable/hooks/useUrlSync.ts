@@ -10,11 +10,11 @@ export interface UrlSyncConfig {
   exclude?: string[];
 }
 
-export interface UseUrlSyncOptions {
+export interface UseUrlSyncOptions<T = Record<string, unknown>> {
   /** 是否启用 URL 同步 */
   enabled: boolean;
   /** DataStore 实例 */
-  store: DataStoreImpl<any>;
+  store: DataStoreImpl<T>;
   /** 同步配置 */
   config?: UrlSyncConfig;
   /** 同步延迟时间（防抖） */
@@ -114,7 +114,9 @@ const parseParamValue = (value: string): unknown => {
  * URL 同步 Hook
  * 将表格状态同步到 URL 参数
  */
-export const useUrlSync = (options: UseUrlSyncOptions) => {
+export const useUrlSync = <T extends Record<string, unknown> = Record<string, unknown>>(
+  options: UseUrlSyncOptions<T>,
+) => {
   const { enabled, store, config = {}, debounceTime = 300 } = options;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRestoringRef = useRef(false);

@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
+import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import type {
   ProDialogProps,
@@ -9,8 +9,14 @@ import type {
   OpenDialogConfig,
   ConfirmDialogConfig,
   DialogReturnProps,
+  OpenDialogParams,
+  FormDialogProps,
+  TableDialogProps,
+  DialogButtonContext,
+  DialogButtonConfig,
+  ProDialogComponent,
 } from './types';
-import { ProForm, ProFormInstance } from '../ProFormN';
+import { ProForm, ProFormInstance, ProFormSchema, ProFormProps } from '../ProForm';
 import { ProTable, ProTableActionType } from '../ProTable';
 import { instanceRegistry } from './instanceRegistry';
 import { renderConfirmDialog, createDialogHolder } from './dialogHolder';
@@ -60,8 +66,8 @@ import { ProPopconfirm, ProMessage, ProNotification, ProNotify, showPopconfirm }
  * ```
  */
 const ProDialogComponent = <
-  TValues extends Record<string, any> = Record<string, any>,
-  T extends Record<string, any> = Record<string, any>,
+  TValues extends Record<string, unknown> = Record<string, unknown>,
+  T extends Record<string, unknown> = Record<string, unknown>,
 >() => {
   const Component = forwardRef<ProDialogInstance<TValues, T>, ProDialogProps<TValues, T>>(
     (
@@ -100,12 +106,13 @@ const ProDialogComponent = <
         showOk = true,
         showCancel = true,
         extraButtons = [],
+        buttons,
         afterOpen,
         afterClose,
         onVisibleChange,
         onOk,
         onCancel,
-        _onClose,
+        onClose,
         escToExit = true,
         mountOnEnter = true,
         unmountOnExit = false,
@@ -115,6 +122,7 @@ const ProDialogComponent = <
         getChildrenPopupContainer,
         instance,
         dialogRender,
+        dialogRef,
         children,
 
         // Drawer 配置
@@ -125,6 +133,8 @@ const ProDialogComponent = <
         confirmTitle = '确认关闭',
         confirmContent = '确定要关闭弹窗吗？未保存的数据将丢失。',
         isEditing,
+        draggable = false,
+        resizable = false,
         fullscreen: fullscreenProp = false,
         showFullscreen = false,
         zIndex,
@@ -163,6 +173,17 @@ const ProDialogComponent = <
         fullscreen: fullscreenProp,
         contentLoading: false,
       });
+
+      // 拖拽状态
+      const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+      const isDraggingRef = useRef(false);
+      const dragStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+
+      // 调整大小状态
+      const [resizeSize, setResizeSize] = useState({ width: 0, height: 0 });
+      const isResizingRef = useRef(false);
+      const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+      const minResizeSize = { width: 300, height: 200 };
 
       // Refs
       const formRef = useRef<ProFormInstance<TValues>>(null);
@@ -247,8 +268,8 @@ const ProDialogComponent = <
         setLoading: (loading) => {
           setState((prev) => ({ ...prev, contentLoading: loading }));
         },
-        getFormInstance: () => formRef.current || undefined,
-        getTableAction: () => tableActionRef.current || undefined,
+        getFormInstance: (): ProFormInstance<TValues> | undefined => formRef.current ?? undefined,
+        getTableAction: (): ProTableActionType | undefined => tableActionRef.current ?? undefined,
         update: (config) => {
           // 更新配置（通过重新渲染实现）
           if (config.title !== undefined) {
@@ -263,10 +284,9 @@ const ProDialogComponent = <
         setFormValues: (values) => {
           formRef.current?.setFieldsValue(values);
         },
-        getFormValues: (nameList) => {
+        getFormValues: (nameList): TValues => {
           const value = formRef.current?.getFieldsValue(nameList);
-          const result: TValues = (value || {}) as TValues;
-          return result;
+          return (value || {}) as TValues;
         },
         setFormFieldValue: (name, value) => {
           formRef.current?.setFieldValue(name, value);
@@ -275,10 +295,9 @@ const ProDialogComponent = <
         resetForm: (nameList) => {
           formRef.current?.resetFields(nameList);
         },
-        validateForm: () => {
+        validateForm: (): Promise<TValues> => {
           const promise = formRef.current?.validate();
-          const result: Promise<TValues> = (promise || Promise.resolve({})) as Promise<TValues>;
-          return result;
+          return (promise || Promise.resolve({} as TValues)) as Promise<TValues>;
         },
         clearFormValidate: (name) => {
           formRef.current?.clearValidate(name);
@@ -289,7 +308,7 @@ const ProDialogComponent = <
         setFormSchemas: (newSchemas) => {
           formRef.current?.setSchemas(newSchemas);
         },
-        submitForm: () => (formRef.current?.submit() as unknown as Promise<void>) || Promise.resolve(),
+        submitForm: (): Promise<void> => (formRef.current?.submit() as unknown as Promise<void>) || Promise.resolve(),
 
         // ===== 表格快捷操作方法 =====
         reloadTable: (resetPageIndex) => {
@@ -310,8 +329,8 @@ const ProDialogComponent = <
         setTableSelectedRowKeys: (keys) => {
           tableActionRef.current?.setSelectedRowKeys(keys);
         },
-        getTableSelectedRows: () => tableActionRef.current?.getSelectedRows() || [],
-        getTableSelectedRowKeys: () => tableActionRef.current?.getSelectedRowKeys() || [],
+        getTableSelectedRows: (): T[] => (tableActionRef.current?.getSelectedRows() as T[]) || ([] as T[]),
+        getTableSelectedRowKeys: (): (string | number)[] => tableActionRef.current?.getSelectedRowKeys() || [],
         getTablePagination: () =>
           tableActionRef.current?.getPagination() || {
             current: 1,
@@ -330,20 +349,31 @@ const ProDialogComponent = <
       // 暴露实例方法
       useImperativeHandle(ref, () => dialogInstance, [dialogInstance]);
 
-      // 同步 dialogInstance 到 ref
       useEffect(() => {
         dialogInstanceRef.current = dialogInstance;
-      }, [dialogInstance]);
+        if (typeof dialogRef === 'function') {
+          dialogRef(dialogInstance);
+        } else if (dialogRef) {
+          dialogRef.current = dialogInstance;
+        }
+      }, [dialogInstance, dialogRef]);
 
       // 注册实例
       useEffect(() => {
         if (instance && dialogInstanceRef.current) {
-          instanceRegistry.register(instance, dialogInstanceRef.current);
+          instanceRegistry.register(instance, dialogInstanceRef.current as ProDialogInstance);
           return () => {
             instanceRegistry.unregister(instance);
           };
         }
       }, [instance]);
+
+      // 关闭或全屏时重置拖拽偏移
+      useEffect(() => {
+        if (!visible || state.fullscreen) {
+          setDragOffset({ x: 0, y: 0 });
+        }
+      }, [visible, state.fullscreen]);
 
       // 关闭处理
       const handleClose = useCallback(() => {
@@ -359,6 +389,7 @@ const ProDialogComponent = <
                   setState((prev) => ({ ...prev, visible: false }));
                 }
                 onVisibleChange?.(false);
+                onClose?.();
                 onCancel?.();
               },
             });
@@ -370,8 +401,9 @@ const ProDialogComponent = <
           setState((prev) => ({ ...prev, visible: false }));
         }
         onVisibleChange?.(false);
+        onClose?.();
         onCancel?.();
-      }, [confirmOnClose, isEditing, confirmTitle, confirmContent, isControlled, onVisibleChange, onCancel]);
+      }, [confirmOnClose, isEditing, confirmTitle, confirmContent, isControlled, onVisibleChange, onClose, onCancel]);
 
       // 确认处理
       const handleOk = useCallback(async () => {
@@ -445,6 +477,96 @@ const ProDialogComponent = <
         setState((prev) => ({ ...prev, fullscreen: !prev.fullscreen }));
       }, []);
 
+      // 拖拽事件处理
+      const handleDragStart = useCallback(
+        (e: React.MouseEvent) => {
+          if (!draggable || state.fullscreen) return;
+          isDraggingRef.current = true;
+          dragStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            offsetX: dragOffset.x,
+            offsetY: dragOffset.y,
+          };
+        },
+        [draggable, state.fullscreen, dragOffset.x, dragOffset.y],
+      );
+
+      const handleDragMove = useCallback((e: MouseEvent) => {
+        if (!isDraggingRef.current) return;
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        setDragOffset({
+          x: dragStartRef.current.offsetX + dx,
+          y: dragStartRef.current.offsetY + dy,
+        });
+      }, []);
+
+      const handleDragEnd = useCallback(() => {
+        isDraggingRef.current = false;
+      }, []);
+
+      useEffect(() => {
+        if (!draggable) return;
+        window.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('mouseup', handleDragEnd);
+        return () => {
+          window.removeEventListener('mousemove', handleDragMove);
+          window.removeEventListener('mouseup', handleDragEnd);
+        };
+      }, [draggable, handleDragMove, handleDragEnd]);
+
+      // 调整大小事件处理
+      const handleResizeStart = useCallback(
+        (e: React.MouseEvent) => {
+          if (!resizable || state.fullscreen) return;
+          e.preventDefault();
+          e.stopPropagation();
+          isResizingRef.current = true;
+          const currentWidth =
+            typeof finalWidth === 'number' ? finalWidth : (finalWidth ? parseInt(finalWidth, 10) : 600) || 600;
+          const currentHeight =
+            typeof finalHeight === 'number' ? finalHeight : (finalHeight ? parseInt(finalHeight, 10) : 400) || 400;
+          resizeStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            width: currentWidth,
+            height: currentHeight,
+          };
+        },
+        [resizable, state.fullscreen, finalWidth, finalHeight],
+      );
+
+      const handleResizeMove = useCallback((e: MouseEvent) => {
+        if (!isResizingRef.current) return;
+        const dx = e.clientX - resizeStartRef.current.x;
+        const dy = e.clientY - resizeStartRef.current.y;
+        const newWidth = Math.max(minResizeSize.width, resizeStartRef.current.width + dx);
+        const newHeight = Math.max(minResizeSize.height, resizeStartRef.current.height + dy);
+        setResizeSize({ width: newWidth, height: newHeight });
+      }, []);
+
+      const handleResizeEnd = useCallback(() => {
+        isResizingRef.current = false;
+      }, []);
+
+      useEffect(() => {
+        if (!resizable) return;
+        window.addEventListener('mousemove', handleResizeMove);
+        window.addEventListener('mouseup', handleResizeEnd);
+        return () => {
+          window.removeEventListener('mousemove', handleResizeMove);
+          window.removeEventListener('mouseup', handleResizeEnd);
+        };
+      }, [resizable, handleResizeMove, handleResizeEnd]);
+
+      // 关闭或全屏时重置调整大小
+      useEffect(() => {
+        if (!visible || state.fullscreen) {
+          setResizeSize({ width: 0, height: 0 });
+        }
+      }, [visible, state.fullscreen]);
+
       // 渲染标题
       const renderTitle = () => {
         if (!state.title && !subTitle && !titleIcon) {
@@ -452,7 +574,16 @@ const ProDialogComponent = <
         }
 
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: draggable && !state.fullscreen ? 'move' : undefined,
+              userSelect: draggable && !state.fullscreen ? 'none' : undefined,
+            }}
+            onMouseDown={handleDragStart}
+          >
             {titleIcon && <span>{titleIcon}</span>}
             <div>
               <div>{state.title}</div>
@@ -472,7 +603,48 @@ const ProDialogComponent = <
         );
       };
 
-      // 渲染底部按钮
+      const [buttonLoadingMap, setButtonLoadingMap] = useState<Record<string, boolean>>({});
+
+      const handleButtonClick = useCallback(
+        async (btnConfig: DialogButtonConfig<TValues, T>) => {
+          const context = {
+            dialog: dialogInstance,
+            form: formRef.current,
+            table: tableActionRef.current,
+            open: (params?: OpenDialogParams<TValues>) => dialogInstance.open(params),
+            close: () => dialogInstance.close(),
+            setTitle: (title: React.ReactNode) => dialogInstance.setTitle(title),
+            setConfirmLoading: (loading: boolean) => dialogInstance.setConfirmLoading(loading),
+            setConfirmDisabled: (disabled: boolean) => dialogInstance.setConfirmDisabled(disabled),
+            setLoading: (loading: boolean) => dialogInstance.setLoading(loading),
+            confirm: (config: Omit<ConfirmDialogConfig, 'type'>) =>
+              new Promise<boolean>((resolve) => {
+                Modal.confirm({
+                  ...config,
+                  onOk: () => resolve(true),
+                  onCancel: () => resolve(false),
+                } as ConfirmProps);
+              }),
+            info: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
+            success: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
+            warning: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),
+            error: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.error(config as ConfirmProps),
+          } as DialogButtonContext<TValues, T>;
+
+          setButtonLoadingMap((prev) => ({ ...prev, [btnConfig.key]: true }));
+
+          try {
+            const result = await btnConfig.onClick?.(context);
+            if (result === true) {
+              handleClose();
+            }
+          } finally {
+            setButtonLoadingMap((prev) => ({ ...prev, [btnConfig.key]: false }));
+          }
+        },
+        [dialogInstance, handleClose],
+      );
+
       const renderFooter = () => {
         if (footerProp === null) {
           return null;
@@ -484,62 +656,131 @@ const ProDialogComponent = <
           return null;
         }
 
-        const buttons: React.ReactNode[] = [];
+        const buttonList: React.ReactNode[] = [];
 
-        // 自定义按钮
-        extraButtons.forEach((btn) => {
-          const disabledVal =
-            typeof btn.disabled === 'function' ? btn.disabled({ dialog: dialogInstance }) : !!btn.disabled;
-          buttons.push(
-            <Button
-              key={btn.key}
-              type={btn.type}
-              status={btn.status}
-              loading={btn.loading}
-              disabled={disabledVal}
-              onClick={() => btn.onClick({ dialog: dialogInstance })}
-              {...btn.props}
-            >
-              {btn.text}
-            </Button>,
-          );
-        });
+        if (buttons && buttons.length > 0) {
+          const context = {
+            dialog: dialogInstance,
+            form: formRef.current,
+            table: tableActionRef.current,
+            open: (params?: OpenDialogParams<TValues>) => dialogInstance.open(params),
+            close: () => dialogInstance.close(),
+            setTitle: (title: React.ReactNode) => dialogInstance.setTitle(title),
+            setConfirmLoading: (loading: boolean) => dialogInstance.setConfirmLoading(loading),
+            setConfirmDisabled: (disabled: boolean) => dialogInstance.setConfirmDisabled(disabled),
+            setLoading: (loading: boolean) => dialogInstance.setLoading(loading),
+            confirm: (config: Omit<ConfirmDialogConfig, 'type'>) =>
+              new Promise<boolean>((resolve) => {
+                Modal.confirm({
+                  ...config,
+                  onOk: () => resolve(true),
+                  onCancel: () => resolve(false),
+                } as ConfirmProps);
+              }),
+            info: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
+            success: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
+            warning: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),
+            error: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.error(config as ConfirmProps),
+          } as DialogButtonContext<TValues, T>;
 
-        // 全屏按钮
-        if (showFullscreen) {
-          buttons.push(
-            <Button
-              key='fullscreen'
-              type='text'
-              icon={state.fullscreen ? <IconFullscreenExit /> : <IconFullscreen />}
-              onClick={toggleFullscreen}
-            />,
-          );
-        }
+          buttons.forEach((btn) => {
+            const isVisible = typeof btn.visible === 'function' ? btn.visible(context) : btn.visible !== false;
 
-        // 取消按钮
-        if (showCancel && !hideCancel) {
-          buttons.push(
-            <Button key='cancel' onClick={handleClose} disabled={state.confirmLoading} {...cancelButtonProps}>
-              {cancelText}
-            </Button>,
-          );
-        }
+            if (!isVisible) {
+              return;
+            }
 
-        // 确认按钮
-        if (showOk) {
-          buttons.push(
-            <Button
-              key='ok'
-              type='primary'
-              loading={state.confirmLoading}
-              disabled={state.confirmDisabled}
-              onClick={handleOk}
-              {...okButtonProps}
-            >
-              {okText}
-            </Button>,
-          );
+            const isDisabled = typeof btn.disabled === 'function' ? btn.disabled(context) : !!btn.disabled;
+
+            buttonList.push(
+              <Button
+                key={btn.key}
+                type={btn.type}
+                status={btn.status}
+                loading={btn.loading || buttonLoadingMap[btn.key]}
+                disabled={isDisabled}
+                onClick={() => handleButtonClick(btn)}
+                {...btn.props}
+              >
+                {btn.text}
+              </Button>,
+            );
+          });
+        } else {
+          extraButtons.forEach((btn) => {
+            const context = {
+              dialog: dialogInstance,
+              form: formRef.current,
+              table: tableActionRef.current,
+              open: (params?: OpenDialogParams<TValues>) => dialogInstance.open(params),
+              close: () => dialogInstance.close(),
+              setTitle: (title: React.ReactNode) => dialogInstance.setTitle(title),
+              setConfirmLoading: (loading: boolean) => dialogInstance.setConfirmLoading(loading),
+              setConfirmDisabled: (disabled: boolean) => dialogInstance.setConfirmDisabled(disabled),
+              setLoading: (loading: boolean) => dialogInstance.setLoading(loading),
+              confirm: (config: Omit<ConfirmDialogConfig, 'type'>) =>
+                new Promise<boolean>((resolve) => {
+                  Modal.confirm({
+                    ...config,
+                    onOk: () => resolve(true),
+                    onCancel: () => resolve(false),
+                  } as ConfirmProps);
+                }),
+              info: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
+              success: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
+              warning: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),
+              error: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.error(config as ConfirmProps),
+            } as DialogButtonContext<TValues, T>;
+            const disabledVal =
+              typeof btn.disabled === 'function' ? btn.disabled(context as DialogButtonContext) : !!btn.disabled;
+            buttonList.push(
+              <Button
+                key={btn.key}
+                type={btn.type}
+                status={btn.status}
+                loading={btn.loading}
+                disabled={disabledVal}
+                onClick={() => btn.onClick?.(context as DialogButtonContext)}
+                {...btn.props}
+              >
+                {btn.text}
+              </Button>,
+            );
+          });
+
+          if (showFullscreen) {
+            buttonList.push(
+              <Button
+                key='fullscreen'
+                type='text'
+                icon={state.fullscreen ? <IconFullscreenExit /> : <IconFullscreen />}
+                onClick={toggleFullscreen}
+              />,
+            );
+          }
+
+          if (showCancel && !hideCancel) {
+            buttonList.push(
+              <Button key='cancel' onClick={handleClose} disabled={state.confirmLoading} {...cancelButtonProps}>
+                {cancelText}
+              </Button>,
+            );
+          }
+
+          if (showOk) {
+            buttonList.push(
+              <Button
+                key='ok'
+                type='primary'
+                loading={state.confirmLoading}
+                disabled={state.confirmDisabled}
+                onClick={handleOk}
+                {...okButtonProps}
+              >
+                {okText}
+              </Button>,
+            );
+          }
         }
 
         return (
@@ -551,7 +792,7 @@ const ProDialogComponent = <
               ...footerStyle,
             }}
           >
-            <Space>{buttons}</Space>
+            <Space>{buttonList}</Space>
           </div>
         );
       };
@@ -562,11 +803,15 @@ const ProDialogComponent = <
         if (schemas) {
           const body = (
             <ProForm
-              ref={formRef}
-              {...formProps}
-              schemas={schemas}
+              ref={formRef as React.RefObject<ProFormInstance<Record<string, unknown>>>}
+              {...(formProps as ProFormProps<Record<string, unknown>>)}
+              schemas={schemas as ProFormSchema<Record<string, unknown>>[]}
               initialValues={initialValues}
-              onValuesChange={onValuesChange}
+              onValuesChange={
+                onValuesChange as
+                  | ((changedValues: Partial<Record<string, unknown>>, allValues: Record<string, unknown>) => void)
+                  | undefined
+              }
               showButton={false}
               labelCol={formProps?.labelCol || (formProps?.layout === 'horizontal' ? { span: 4 } : undefined)}
               wrapperCol={formProps?.wrapperCol || (formProps?.layout === 'horizontal' ? { span: 20 } : undefined)}
@@ -671,39 +916,37 @@ const ProDialogComponent = <
         if (mode === 'drawer') {
           return (
             <Drawer
-              {...({
-                visible,
-                title: renderTitle(),
-                footer: renderFooter(),
-                closable,
-                closeIcon,
-                mask,
-                maskClosable,
-                maskStyle,
-                style: {
-                  ...style,
-                  maxWidth: '100vw',
-                  maxHeight: '100vh',
-                },
-                className,
-                bodyStyle,
-                headerStyle,
-                escToExit,
-                mountOnEnter,
-                unmountOnExit,
-                focusLock,
-                autoFocus,
-                getPopupContainer,
-                getChildrenPopupContainer,
-                afterOpen,
-                afterClose,
-                onCancel: handleClose,
-                confirmLoading: state.confirmLoading,
-                width: finalWidth,
-                height: finalHeight,
-                placement,
-                zIndex,
-              } as any)}
+              visible={visible}
+              title={renderTitle()}
+              footer={renderFooter()}
+              closable={closable}
+              closeIcon={closeIcon}
+              mask={mask}
+              maskClosable={maskClosable}
+              maskStyle={maskStyle}
+              style={{
+                ...style,
+                maxWidth: '100vw',
+                maxHeight: '100vh',
+              }}
+              className={className}
+              bodyStyle={bodyStyle}
+              headerStyle={headerStyle}
+              escToExit={escToExit}
+              mountOnEnter={mountOnEnter}
+              unmountOnExit={unmountOnExit}
+              focusLock={focusLock}
+              autoFocus={autoFocus}
+              getPopupContainer={getPopupContainer}
+              getChildrenPopupContainer={getChildrenPopupContainer}
+              afterOpen={afterOpen}
+              afterClose={afterClose}
+              onCancel={handleClose}
+              confirmLoading={state.confirmLoading}
+              width={finalWidth}
+              height={finalHeight}
+              placement={placement}
+              zIndex={zIndex}
             >
               {renderContent()}
             </Drawer>
@@ -712,42 +955,71 @@ const ProDialogComponent = <
 
         return (
           <Modal
-            {...({
-              visible,
-              title: renderTitle(),
-              footer: renderFooter(),
-              closable,
-              closeIcon,
-              mask,
-              maskClosable,
-              maskStyle,
-              style: {
-                ...style,
-                maxWidth: '100vw',
-                maxHeight: '100vh',
-              },
-              className,
-              wrapStyle,
-              wrapClassName,
-              escToExit,
-              mountOnEnter,
-              unmountOnExit,
-              focusLock,
-              autoFocus,
-              getPopupContainer,
-              getChildrenPopupContainer,
-              afterOpen,
-              afterClose,
-              onCancel: handleClose,
-              confirmLoading: state.confirmLoading,
-              width: finalWidth,
-              simple,
-              alignCenter,
-              modalRender: dialogRender as any,
-              onOk: handleOk,
-            } as any)}
+            visible={visible}
+            title={renderTitle()}
+            footer={renderFooter()}
+            closable={closable}
+            closeIcon={closeIcon}
+            mask={mask}
+            maskClosable={maskClosable}
+            maskStyle={maskStyle}
+            style={{
+              ...style,
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+              width: resizeSize.width > 0 ? resizeSize.width : finalWidth,
+              height: resizeSize.height > 0 ? resizeSize.height : undefined,
+              transform: draggable && !state.fullscreen ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined,
+            }}
+            className={className}
+            wrapStyle={{
+              ...wrapStyle,
+              position: draggable && !state.fullscreen ? 'absolute' : undefined,
+            }}
+            wrapClassName={wrapClassName}
+            escToExit={escToExit}
+            mountOnEnter={mountOnEnter}
+            unmountOnExit={unmountOnExit}
+            focusLock={focusLock}
+            autoFocus={autoFocus}
+            getPopupContainer={getPopupContainer}
+            getChildrenPopupContainer={getChildrenPopupContainer}
+            afterOpen={afterOpen}
+            afterClose={afterClose}
+            onCancel={handleClose}
+            confirmLoading={state.confirmLoading}
+            simple={simple}
+            alignCenter={draggable && !state.fullscreen ? false : alignCenter}
+            modalRender={dialogRender}
+            onOk={handleOk}
           >
-            {bodyStyle ? <div style={bodyStyle}>{renderContent()}</div> : renderContent()}
+            <div
+              style={{
+                position: 'relative',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {bodyStyle ? <div style={bodyStyle}>{renderContent()}</div> : renderContent()}
+              {resizable && !state.fullscreen && (
+                <div
+                  className='pro-dialog-resize-handle'
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: 0,
+                    width: 12,
+                    height: 12,
+                    cursor: 'se-resize',
+                    background: 'linear-gradient(135deg, transparent 50%, var(--color-border) 50%)',
+                    borderRight: '1px solid var(--color-border)',
+                    borderBottom: '1px solid var(--color-border)',
+                  }}
+                  onMouseDown={handleResizeStart}
+                />
+              )}
+            </div>
           </Modal>
         );
       };
@@ -785,20 +1057,26 @@ ProDialog.warning = (config: Omit<ConfirmDialogConfig, 'type'>): DialogReturnPro
 ProDialog.error = (config: Omit<ConfirmDialogConfig, 'type'>): DialogReturnProps =>
   renderConfirmDialog({ ...config, type: 'error' });
 
-ProDialog.form = (config: any): DialogReturnProps =>
+ProDialog.form = (<TValues extends Record<string, unknown>>(
+  config: Omit<OpenDialogConfig<TValues, unknown>, 'schemas' | 'formProps'> &
+    FormDialogProps<TValues> & { title: React.ReactNode },
+): DialogReturnProps =>
   createDialogHolder({
     ...config,
     schemas: config.schemas,
     formProps: config.formProps,
     onSubmit: config.onSubmit || config.onFinish,
-  });
+  })) as ProDialogComponent['form'];
 
-ProDialog.table = (config: any): DialogReturnProps =>
+ProDialog.table = (<TRow extends Record<string, unknown>>(
+  config: Omit<OpenDialogConfig<unknown, TRow>, 'columns' | 'tableProps'> &
+    TableDialogProps<TRow> & { title: React.ReactNode },
+): DialogReturnProps =>
   createDialogHolder({
     ...config,
     columns: config.columns,
     tableProps: config.tableProps,
-  });
+  })) as ProDialogComponent['table'];
 
 // ===== 挂载反馈类组件 =====
 
@@ -893,5 +1171,5 @@ export type {
 // 导出 Hook 和工具
 export { useProDialog } from './useProDialog';
 export { getProDialogInstance, instanceRegistry as dialogInstanceRegistry } from './instanceRegistry';
-export type { ProFormSchema } from '../ProFormN/types';
+export type { ProFormSchema } from '../ProForm/types';
 export type { ProColumnType } from '../ProTable/types';

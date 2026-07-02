@@ -27,7 +27,7 @@ export interface RootContextValue {
   /** 表单状态 */
   formState: FormState;
   /** 表单实例 */
-  formInstance: ProFormInstance;
+  instance: ProFormInstance;
   /** Arco Form 实例 */
   arcoForm: ArcoFormInstance;
   /** 布局模式 */
@@ -56,7 +56,7 @@ const defaultRootContext: RootContextValue = {
     submitting: false,
     status: 'edit',
   },
-  formInstance: null as unknown as ProFormInstance,
+  instance: null as unknown as ProFormInstance,
   arcoForm: null as unknown as ArcoFormInstance,
   layout: 'vertical',
   size: 'default',

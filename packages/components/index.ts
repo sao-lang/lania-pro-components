@@ -39,13 +39,13 @@ export type {
 export { useProDialog } from './ProDialog/useProDialog';
 export { getProDialogInstance, instanceRegistry as dialogInstanceRegistry } from './ProDialog/instanceRegistry';
 
-export { ProForm } from './ProFormN';
-export type { ProFormInstance } from './ProFormN/types';
-export { ProFormProvider } from './ProFormN/ProFormProvider';
-export { FormField } from './ProFormN/FormField';
-export { useProForm } from './ProFormN/useProForm';
-export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProFormN/types';
-export type { ProFormListProps, ProFormStepsProps } from './ProFormN/components/types';
+export { ProForm } from './ProForm';
+export type { ProFormInstance } from './ProForm/types';
+export { ProFormProvider } from './ProForm/ProFormProvider';
+export { FormField } from './ProForm/FormField';
+export { useProForm } from './ProForm/useProForm';
+export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProForm/types';
+export type { ProFormListProps, ProFormStepsProps } from './ProForm/components/types';
 
 export { ProTable } from './ProTable';
 export type { ProTableActionType } from './ProTable/types';

@@ -13,13 +13,13 @@ export interface VirtualScrollConfig {
 /**
  * 虚拟滚动状态
  */
-export interface VirtualScrollState {
+export interface VirtualScrollState<T = Record<string, unknown>> {
   /** 起始索引 */
   startIndex: number;
   /** 结束索引 */
   endIndex: number;
   /** 可见项 */
-  visibleItems: any[];
+  visibleItems: T[];
   /** 总高度 */
   totalHeight: number;
   /** 偏移量 */
@@ -31,11 +31,11 @@ export interface VirtualScrollState {
 /**
  * 虚拟滚动 Hook 返回类型
  */
-export interface UseVirtualScrollReturn {
+export interface UseVirtualScrollReturn<T = Record<string, unknown>> {
   /** 虚拟滚动状态 */
-  state: VirtualScrollState;
+  state: VirtualScrollState<T>;
   /** 容器 ref */
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   /** 滚动回调 */
   onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
   /** 滚动到指定索引 */
@@ -78,7 +78,7 @@ export interface UseVirtualScrollReturn {
  * );
  * ```
  */
-export function useVirtualScroll<T = any>(options: {
+export function useVirtualScroll<T = Record<string, unknown>>(options: {
   /** 数据源 */
   dataSource: T[];
   /** 虚拟滚动配置 */
@@ -87,7 +87,7 @@ export function useVirtualScroll<T = any>(options: {
   enabled?: boolean;
   /** 容器高度 */
   containerHeight?: number;
-}): UseVirtualScrollReturn {
+}): UseVirtualScrollReturn<T> {
   const { dataSource, config, enabled = false, containerHeight = 400 } = options;
 
   const { itemHeight = 50, overscan = 5 } = config || {};
@@ -197,7 +197,7 @@ export function useVirtualScroll<T = any>(options: {
     }
   }, [dataSource.length, totalHeight, enabled]);
 
-  const state: VirtualScrollState = {
+  const state: VirtualScrollState<T> = {
     startIndex,
     endIndex,
     visibleItems,
