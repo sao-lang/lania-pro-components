@@ -130,7 +130,6 @@ export const BatchButton: React.FC<BatchButtonProps> = ({
       autoInsertSpace={autoInsertSpace}
     >
       {text}
-      {selectedKeys.length > 0 && ` (${selectedKeys.length})`}
     </Button>
   );
 };
