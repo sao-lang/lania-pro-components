@@ -1,5 +1,5 @@
 {
-  "name": "@lania-pro/components",
+  "name": "@lania-pro-components/components",
   "version": "1.0.0",
   "description": "基于 Arco Design 的 Schema 驱动企业级组件库",
   "type": "module",

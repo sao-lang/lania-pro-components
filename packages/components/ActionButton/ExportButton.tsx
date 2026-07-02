@@ -46,6 +46,7 @@ export const ExportButton = forwardRef<ExportButtonRef, ExportButtonProps>(
       visible = true,
       timeout,
       headers,
+      onClick,
       ...restProps
     },
     ref,
@@ -82,12 +83,20 @@ export const ExportButton = forwardRef<ExportButtonRef, ExportButtonProps>(
       [handleExport, loading],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        void handleExport();
+      },
+      [onClick, handleExport],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} loading={loading} onClick={handleExport as unknown as () => void} {...restProps}>
+      <Button type={type} icon={icon} loading={loading} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

@@ -48,6 +48,7 @@ export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, Validation
 export type { ProFormListProps, ProFormStepsProps } from './ProForm/components/types';
 
 export { ProTable } from './ProTable';
+export { useProTable } from './ProTable/hooks/useProTable';
 export type { ProTableActionType } from './ProTable/types';
 export type { ProTableProps, ProColumnType, ProTableState } from './ProTable/types';
 

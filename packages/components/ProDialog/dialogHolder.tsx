@@ -1,8 +1,6 @@
 import { deepMerge } from './utils';
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Modal } from '@arco-design/web-react';
-import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
 import { IconInfoCircle, IconCheckCircle, IconExclamationCircle, IconCloseCircle } from '@arco-design/web-react/icon';
 import type {
   OpenDialogConfig,
@@ -133,136 +131,84 @@ export function renderConfirmDialog(config: ConfirmDialogConfig): DialogReturnPr
     }
   };
 
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-
-  const root = createRoot(container);
-
-  const close = () => {
-    root.unmount();
-    if (container.parentNode) {
-      container.parentNode.removeChild(container);
-    }
-  };
-
-  const handleConfirm = async () => {
-    if (onConfirm) {
-      await onConfirm();
-    }
-    if (autoClose) {
-      close();
-    }
-  };
-
-  const modalConfig = {
-    title,
-    content: (
+  const renderContent = (iconNode: React.ReactNode, contentNode: React.ReactNode) => (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 24,
+      }}
+    >
       <div
         style={{
+          fontSize: 20,
+          lineHeight: 1,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          minHeight: 24,
         }}
       >
-        <div
-          style={{
-            fontSize: 20,
-            lineHeight: 1,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          {icon || getDefaultIcon()}
-        </div>
-        <div style={{ lineHeight: 1.5, display: 'flex', alignItems: 'center' }}>{content}</div>
+        {iconNode}
       </div>
-    ),
+      <div style={{ lineHeight: 1.5, display: 'flex', alignItems: 'center' }}>{contentNode}</div>
+    </div>
+  );
+
+  const isSimple = type !== 'confirm';
+  const hideCancel = type !== 'confirm';
+
+  let currentIcon: ReactNode = icon || getDefaultIcon();
+  let currentContent: ReactNode = content;
+  let currentOkText = okText;
+  let currentCancelText = cancelText;
+
+  const { update: holderUpdate, close: holderClose } = createDialogHolder({
+    title,
+    content: () => renderContent(currentIcon, currentContent),
     okText,
     cancelText,
-    onOk: handleConfirm as (e?: MouseEvent) => void | Promise<void>,
-    onCancel: close,
-  } as const;
-
-  interface ModalResult {
-    update: (config: unknown) => void;
-    close: () => void;
-  }
-
-  let modalResult: ModalResult;
-
-  switch (type) {
-    case 'info':
-      modalResult = Modal.info({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
-      break;
-    case 'success':
-      modalResult = Modal.success({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
-      break;
-    case 'warning':
-      modalResult = Modal.warning({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
-      break;
-    case 'error':
-      modalResult = Modal.error({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
-      break;
-    default:
-      modalResult = Modal.confirm({ ...modalConfig, ...restConfig } as ConfirmProps) as ModalResult;
-  }
+    hideCancel,
+    simple: isSimple,
+    onOk: async () => {
+      if (onConfirm) {
+        await onConfirm();
+      }
+      if (autoClose) {
+        holderClose();
+      }
+    },
+    onCancel: () => holderClose(),
+    ...restConfig,
+  });
 
   return {
     update: (newConfig: Partial<OpenDialogConfig>) => {
-      const merged = deepMerge(
-        { ...modalConfig, ...restConfig } as Record<string, unknown>,
-        newConfig as Record<string, unknown>,
-      );
-      const confirmNewConfig = newConfig as Partial<ConfirmDialogConfig>;
-      modalResult.update({
-        ...merged,
-        content:
-          confirmNewConfig.content !== undefined || confirmNewConfig.icon !== undefined ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                minHeight: 24,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 20,
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {confirmNewConfig.icon ||
-                  ((merged as Record<string, unknown>).icon as React.ReactNode) ||
-                  getDefaultIcon()}
-              </div>
-              <div
-                style={{
-                  lineHeight: 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {confirmNewConfig.content !== undefined ? confirmNewConfig.content : modalConfig.content}
-              </div>
-            </div>
-          ) : (
-            modalConfig.content
-          ),
-      } as ConfirmProps);
+      const newConfirmConfig = newConfig as Partial<ConfirmDialogConfig>;
+      if (newConfirmConfig.icon !== undefined) {
+        currentIcon = newConfirmConfig.icon;
+      }
+      if (newConfirmConfig.content !== undefined) {
+        currentContent = newConfirmConfig.content as React.ReactNode;
+      }
+      if (newConfirmConfig.okText !== undefined) {
+        currentOkText = newConfirmConfig.okText;
+      }
+      if (newConfirmConfig.cancelText !== undefined) {
+        currentCancelText = newConfirmConfig.cancelText;
+      }
+      holderUpdate({
+        ...newConfig,
+        content: () => renderContent(currentIcon, currentContent),
+        okText: currentOkText,
+        cancelText: currentCancelText,
+      });
     },
     close: () => {
-      modalResult.close();
-      close();
+      holderClose();
     },
     destroy: () => {
-      modalResult.close();
-      close();
+      holderClose();
     },
   };
 }

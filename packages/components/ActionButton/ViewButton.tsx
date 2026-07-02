@@ -38,6 +38,7 @@ export const ViewButton = forwardRef<ViewButtonRef, ViewButtonProps>(
       width = 600,
       renderContent,
       dialogProps,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -62,12 +63,20 @@ export const ViewButton = forwardRef<ViewButtonRef, ViewButtonProps>(
       [handleOpen],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        handleOpen();
+      },
+      [onClick, handleOpen],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} onClick={handleOpen} {...restProps}>
+      <Button type={type} icon={icon} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

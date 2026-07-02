@@ -37,6 +37,7 @@ export const JumpButton = forwardRef<JumpButtonRef, JumpButtonProps>(
       to,
       target = '_self',
       onBeforeJump,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -65,12 +66,20 @@ export const JumpButton = forwardRef<JumpButtonRef, JumpButtonProps>(
       [handleJump],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        void handleJump();
+      },
+      [onClick, handleJump],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} onClick={handleJump as unknown as () => void} {...restProps}>
+      <Button type={type} icon={icon} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

@@ -50,6 +50,7 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       confirmContent,
       dialogProps,
       onAction,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -133,12 +134,20 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       [handleExecute, loading],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        void handleExecute();
+      },
+      [onClick, handleExecute],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} status={status} icon={icon} loading={loading} onClick={handleExecute} {...restProps}>
+      <Button type={type} status={status} icon={icon} loading={loading} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

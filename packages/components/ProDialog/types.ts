@@ -716,7 +716,9 @@ export interface TableDialogProps<TRow = unknown, TKey extends Key = Key> {
  * ProDialog 完整属性
  */
 export interface ProDialogProps<TValues = Record<string, unknown>, TRow = unknown>
-  extends BaseDialogProps, FormDialogProps<TValues>, TableDialogProps<TRow> {
+  extends BaseDialogProps,
+    FormDialogProps<TValues>,
+    TableDialogProps<TRow> {
   /**
    * Drawer 模式下的位置
    * @default 'right'
@@ -818,10 +820,8 @@ export interface ProDialogProps<TValues = Record<string, unknown>, TRow = unknow
 /**
  * 命令式打开弹窗配置
  */
-export interface OpenDialogConfig<TValues = Record<string, unknown>, TRow = unknown> extends Omit<
-  ProDialogProps<TValues, TRow>,
-  'visible' | 'defaultVisible' | 'dialogRef'
-> {
+export interface OpenDialogConfig<TValues = Record<string, unknown>, TRow = unknown>
+  extends Omit<ProDialogProps<TValues, TRow>, 'visible' | 'defaultVisible' | 'dialogRef'> {
   /**
    * 弹窗内容
    */
@@ -1244,10 +1244,8 @@ export type DialogEventListener = (type: DialogEventType, payload?: unknown) => 
 /**
  * ProDialog Hook 配置选项
  */
-export interface UseProDialogOptions<TValues = Record<string, unknown>, TRow = unknown> extends Omit<
-  ProDialogProps<TValues, TRow>,
-  'visible' | 'defaultVisible' | 'dialogRef'
-> {
+export interface UseProDialogOptions<TValues = Record<string, unknown>, TRow = unknown>
+  extends Omit<ProDialogProps<TValues, TRow>, 'visible' | 'defaultVisible' | 'dialogRef'> {
   /**
    * 弹窗实例名称，用于全局获取
    */

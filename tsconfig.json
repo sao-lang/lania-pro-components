@@ -14,7 +14,9 @@
     "ignoreDeprecations": "6.0",
     "paths": {
       "@lania-pro/components": ["packages/components"],
-      "@lania-pro/components/*": ["packages/components/*"]
+      "@lania-pro/components/*": ["packages/components/*"],
+      "@lania-pro/theme": ["packages/theme"],
+      "@lania-pro/theme/*": ["packages/theme/*"]
     },
     "skipLibCheck": true,
     "isolatedModules": true,
@@ -25,6 +27,7 @@
   },
   "include": [
     "packages/components/**/*",
+    "packages/theme/**/*",
     "**/*.js",
     "**/*.cjs",
     "**/*.mjs",

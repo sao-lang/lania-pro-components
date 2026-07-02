@@ -45,6 +45,7 @@ export const EditButton = forwardRef<EditButtonRef, EditButtonProps>(
       onSubmit,
       onBeforeOpen,
       onAfterClose,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -96,12 +97,20 @@ export const EditButton = forwardRef<EditButtonRef, EditButtonProps>(
       [handleOpen, loading],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        void handleOpen();
+      },
+      [onClick, handleOpen],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} loading={loading} onClick={handleOpen as unknown as () => void} {...restProps}>
+      <Button type={type} icon={icon} loading={loading} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

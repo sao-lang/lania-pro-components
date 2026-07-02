@@ -5,6 +5,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import babel from '@rollup/plugin-babel';
 import dts from 'rollup-plugin-dts';
 import terser from '@rollup/plugin-terser';
+import copy from 'rollup-plugin-copy';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -12,12 +13,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const components = [
-  'ActionButton',
-  'ProDialog',
-  'ProForm',
-  'ProTable',
-  'ProSelect',
-  'ProUpload',
+  { name: 'ActionButton', ext: 'tsx' },
+  { name: 'ProDialog', ext: 'tsx' },
+  { name: 'ProForm', ext: 'ts' },
+  { name: 'ProTable', ext: 'tsx' },
+  { name: 'ProSelect', ext: 'tsx' },
+  { name: 'ProUpload', ext: 'tsx' },
 ];
 
 const baseConfig = {
@@ -25,15 +26,15 @@ const baseConfig = {
   plugins: [
     nodeResolve({ extensions: ['.js', '.jsx', '.ts', '.tsx'] }),
     commonjs(),
-    babel({
-      extensions: ['.js', '.jsx', '.ts', '.tsx'],
-      presets: ['@babel/preset-react'],
-      babelHelpers: 'bundled',
-    }),
     typescript({
       tsconfig: path.resolve(__dirname, 'tsconfig.json'),
       declaration: true,
       declarationMap: true,
+    }),
+    babel({
+      extensions: ['.js', '.jsx', '.ts', '.tsx'],
+      presets: ['@babel/preset-react', '@babel/preset-typescript'],
+      babelHelpers: 'bundled',
     }),
   ],
 };
@@ -41,49 +42,88 @@ const baseConfig = {
 const componentConfigs = components.flatMap(component => [
   {
     ...baseConfig,
-    input: `packages/components/${component}/index.ts${component === 'ActionButton' ? 'x' : ''}`,
+    input: path.resolve(__dirname, `packages/components/${component.name}/index.${component.ext}`),
     output: [
       {
-        file: `packages/components/dist/${component}/index.cjs`,
+        file: path.resolve(__dirname, `packages/components/dist/${component.name}/index.cjs`),
         format: 'cjs',
         sourcemap: true,
         exports: 'named',
       },
       {
-        file: `packages/components/dist/${component}/index.mjs`,
+        file: path.resolve(__dirname, `packages/components/dist/${component.name}/index.mjs`),
         format: 'esm',
         sourcemap: true,
       },
     ],
   },
   {
-    input: `packages/components/${component}/index.ts${component === 'ActionButton' ? 'x' : ''}`,
+    input: path.resolve(__dirname, `packages/components/${component.name}/index.${component.ext}`),
     output: {
-      file: `packages/components/dist/${component}/index.d.ts`,
+      file: path.resolve(__dirname, `packages/components/dist/${component.name}/index.d.ts`),
       format: 'esm',
     },
     plugins: [dts()],
   },
 ]);
 
-export default defineConfig([
+const themeConfig = [
   {
     ...baseConfig,
-    input: 'packages/components/index.ts',
+    input: path.resolve(__dirname, 'packages/theme/src/index.ts'),
     output: [
       {
-        file: 'packages/components/dist/index.cjs',
+        file: path.resolve(__dirname, 'packages/theme/dist/index.cjs'),
         format: 'cjs',
         sourcemap: true,
         exports: 'named',
       },
       {
-        file: 'packages/components/dist/index.mjs',
+        file: path.resolve(__dirname, 'packages/theme/dist/index.mjs'),
+        format: 'esm',
+        sourcemap: true,
+      },
+    ],
+    plugins: [
+      ...baseConfig.plugins,
+      copy({
+        targets: [
+          { src: [path.resolve(__dirname, 'packages/theme/src/light.css')], dest: path.resolve(__dirname, 'packages/theme/dist') },
+          { src: [path.resolve(__dirname, 'packages/theme/src/dark.css')], dest: path.resolve(__dirname, 'packages/theme/dist') },
+        ],
+        flatten: true,
+        verbose: true,
+      }),
+    ],
+  },
+  {
+    input: path.resolve(__dirname, 'packages/theme/src/index.ts'),
+    output: {
+      file: path.resolve(__dirname, 'packages/theme/dist/index.d.ts'),
+      format: 'esm',
+    },
+    plugins: [dts()],
+  },
+];
+
+export default defineConfig([
+  {
+    ...baseConfig,
+    input: path.resolve(__dirname, 'packages/components/index.ts'),
+    output: [
+      {
+        file: path.resolve(__dirname, 'packages/components/dist/index.cjs'),
+        format: 'cjs',
+        sourcemap: true,
+        exports: 'named',
+      },
+      {
+        file: path.resolve(__dirname, 'packages/components/dist/index.mjs'),
         format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'packages/components/dist/index.min.mjs',
+        file: path.resolve(__dirname, 'packages/components/dist/index.min.mjs'),
         format: 'esm',
         sourcemap: true,
         plugins: [terser()],
@@ -91,12 +131,13 @@ export default defineConfig([
     ],
   },
   {
-    input: 'packages/components/index.ts',
+    input: path.resolve(__dirname, 'packages/components/index.ts'),
     output: {
-      file: 'packages/components/dist/index.d.ts',
+      file: path.resolve(__dirname, 'packages/components/dist/index.d.ts'),
       format: 'esm',
     },
     plugins: [dts()],
   },
   ...componentConfigs,
+  ...themeConfig,
 ]);

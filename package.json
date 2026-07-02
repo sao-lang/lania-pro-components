@@ -1,25 +1,27 @@
 {
-  "name": "@lania-pro-components/monorepo",
+  "name": "@lania-pro-components/components",
   "version": "1.0.0",
-  "description": "基于 Arco Design 的 Schema 驱动企业级组件库 - Monorepo",
+  "description": "基于 Arco Design 的 Schema 驱动企业级组件库",
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "pnpm --filter @lania-pro/components build",
-    "dev": "pnpm --filter @lania-pro/components dev",
-    "typecheck": "pnpm --filter @lania-pro/components typecheck",
-    "lint": "eslint packages/components --ext .ts,.tsx",
-    "lint:fix": "eslint packages/components --ext .ts,.tsx --fix",
-    "format": "prettier --write packages/components",
-    "format:check": "prettier --check packages/components",
-    "clean": "rm -rf packages/components/dist",
-    "install:all": "pnpm install"
+    "build": "pnpm --filter @lania-pro-components/components build",
+    "dev": "pnpm --filter @lania-pro-components/components dev",
+    "typecheck": "pnpm --filter @lania-pro-components/components typecheck",
+    "lint": "eslint @lania-pro-components/components --ext .ts,.tsx",
+    "lint:fix": "eslint @lania-pro-components/components --ext .ts,.tsx --fix",
+    "format": "prettier --write @lania-pro-components/components",
+    "format:check": "prettier --check @lania-pro-components/components",
+    "clean": "rm -rf @lania-pro-components/components/dist",
+    "install:all": "pnpm install",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "arco-design",
     "pro-components",
-    "schema-driven",
-    "monorepo"
+    "schema-driven"
   ],
   "author": "",
   "license": "ISC",
@@ -35,7 +37,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-syntax-typescript": "^7.29.7",
     "@babel/preset-react": "^7.24.7",
+    "@babel/preset-typescript": "^7.29.7",
     "@rollup/plugin-babel": "^6.0.4",
     "@rollup/plugin-commonjs": "^26.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
@@ -46,6 +50,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.2.0",
     "@typescript-eslint/parser": "^8.2.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -53,7 +58,9 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "prettier": "^3.3.3",
     "rollup": "^4.21.2",
+    "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-dts": "^6.4.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitepress": "^1.6.4"
   }
 }

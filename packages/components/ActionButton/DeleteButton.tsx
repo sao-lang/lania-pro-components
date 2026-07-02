@@ -41,6 +41,7 @@ export const DeleteButton = forwardRef<DeleteButtonRef, DeleteButtonProps>(
       okButtonProps,
       dialogProps,
       onDelete,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -82,12 +83,20 @@ export const DeleteButton = forwardRef<DeleteButtonRef, DeleteButtonProps>(
       [handleOpenConfirm, loading],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        handleOpenConfirm();
+      },
+      [onClick, handleOpenConfirm],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} status={status} icon={icon} loading={loading} onClick={handleOpenConfirm} {...restProps}>
+      <Button type={type} status={status} icon={icon} loading={loading} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

@@ -45,6 +45,7 @@ export const ImportButton = forwardRef<ImportButtonRef, ImportButtonProps>(
       renderUpload,
       onSuccess,
       onImportError,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -166,12 +167,20 @@ export const ImportButton = forwardRef<ImportButtonRef, ImportButtonProps>(
       [handleOpen, uploading],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        handleOpen();
+      },
+      [onClick, handleOpen],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} onClick={handleOpen} {...restProps}>
+      <Button type={type} icon={icon} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );

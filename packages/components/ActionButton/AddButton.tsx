@@ -44,6 +44,7 @@ export const AddButton = forwardRef<AddButtonRef, AddButtonProps>(
       onSubmit,
       onBeforeOpen,
       onAfterClose,
+      onClick,
       visible = true,
       ...restProps
     },
@@ -83,12 +84,20 @@ export const AddButton = forwardRef<AddButtonRef, AddButtonProps>(
       [handleOpen],
     );
 
+    const handleClick = useCallback(
+      (e: Event) => {
+        onClick?.(e);
+        void handleOpen();
+      },
+      [onClick, handleOpen],
+    );
+
     if (!visible) {
       return null;
     }
 
     return (
-      <Button type={type} icon={icon} onClick={handleOpen} {...restProps}>
+      <Button type={type} icon={icon} onClick={handleClick} {...restProps}>
         {text}
       </Button>
     );
