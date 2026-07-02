@@ -58,6 +58,13 @@
   ],
   "author": "",
   "license": "ISC",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@lania-pro-components/utils": "workspace:*"
   },

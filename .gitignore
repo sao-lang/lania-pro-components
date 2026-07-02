@@ -3,9 +3,5 @@ dist/
 *.log
 .DS_Store
 *.tsbuildinfo
-.npmrc
-.env
-.env.local
-.env.production
 .pnpm-store
 .vitepress

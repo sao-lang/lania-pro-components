@@ -1,52 +1,140 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { ThemeType } from './types';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import type { ThemeType, ResolvedThemeType, ThemeContextValue } from './types';
 import type { ReactNode } from 'react';
 
 const THEME_KEY = 'lania-pro-theme';
 
-interface ThemeContextValue {
-  theme: ThemeType;
-  setTheme: (theme: ThemeType) => void;
-}
-
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children, initialTheme = 'light' }: { children: ReactNode; initialTheme?: ThemeType }) {
+function getSystemTheme(): ResolvedThemeType {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function resolveTheme(theme: ThemeType, systemTheme: ResolvedThemeType): ResolvedThemeType {
+  if (theme === 'system') {
+    return systemTheme;
+  }
+  return theme;
+}
+
+function applyTheme(resolvedTheme: ResolvedThemeType) {
+  if (typeof window === 'undefined') return;
+
+  const root = document.documentElement;
+  const body = document.body;
+
+  if (resolvedTheme === 'dark') {
+    root.setAttribute('arco-theme', 'dark');
+    body.setAttribute('arco-theme', 'dark');
+    root.setAttribute('data-theme', 'dark');
+    body.setAttribute('data-theme', 'dark');
+  } else {
+    root.removeAttribute('arco-theme');
+    body.removeAttribute('arco-theme');
+    root.removeAttribute('data-theme');
+    body.removeAttribute('data-theme');
+  }
+}
+
+export interface ThemeProviderProps {
+  children: ReactNode;
+  initialTheme?: ThemeType;
+  storageKey?: string;
+  onThemeChange?: (theme: ThemeType, resolvedTheme: ResolvedThemeType) => void;
+}
+
+export function ThemeProvider({
+  children,
+  initialTheme = 'system',
+  storageKey = THEME_KEY,
+  onThemeChange,
+}: ThemeProviderProps) {
   const [theme, setThemeState] = useState<ThemeType>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(THEME_KEY) as ThemeType | null;
-      if (stored) {
+      const stored = localStorage.getItem(storageKey) as ThemeType | null;
+      if (stored === 'light' || stored === 'dark' || stored === 'system') {
         return stored;
-      }
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
       }
     }
     return initialTheme;
   });
 
+  const [systemTheme, setSystemThemeState] = useState<ResolvedThemeType>(() => getSystemTheme());
+
+  const resolvedTheme = useMemo<ResolvedThemeType>(() => {
+    return resolveTheme(theme, systemTheme);
+  }, [theme, systemTheme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemThemeState(e.matches ? 'dark' : 'light');
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(THEME_KEY, theme);
-      if (theme === 'dark') {
-        document.documentElement.setAttribute('arco-theme', 'dark');
-        document.body.setAttribute('arco-theme', 'dark');
-      } else {
-        document.documentElement.removeAttribute('arco-theme');
-        document.body.removeAttribute('arco-theme');
-      }
+      localStorage.setItem(storageKey, theme);
     }
-  }, [theme]);
+    applyTheme(resolvedTheme);
+    onThemeChange?.(theme, resolvedTheme);
+  }, [theme, resolvedTheme, storageKey, onThemeChange]);
 
   const setTheme = useCallback((newTheme: ThemeType) => {
     setThemeState(newTheme);
   }, []);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const current = prev === 'system' ? systemTheme : prev;
+      return current === 'dark' ? 'light' : 'dark';
+    });
+  }, [systemTheme]);
+
+  const setLightTheme = useCallback(() => {
+    setThemeState('light');
+  }, []);
+
+  const setDarkTheme = useCallback(() => {
+    setThemeState('dark');
+  }, []);
+
+  const setSystemTheme = useCallback(() => {
+    setThemeState('system');
+  }, []);
+
+  const contextValue = useMemo<ThemeContextValue>(
+    () => ({
+      theme,
+      resolvedTheme,
+      setTheme,
+      toggleTheme,
+      setLightTheme,
+      setDarkTheme,
+      setSystemTheme,
+    }),
+    [theme, resolvedTheme, setTheme, toggleTheme, setLightTheme, setDarkTheme, setSystemTheme],
   );
+
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
