@@ -248,10 +248,11 @@ export interface PreviewConfig {
 /**
  * ProUpload 组件属性
  */
-export interface ProUploadProps extends Omit<
-  UploadProps,
-  'fileList' | 'onChange' | 'customRequest' | 'onProgress' | 'onPreview' | 'onRemove' | 'beforeUpload'
-> {
+export interface ProUploadProps
+  extends Omit<
+    UploadProps,
+    'fileList' | 'onChange' | 'customRequest' | 'onProgress' | 'onPreview' | 'onRemove' | 'beforeUpload'
+  > {
   /**
    * 文件列表
    */

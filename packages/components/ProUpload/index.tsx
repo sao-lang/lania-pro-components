@@ -107,14 +107,10 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
 
     const finalFileList = controlledFileList !== undefined ? controlledFileList : fileList;
 
-    const {
-      maxCount = 1,
-      maxSize = 10,
-      accept,
-      imageConfig,
-      videoConfig,
-      compressConfig,
-    } = useMemo(() => ({ ...config, type }), [config, type]);
+    const { maxCount, maxSize, accept, imageConfig, videoConfig, compressConfig } = useMemo(
+      () => ({ ...config, type }),
+      [config, type],
+    );
 
     const finalPreviewConfig = useMemo(
       () => ({
@@ -684,7 +680,8 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
       if (!showCount) {
         return null;
       }
-      const text = countFormat.replace('{current}', String(finalFileList.length)).replace('{max}', String(maxCount));
+      const countText = countFormat.replace('{current}', String(finalFileList.length));
+      const text = maxCount ? countText.replace('{max}', String(maxCount)) : countText;
       return <div style={{ marginTop: 8, color: '#86909c', fontSize: 12 }}>{text}</div>;
     }, [showCount, countFormat, finalFileList.length, maxCount]);
 
@@ -710,8 +707,8 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
             {dragDescription && <div style={{ marginTop: 8, color: '#86909c', fontSize: 14 }}>{dragDescription}</div>}
             {showFileInfo && (
               <div style={{ marginTop: 8, color: '#86909c', fontSize: 12 }}>
-                支持 {type === 'image' ? 'JPG、PNG、GIF' : type === 'video' ? 'MP4、MOV' : '任意'} 格式， 单个文件不超过{' '}
-                {maxSize}MB
+                {(finalAccept ? `支持${finalAccept}格式${maxSize ? '，' : ''}` : '') +
+                  (maxSize ? `单个文件不超过${maxSize}MB` : '')}
               </div>
             )}
           </div>
@@ -750,7 +747,7 @@ const ProUploadComponent = forwardRef<ProUploadInstance, ProUploadProps>(
           renderUploadList={renderUploadList}
           customRequest={() => {}}
         >
-          {showUploadButton && finalFileList.length < maxCount ? renderButton() : null}
+          {showUploadButton && finalFileList.length < (maxCount ?? Infinity) ? renderButton() : null}
         </Upload>
       ),
       [
