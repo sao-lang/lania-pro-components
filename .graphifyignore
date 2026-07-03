@@ -1,0 +1,10 @@
+docs/
+node_modules/
+dist/
+*.md
+*.mdx
+*.txt
+*.html
+*.yaml
+*.yml
+preview.md

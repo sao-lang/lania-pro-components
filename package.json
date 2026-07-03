@@ -27,7 +27,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "graphify:install": "pip install graphifyy",
+    "graphify:build": "python -m graphify extract . && python -m graphify cluster-only . --no-label",
+    "graphify": "pnpm graphify:install && pnpm graphify:build",
+    "graphify:update": "python -m graphify update . && python -m graphify cluster-only . --no-label"
   },
   "keywords": [
     "arco-design",

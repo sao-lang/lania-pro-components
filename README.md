@@ -6,11 +6,11 @@
 
 本项目采用 **pnpm workspace monorepo** 架构，包含以下三个独立的 npm 包：
 
-| 包名 | 说明 | 位置 |
-|------|------|------|
-| `@lania-pro-components/components` | 组件库主包，包含所有业务组件 | [packages/components/](packages/components) |
-| `@lania-pro-components/utils` | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils) |
-| `@lania-pro-components/theme` | 主题包，提供 light / dark 两种主题及 ThemeProvider | [packages/theme/](packages/theme) |
+| 包名                               | 说明                                                 | 位置                                        |
+| ---------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
+| `@lania-pro-components/components` | 组件库主包，包含所有业务组件                         | [packages/components/](packages/components) |
+| `@lania-pro-components/utils`      | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils)           |
+| `@lania-pro-components/theme`      | 主题包，提供 light / dark 两种主题及 ThemeProvider   | [packages/theme/](packages/theme)           |
 
 ## 核心理念
 
@@ -148,16 +148,16 @@
 
 **按钮类型：**
 
-| 按钮 | 说明 | 核心回调 |
-|------|------|----------|
-| `AddButton` | 新增按钮，点击打开表单弹窗 | `onSubmit(values)` |
-| `EditButton` | 编辑按钮，点击打开带初始值的表单弹窗 | `onSubmit(values)` |
-| `DeleteButton` | 删除按钮，点击弹出二次确认 | `onDelete()` |
-| `ViewButton` | 查看按钮，点击打开详情弹窗 | `renderContent()` |
-| `BatchButton` | 批量操作按钮，支持选中数量校验 | `onAction(rows, keys)` |
-| `ExportButton` | 导出按钮，支持 URL 导出或自定义逻辑 | `onExport()` |
-| `ImportButton` | 导入按钮，点击打开上传弹窗 | `onSuccess(result)` |
-| `JumpButton` | 跳转按钮，支持新窗口/当前窗口 | `to` |
+| 按钮           | 说明                                 | 核心回调               |
+| -------------- | ------------------------------------ | ---------------------- |
+| `AddButton`    | 新增按钮，点击打开表单弹窗           | `onSubmit(values)`     |
+| `EditButton`   | 编辑按钮，点击打开带初始值的表单弹窗 | `onSubmit(values)`     |
+| `DeleteButton` | 删除按钮，点击弹出二次确认           | `onDelete()`           |
+| `ViewButton`   | 查看按钮，点击打开详情弹窗           | `renderContent()`      |
+| `BatchButton`  | 批量操作按钮，支持选中数量校验       | `onAction(rows, keys)` |
+| `ExportButton` | 导出按钮，支持 URL 导出或自定义逻辑  | `onExport()`           |
+| `ImportButton` | 导入按钮，点击打开上传弹窗           | `onSuccess(result)`    |
+| `JumpButton`   | 跳转按钮，支持新窗口/当前窗口        | `to`                   |
 
 **设计原则：**
 
@@ -242,15 +242,15 @@ ActionButton ── 调用 ──→ ProDialog（增/删/改/查弹窗）
 
 [packages/utils/src/](packages/utils/src)
 
-| 模块 | 说明 | 主要导出 |
-|------|------|----------|
-| `reactive.ts` | 响应式系统 | `reactive` / `ref` / `computed` / `effect` / `watch` / `batch` |
-| `performance.ts` | 性能优化工具 | `debounce` / `throttle` / `TaskQueue` / `LRUCache` / `PerformanceMonitor` |
-| `defineEnumMap.ts` | 枚举映射 | `defineEnumMap` — 统一管理枚举值，提供 getOptionList / findLabelByValue 等方法 |
-| `object.ts` | 对象/路径操作 | `deepMerge` / `getNestedValue` / `setNestedValue` / `deleteNestedValue` |
-| `format.ts` | 格式化工具 | `formatNumber` / `formatMoney` / `formatPercent` / `formatDate` |
-| `dom.ts` | DOM 工具 | `copyToClipboard` — 纯版本，返回 `Promise<boolean>` |
-| `fileType.ts` | 文件类型判断 | `isVideo` / `isImage` / `getFileType` |
+| 模块               | 说明          | 主要导出                                                                       |
+| ------------------ | ------------- | ------------------------------------------------------------------------------ |
+| `reactive.ts`      | 响应式系统    | `reactive` / `ref` / `computed` / `effect` / `watch` / `batch`                 |
+| `performance.ts`   | 性能优化工具  | `debounce` / `throttle` / `TaskQueue` / `LRUCache` / `PerformanceMonitor`      |
+| `defineEnumMap.ts` | 枚举映射      | `defineEnumMap` — 统一管理枚举值，提供 getOptionList / findLabelByValue 等方法 |
+| `object.ts`        | 对象/路径操作 | `deepMerge` / `getNestedValue` / `setNestedValue` / `deleteNestedValue`        |
+| `format.ts`        | 格式化工具    | `formatNumber` / `formatMoney` / `formatPercent` / `formatDate`                |
+| `dom.ts`           | DOM 工具      | `copyToClipboard` — 纯版本，返回 `Promise<boolean>`                            |
+| `fileType.ts`      | 文件类型判断  | `isVideo` / `isImage` / `getFileType`                                          |
 
 ## Theme 主题包
 
@@ -272,19 +272,19 @@ ActionButton ── 调用 ──→ ProDialog（增/删/改/查弹窗）
 
 ## 技术栈
 
-| 类别 | 技术 | 版本 |
-|------|------|------|
-| UI 框架 | Arco Design Web React | ^2.66.0 |
-| 语言 | TypeScript | ^6.0.0 |
-| React | React / ReactDOM | ^18.0.0 \|\| ^19.0.0 |
-| 状态管理 | 自研响应式系统（基于 Proxy） | — |
-| 日期处理 | dayjs | ^1.11.0 |
-| 构建工具 | Rollup | ^4.0.0 |
-| 包管理 | pnpm | 10.26.1 |
-| 测试框架 | Vitest + jsdom | ^4.0.0 |
-| 测试库 | Testing Library React | ^16.0.0 |
-| 文档站 | VitePress | ^1.6.0 |
-| 代码规范 | ESLint + Prettier | — |
+| 类别     | 技术                         | 版本                 |
+| -------- | ---------------------------- | -------------------- |
+| UI 框架  | Arco Design Web React        | ^2.66.0              |
+| 语言     | TypeScript                   | ^6.0.0               |
+| React    | React / ReactDOM             | ^18.0.0 \|\| ^19.0.0 |
+| 状态管理 | 自研响应式系统（基于 Proxy） | —                    |
+| 日期处理 | dayjs                        | ^1.11.0              |
+| 构建工具 | Rollup                       | ^4.0.0               |
+| 包管理   | pnpm                         | 10.26.1              |
+| 测试框架 | Vitest + jsdom               | ^4.0.0               |
+| 测试库   | Testing Library React        | ^16.0.0              |
+| 文档站   | VitePress                    | ^1.6.0               |
+| 代码规范 | ESLint + Prettier            | —                    |
 
 ## 设计模式
 
@@ -478,10 +478,15 @@ const MyForm = () => (
     schemas={[
       { name: 'username', label: '用户名', component: 'Input', required: true },
       { name: 'email', label: '邮箱', component: 'Input', required: true },
-      { name: 'role', label: '角色', component: 'Select', options: [
-        { label: '管理员', value: 'admin' },
-        { label: '用户', value: 'user' },
-      ]},
+      {
+        name: 'role',
+        label: '角色',
+        component: 'Select',
+        options: [
+          { label: '管理员', value: 'admin' },
+          { label: '用户', value: 'user' },
+        ],
+      },
     ]}
     onFinish={async (values) => {
       console.log(values);
@@ -500,10 +505,15 @@ const MyTable = () => (
     columns={[
       { title: 'ID', dataIndex: 'id', valueType: 'index' },
       { title: '用户名', dataIndex: 'username', valueType: 'text' },
-      { title: '状态', dataIndex: 'status', valueType: 'enum', valueEnum: {
-        active: { text: '启用', status: 'success' },
-        disabled: { text: '禁用', status: 'error' },
-      }},
+      {
+        title: '状态',
+        dataIndex: 'status',
+        valueType: 'enum',
+        valueEnum: {
+          active: { text: '启用', status: 'success' },
+          disabled: { text: '禁用', status: 'error' },
+        },
+      },
       { title: '创建时间', dataIndex: 'createdAt', valueType: 'date' },
       { title: '金额', dataIndex: 'amount', valueType: 'money' },
     ]}
@@ -527,7 +537,7 @@ const dialogRef = useRef<ProDialogInstance>(null);
 
 <ProDialog
   ref={dialogRef}
-  title="新增用户"
+  title='新增用户'
   schemas={[
     { name: 'username', label: '用户名', component: 'Input', required: true },
     { name: 'email', label: '邮箱', component: 'Input', required: true },
@@ -536,7 +546,7 @@ const dialogRef = useRef<ProDialogInstance>(null);
     await createUser(values);
     return true; // 返回 true 自动关闭弹窗
   }}
-/>
+/>;
 
 // 打开弹窗
 dialogRef.current?.open({ title: '新增用户' });
@@ -654,6 +664,54 @@ pnpm docs:build
 # 预览构建结果
 pnpm docs:preview
 ```
+
+## Graphify — 知识图谱
+
+本项目的代码库已通过 [graphify](https://github.com/safishamsi/graphify) 构建为可查询的知识图谱，支持快速理解架构、查找组件关系和定位代码。
+
+### 前置条件
+
+- **Python 3.10+** — graphify 是 Python 工具（PyPI 包名 `graphifyy`）
+- **pnpm** — 已配置好一键脚本
+
+### 一键安装并构建（新设备）
+
+在新设备上克隆项目后，运行以下命令**一键安装 graphify 并构建知识图谱**：
+
+```bash
+pnpm graphify
+```
+
+该命令会自动：
+
+1. 通过 `pip install graphifyy` 安装 graphify
+2. 执行 AST 提取，生成 `graphify-out/graph.json`、`graph.html`、`GRAPH_REPORT.md`
+
+### 更新图谱
+
+代码变更后，运行以下命令快速更新（无需 API Key，只重新提取变动的文件）：
+
+```bash
+pnpm graphify:update
+```
+
+### 输出文件
+
+| 文件                           | 说明                                          |
+| ------------------------------ | --------------------------------------------- |
+| `graphify-out/graph.html`      | 交互式可视化图表，浏览器打开即可浏览          |
+| `graphify-out/GRAPH_REPORT.md` | 架构审计报告（God Nodes、社区结构、异常连接） |
+| `graphify-out/graph.json`      | 完整图谱数据，支持 query/path/explain 查询    |
+
+### 在 VS Code Copilot Chat 中查询
+
+安装完成后，在 Copilot Chat 中直接用自然语言查询：
+
+- `/graphify query "ProForm 和 ProTable 的关系"`
+- `/graphify path "DataStore" "ProTable"`
+- `/graphify explain "ActionButton"`
+
+> **注意**：代码提取完全本地进行（tree-sitter AST），无需联网。文档/图片/PDF 的语义提取需要设置 LLM API Key（如 `ANTHROPIC_API_KEY`、`GEMINI_API_KEY`）。
 
 ## 许可证
 

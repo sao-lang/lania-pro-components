@@ -5,3 +5,5 @@ dist/
 *.tsbuildinfo
 .pnpm-store
 .vitepress
+.trae
+graphify-out

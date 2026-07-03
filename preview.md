@@ -10,13 +10,13 @@
 
 ## 二、项目定位（1分钟阐述）
 
-| 维度 | 表述内容 |
-|------|---------|
-| **项目背景** | 针对中后台业务中表单、表格、弹窗等高频场景重复开发的问题，自研了一套 Schema 驱动的组件库 |
-| **技术栈** | React 18/19 + TypeScript 6 + Arco Design + pnpm monorepo + Rollup + Vitest |
-| **包结构** | 三个 npm 包：`components`（组件库）、`utils`（工具函数/响应式系统）、`theme`（主题系统） |
+| 维度         | 表述内容                                                                                                                         |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| **项目背景** | 针对中后台业务中表单、表格、弹窗等高频场景重复开发的问题，自研了一套 Schema 驱动的组件库                                         |
+| **技术栈**   | React 18/19 + TypeScript 6 + Arco Design + pnpm monorepo + Rollup + Vitest                                                       |
+| **包结构**   | 三个 npm 包：`components`（组件库）、`utils`（工具函数/响应式系统）、`theme`（主题系统）                                         |
 | **核心组件** | ProForm（表单引擎）、ProTable（数据表格）、ProDialog（弹窗）、ActionButton（CRUD按钮组）、ProSelect（选择器）、ProUpload（上传） |
-| **用户价值** | 开发效率提升 50%+，通过配置代替编码，减少重复劳动 |
+| **用户价值** | 开发效率提升 50%+，通过配置代替编码，减少重复劳动                                                                                |
 
 ---
 
@@ -29,6 +29,7 @@
 > "我参考了 Vue 3 响应式原理，基于 ES6 Proxy 实现了一套完整的响应式系统（reactive.ts），包含 reactive、effect、computed、watch、batchUpdate 等核心 API。与 Vue 不同的是，我采用了 **WeakMap → Map → Dep** 的三层依赖收集结构，天然支持 GC 回收。同时实现了同步/异步批量更新机制，避免频繁触发渲染。"
 
 **追问应对**（当面试官问为什么不自接用 Zustand/Redux）：
+
 > "我们的响应式系统是专为表单引擎设计的，表单需要在字段级别进行细粒度依赖追踪。如果用 Redux 或 Zustand，每个字段值变化都需要手动发 action 通知。而 Proxy 方案可以自动追踪"哪些字段依赖了哪些值的变化"，ProForm 中字段联动的核心就是这个机制。"
 
 ### 亮点 2：分层表单引擎架构
@@ -38,25 +39,28 @@
 > "ProForm 采用了 **核心层 → 功能层 → 插件层** 的分层架构。核心层包含 FormStore（响应式状态管理）、FieldNode（字段节点）、ValidationEngine（校验引擎）。功能层支持字段联动（dependencies + reactions）、五种表单状态（edit/readonly/preview/disabled/draft）、四种布局模式。插件层通过 componentRegistry / readonlyRegistry 实现组件扩展。"
 
 **追问应对**：
+
 > "FormStore 通过 Proxy 驱动表单内部状态，字段值变化时自动触发联动规则和校验。相比 Arco Form 自带的受控模式，我们的方案在复杂表单中性能更好——因为字段之间的依赖追踪是自动的，不需要手动编写 useEffect 去监听每个字段的变化。"
 
-### 亮点 3：完整企业级 ProTable 表格
+### 亮点 3：更完整的 ProTable 表格能力
 
 **关键词**：请求引擎、20+ valueType、可编辑表格、URL 同步、缓存
 
-> "ProTable 内置 RequestEngine 自动管理 loading、分页、搜索状态。支持 20 多种 valueType（text/money/percent/date/select/tag/image 等），每个类型都有对应的渲染器和格式化逻辑。还有可编辑表格、拖拽排序、URL query 同步、数据缓存等企业级功能。"
+> "ProTable 包含一个请求引擎，自动管理 loading、分页、搜索状态。支持 20 多种 valueType（text/money/percent/date/select/tag/image 等），每个类型都有对应的渲染器和格式化逻辑。还有可编辑表格、拖拽排序、URL query 同步、数据缓存等实用功能。"
 
 **追问应对**：
-> "ProTable 的可编辑表格支持行编辑和单元格编辑两种模式，内部复用了 ProForm 的表单引擎，所以校验、联动等功能开箱即用。表格的查询表单也是 ProForm 的实例，做到了技术架构的统一。"
+
+> "ProTable 的可编辑表格支持行编辑和单元格编辑两种模式，内部复用了 ProForm 的表单引擎，因此校验和联动能力可以直接复用。表格的查询表单也是基于同一套 Schema 方案，实现了架构统一。"
 
 ### 亮点 4：性能优化体系
 
 **关键词**：虚拟滚动、懒加载、批量更新、性能监控
 
-> "我在 ProForm 中实现了多维度的性能优化方案：虚拟滚动（处理 100+ 字段大表单）、优先级加载（高优字段先渲染）、分组懒加载（每 10 个字段为一组分批渲染）。搭配自研的批量更新机制（batchUpdate），在一次赋值多个字段时只触发一次渲染。还有 performanceMonitor 性能监控面板，可以实时查看渲染耗时。"
+> "我在 ProForm 中实现了多维度的性能优化方案：虚拟滚动（处理更长的表单）、优先级加载（优先渲染关键字段）、分组懒加载（每 10 个字段为一组分批渲染）。搭配自研的批量更新机制（batchUpdate），在一次赋值多个字段时只触发一次渲染。ProTable 也支持类似的优化思路，例如可选择启用虚拟滚动、对请求做防抖和取消、以及缓存数据，减少重复渲染和重复请求。还有 performanceMonitor 性能监控面板，可以实时查看渲染耗时。"
 
 **追问应对**：
-> "对于超长表单（如 200+ 字段），仅虚拟滚动是不够的。我还做了字段优先级分层——必填/核心字段优先渲染，次要字段分批次插入 DOM。这样首屏渲染时间从 2s 降到了 200ms 以内。"
+
+> "对于较长的表单，单靠虚拟滚动并不能彻底解决所有问题。我还做了字段优先级分层——必填/核心字段先渲染，次要字段再分批插入 DOM，这样首屏体验会更加顺畅。"
 
 ### 亮点 5：完善的工程化体系
 
@@ -71,6 +75,7 @@
 ### Q：你在项目中做了什么？
 
 > "我独立负责了 lania-pro-components 从 0 到 1 的架构设计和开发。具体包括：
+>
 > 1. **技术选型**：选择 Arco Design 作为 UI 基座 + TypeScript + pnpm monorepo
 > 2. **核心引擎**：自研了基于 Proxy 的响应式系统（reactive/effect/computed/watch）和表单引擎（FormStore/ValidationEngine）
 > 3. **组件开发**：完成了 ProForm、ProTable、ProDialog、ActionButton、ProSelect、ProUpload 六个核心组件的开发
@@ -97,7 +102,6 @@
 - 如果面试官是前端架构师级别，深入聊 **响应式系统实现原理**、**分层架构设计**、**性能优化方案**
 - 准备好 GitHub 仓库链接（`https://github.com/sao-lang/lania-pro-components.git`），面试后可以发面试官
 
-
 ## 面试追问深度解答
 
 ### Q1：优先级加载、虚拟滚动、分组懒加载、批量更新机制具体怎么做的？
@@ -118,7 +122,7 @@ const virtualState = useMemo(() => {
   const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);  // overscan=5 额外缓冲区
   const visibleCount = Math.ceil(containerHeight / itemHeight) + overscan * 2;
   const endIndex = Math.min(items.length - 1, startIndex + visibleCount);
-  
+
   // 只取可视区域的 items
   const visibleItems = items.slice(startIndex, endIndex + 1);
   const offsetY = startIndex * itemHeight;  // 用于 translateY 定位
@@ -127,6 +131,7 @@ const virtualState = useMemo(() => {
 ```
 
 **技术细节**：
+
 - `useScroll` 监听容器的 scroll 事件，`passive: true` 不阻塞主线程
 - `useMemo` 根据 `scrollTop` 实时计算 startIndex/endIndex/offsetY
 - 外层固定高度容器 `overflow: auto`，内层用 `translateY(offsetY)` 模拟滚动位置
@@ -134,6 +139,7 @@ const virtualState = useMemo(() => {
 - 150ms 无滚动后设置 `isScrolling=false`，减少滚动过程中的渲染
 
 **面试回答**：
+
 > "虚拟滚动我采用固定的 itemHeight 计算总高度，通过 scrollTop 推算出当前应该渲染哪些字段。关键在于 overscan 参数——可视区域上下各多渲染 5 行，保证快速滚动时不会闪白。渲染时外层固定高度 + overflow:auto，内层通过 CSS translateY 模拟滚动位置。对于动态高度场景，我还实现了动态版本——通过 measuredHeightsRef WeakMap 缓存真实高度，用二分查找定位索引。"
 
 ---
@@ -154,7 +160,7 @@ const loadMore = useCallback(() => {
   timeoutRef.current = setTimeout(() => {
     setLoadedCount(nextCount);
     if (nextCount >= totalCount) setIsComplete(true);
-  }, groupDelay);  // 默认延迟 100ms
+  }, groupDelay); // 默认延迟 100ms
 }, [loadedCount, groupSize, groupDelay]);
 
 // 每次渲染时只取前 loadedCount 个字段
@@ -200,9 +206,9 @@ useEffect(() => {
 
 ```typescript
 export function batchUpdate(fn: () => void): void {
-  isBatching = true;          // 开启批量模式
+  isBatching = true; // 开启批量模式
   try {
-    fn();                     // 执行期间所有 set 操作只暂存到 batchQueue
+    fn(); // 执行期间所有 set 操作只暂存到 batchQueue
   } finally {
     isBatching = false;
     // 一次性执行所有积压的 effect（去重）
@@ -216,7 +222,7 @@ batchUpdate(() => {
   state.values['name'] = 'Alice';
   state.values['age'] = 30;
   state.values['email'] = 'alice@example.com';
-});  // 只触发一次 effect，而非三次
+}); // 只触发一次 effect，而非三次
 ```
 
 此外还有**异步批量更新（asyncBatchUpdate）**：将 effect 推后到下一帧执行，默认 16ms 延迟（约一帧），累积超过 100 个立即刷新，防止队列过大。
@@ -231,13 +237,13 @@ batchUpdate(() => {
 
 ```typescript
 export class PerformanceMonitor {
-  private marks: Map<string, number> = new Map();    // 标记名 -> 开始时间
+  private marks: Map<string, number> = new Map(); // 标记名 -> 开始时间
   private measures: Map<string, number[]> = new Map(); // 测量名 -> 耗时数组(保留最近100条)
   private enabled: boolean;
 
   mark(name: string): void {
     if (!this.enabled) return;
-    this.marks.set(name, performance.now());  // 记录标记点
+    this.marks.set(name, performance.now()); // 记录标记点
   }
 
   measure(name: string, startMark?: string): number | null {
@@ -250,7 +256,7 @@ export class PerformanceMonitor {
     return duration;
   }
 
-  getStats(name: string): { avg, min, max, count } | null {
+  getStats(name: string): { avg; min; max; count } | null {
     // 计算平均/最小/最大耗时
   }
 }
@@ -284,6 +290,7 @@ useEffect(() => {
 **为什么设计 PerformanceMonitor？**
 
 > "设计性能监控器有三个原因：
+>
 > 1. **定位性能瓶颈**：表单字段数从 10 增长到 100 时，渲染时间可能从 50ms 飙升到 2s。如果没有监控手段，就只能凭感觉猜哪里慢。PerformanceMonitor 可以精确测量每个阶段的耗时。
 > 2. **量化优化效果**：每次优化后看一眼监控面板——虚拟滚动是否生效、懒加载是否减少首屏耗时，数据说话而不是靠感觉。
 > 3. **开发环境专用**：仅开发环境下启用（`process.env.NODE_ENV === 'development'`），生产环境零开销。配合 `FormPerformanceMonitor` 浮窗组件，开发者可以在使用组件时直观看到实时性能数据——平均渲染耗时、最小/最大耗时、测量次数等。确认没问题后关掉监控即可。"
@@ -356,12 +363,13 @@ store.subscribe(() => {
       sortField: store.getState().sorter.field,
       sortOrder: store.getState().sorter.order,
     };
-    updateUrlParams(params);  // 使用 replaceState（不产生浏览器历史记录）
+    updateUrlParams(params); // 使用 replaceState（不产生浏览器历史记录）
   }, 300);
 });
 ```
 
 **技术细节**：
+
 - `isRestoringRef` 标志防止"写入 URL → store 再次变化 → 再次写入 URL"的死循环
 - 复杂对象自动 `JSON.stringify`，写入时自动 `JSON.parse` + 回退到数字/布尔解析
 - 支持 `prefix` 参数，例如 `pro-` 前缀：URL 中显示 `?pro-current=1&pro-pageSize=20`
@@ -381,22 +389,22 @@ export class LRUCache<K, V> {
   private maxSize: number;
 
   get(key: K): V | undefined {
-    const value = this.cache.get(key);  // 访问后移到末尾
+    const value = this.cache.get(key); // 访问后移到末尾
     if (value !== undefined) {
       this.cache.delete(key);
-      this.cache.set(key, value);  // 重新插入到末尾（最近使用）
+      this.cache.set(key, value); // 重新插入到末尾（最近使用）
     }
     return value;
   }
 
   set(key: K, value: V): void {
     if (this.cache.has(key)) {
-      this.cache.delete(key);       // 已存在：删除旧的
+      this.cache.delete(key); // 已存在：删除旧的
     } else if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);  // 容量满：淘汰最久未使用的
+      this.cache.delete(firstKey); // 容量满：淘汰最久未使用的
     }
-    this.cache.set(key, value);     // 插入到末尾
+    this.cache.set(key, value); // 插入到末尾
   }
 }
 ```
@@ -411,16 +419,18 @@ export class LRUCache<K, V> {
 
 > "中后台表单在不同业务阶段有截然不同的交互需求，单一状态无法覆盖所有场景。设计这五种状态源于对实际业务场景的抽象："
 
-| 状态 | 交互表现 | 典型场景 |
-|------|---------|---------|
-| **edit（编辑）** | 所有字段可编辑、可提交、可校验 | 新增/编辑表单 |
-| **readonly（只读）** | 显示文本而非输入框，不可交互 | 详情查看页 |
-| **preview（预览）** | 类似 readonly，但表单尚未保存，通常是 draft 后的预览 | 草稿预览确认 |
-| **disabled（禁用）** | 输入框保留但灰色不可操作 | 审批通过后不可修改的历史数据 |
-| **draft（草稿）** | 可编辑，但提交前可以自动保存到 localStorage | 长表单防丢失 |
+| 状态                 | 交互表现                                             | 典型场景                     |
+| -------------------- | ---------------------------------------------------- | ---------------------------- |
+| **edit（编辑）**     | 所有字段可编辑、可提交、可校验                       | 新增/编辑表单                |
+| **readonly（只读）** | 显示文本而非输入框，不可交互                         | 详情查看页                   |
+| **preview（预览）**  | 类似 readonly，但表单尚未保存，通常是 draft 后的预览 | 草稿预览确认                 |
+| **disabled（禁用）** | 输入框保留但灰色不可操作                             | 审批通过后不可修改的历史数据 |
+| **draft（草稿）**    | 可编辑，但提交前可以自动保存到 localStorage          | 长表单防丢失                 |
 
 **面试回答**：
+
 > "五种状态是从实际业务中抽象出来的。比如一个审批系统：
+>
 > - **编辑态**：申请人填写表单
 > - **草稿态**：填写中自动存草稿（防丢失），用户可以暂存离开
 > - **预览态**：提交前预览确认
