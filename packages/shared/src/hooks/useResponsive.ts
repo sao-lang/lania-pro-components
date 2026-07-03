@@ -1,20 +1,15 @@
 /**
- * 响应式适配 Hook（useResponsive）
+ * @lania-pro-components/shared
  *
- * 为 ProTable 提供响应式断点检测和列隐藏能力：
- * - 预定义断点：xxs / xs / sm / md / lg / xl / xxl
- * - 自定义断点配置
- * - 自动列隐藏（根据断点调整列显隐）
- * - 提供当前断点状态
- */
-/**
  * 响应式适配 Hook（useResponsive）
  *
  * 通过 window.matchMedia 监听视口尺寸变化，提供响应式断点检测：
- * - 预定义断点：xxs(320) / xs(480) / sm(576) / md(768) / lg(992) / xl(1200) / xxl(1600)
- * - 根据当前断点自动决定哪些列应该隐藏
+ * - 预定义断点：xs(576) / sm(576) / md(768) / lg(992) / xl(1200) / xxl(1600)
+ * - 根据当前断点自动决定列数
  * - 支持自定义断点配置
- * - 组件销毁时自动清理监听
+ * - 独立于任何业务组件，纯通用响应式抽象
+ *
+ * 迁移自 ProTable/hooks/useResponsive.ts
  */
 import { useState, useEffect, useCallback } from 'react';
 
@@ -89,21 +84,11 @@ const defaultBreakpoints: Required<Breakpoints> = {
 function getBreakpoint(width: number, breakpoints: Breakpoints): Breakpoint {
   const bp = { ...defaultBreakpoints, ...breakpoints };
 
-  if (width < bp.xs) {
-    return 'xs';
-  }
-  if (width < bp.md) {
-    return 'sm';
-  }
-  if (width < bp.lg) {
-    return 'md';
-  }
-  if (width < bp.xl) {
-    return 'lg';
-  }
-  if (width < bp.xxl) {
-    return 'xl';
-  }
+  if (width < bp.xs) return 'xs';
+  if (width < bp.md) return 'sm';
+  if (width < bp.lg) return 'md';
+  if (width < bp.xl) return 'lg';
+  if (width < bp.xxl) return 'xl';
   return 'xxl';
 }
 
@@ -117,7 +102,6 @@ function getColumnsByBreakpoint(breakpoint: Breakpoint, config?: ResponsiveConfi
     return map[breakpoint];
   }
 
-  // 默认列数映射
   const defaultMap: Record<Breakpoint, number> = {
     xs: 1,
     sm: 2,
@@ -126,7 +110,6 @@ function getColumnsByBreakpoint(breakpoint: Breakpoint, config?: ResponsiveConfi
     xl: 4,
     xxl: 6,
   };
-
   return defaultMap[breakpoint];
 }
 
@@ -168,7 +151,6 @@ export interface UseResponsiveReturn {
 export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
   const enabled = config?.enabled ?? true;
 
-  // 初始状态
   const [state, setState] = useState<ResponsiveState>(() => {
     if (typeof window === 'undefined') {
       return {
@@ -195,11 +177,8 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     };
   });
 
-  // 更新响应式状态
   const updateState = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    if (typeof window === 'undefined') return;
 
     const width = window.innerWidth;
     const breakpoint = getBreakpoint(width, config?.breakpoints || {});
@@ -215,13 +194,9 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     });
   }, [config]);
 
-  // 监听窗口大小变化
   useEffect(() => {
-    if (!enabled || typeof window === 'undefined') {
-      return;
-    }
+    if (!enabled || typeof window === 'undefined') return;
 
-    // 使用防抖优化性能
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const handleResize = () => {
@@ -230,8 +205,6 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     };
 
     window.addEventListener('resize', handleResize);
-
-    // 初始更新
     updateState();
 
     return () => {
@@ -240,33 +213,25 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     };
   }, [enabled, updateState]);
 
-  // 获取当前断点
   const getCurrentBreakpoint = useCallback((): Breakpoint => state.breakpoint, [state.breakpoint]);
 
-  // 检查是否匹配指定断点
   const matchBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => state.breakpoint === breakpoint,
     [state.breakpoint],
   );
 
-  // 检查是否大于等于指定断点
   const gteBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => {
       const order: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'];
-      const currentIndex = order.indexOf(state.breakpoint);
-      const targetIndex = order.indexOf(breakpoint);
-      return currentIndex >= targetIndex;
+      return order.indexOf(state.breakpoint) >= order.indexOf(breakpoint);
     },
     [state.breakpoint],
   );
 
-  // 检查是否小于等于指定断点
   const lteBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => {
       const order: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'];
-      const currentIndex = order.indexOf(state.breakpoint);
-      const targetIndex = order.indexOf(breakpoint);
-      return currentIndex <= targetIndex;
+      return order.indexOf(state.breakpoint) <= order.indexOf(breakpoint);
     },
     [state.breakpoint],
   );
@@ -308,9 +273,7 @@ export function useResponsiveColumns(options?: {
   const [columns, setColumns] = useState(maxColumns);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    if (typeof window === 'undefined') return;
 
     const calculateColumns = () => {
       const container = containerRef?.current;
@@ -338,5 +301,3 @@ export function useResponsiveColumns(options?: {
 
   return columns;
 }
-
-export default useResponsive;

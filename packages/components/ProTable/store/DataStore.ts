@@ -1,20 +1,13 @@
 /**
  * 数据存储（DataStore）
  *
- * ProTable 的核心数据管理层，基于原生 JavaScript 实现：
- * - 不依赖外部状态管理库（Redux/Zustand）
- * - 通过 Listener 机制实现状态变更通知
- * - 支持 reset 恢复到初始状态
- *
- * 管理的数据维度：
- * - data: 表格数据列表
- * - loading: 加载状态
- * - selectedRowKeys / selectedRows: 选中状态
- * - pagination: 分页信息
- * - queryParams / sorter / filters: 查询/排序/筛选参数
+ * ProTable 的核心数据管理层，底层使用 @lania-pro-components/utils 的 createStore
+ * 作为状态容器，外部接口保持不变。
  */
 
 /* eslint-disable @typescript-eslint/naming-convention */
+import { createStore } from '@lania-pro-components/utils';
+import type { Store } from '@lania-pro-components/utils';
 import type { DataStoreState, DataStoreActions, CreateDataStoreOptions } from './types';
 
 /**
@@ -24,15 +17,13 @@ type StateChangeListener<T> = (state: DataStoreState<T>, prevState: DataStoreSta
 
 /**
  * DataStore 类
- * 基于原生 Proxy 实现响应式状态管理，不依赖外部库
+ * 基于 createStore 实现状态管理
  */
 class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<T> {
-  // 内部状态
-  private _state: DataStoreState<T>;
-  private _listeners: Set<StateChangeListener<T>> = new Set();
-  private _initialState: Partial<DataStoreState<T>>;
+  /** 底层 Store 实例 */
+  private store: Store<DataStoreState<T>>;
 
-  // 初始状态引用（用于 reset）
+  /** 初始值（用于 reset） */
   private _initialData: T[];
   private _initialQuery: Record<string, unknown>;
   private _initialPagination: { current: number; pageSize: number };
@@ -44,7 +35,7 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
     this._initialQuery = initialQuery;
     this._initialPagination = initialPagination;
 
-    this._state = {
+    this.store = createStore<DataStoreState<T>>({
       dataSource: initialData,
       loading: false,
       error: undefined,
@@ -57,248 +48,161 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
       selectedRows: [],
       isPolling: false,
       pollingInterval: undefined,
-    };
-
-    this._initialState = { ...this._state };
-  }
-
-  /**
-   * 通知所有监听器
-   */
-  private _notify<K extends keyof DataStoreState<T>>(key: K, prevValue: DataStoreState<T>[K]) {
-    const prevState: DataStoreState<T> = { ...this._state, [key]: prevValue };
-    this._listeners.forEach((listener) => listener(this._state, prevState));
+    });
   }
 
   /**
    * 订阅状态变化
    */
   subscribe(listener: StateChangeListener<T>): () => void {
-    this._listeners.add(listener);
-    return () => {
-      this._listeners.delete(listener);
-    };
+    return this.store.subscribe(listener);
   }
 
   /**
    * 获取当前状态
    */
   getState(): DataStoreState<T> {
-    return this._state;
+    return this.store.getState();
   }
 
   // ==================== 数据操作 ====================
 
   setDataSource(data: T[]): void {
-    const prev = this._state.dataSource;
-    this._state.dataSource = data;
-    this._notify('dataSource', prev);
+    this.store.setState({ dataSource: data });
   }
 
   setLoading(loading: boolean): void {
-    const prev = this._state.loading;
-    this._state.loading = loading;
-    this._notify('loading', prev);
+    this.store.setState({ loading });
   }
 
   setError(error?: Error): void {
-    const prev = this._state.error;
-    this._state.error = error;
-    this._notify('error', prev);
+    this.store.setState({ error });
   }
 
   setTotal(total: number): void {
-    const prev = this._state.total;
-    this._state.total = total;
-    this._notify('total', prev);
+    this.store.setState({ total });
   }
 
   // ==================== 查询操作 ====================
 
   setQuery(query: Record<string, unknown>): void {
-    const prevQuery = this._state.query;
-    const prevPagination = this._state.pagination;
-    const prevSelectedRowKeys = this._state.selectedRowKeys;
-    const prevSelectedRows = this._state.selectedRows;
-
-    this._state.query = query;
-    this._state.pagination = { ...prevPagination, current: 1 };
-    this._state.selectedRowKeys = [];
-    this._state.selectedRows = [];
-
-    this._notify('query', prevQuery);
-    this._notify('pagination', prevPagination);
-    this._notify('selectedRowKeys', prevSelectedRowKeys);
-    this._notify('selectedRows', prevSelectedRows);
+    this.store.setState({
+      query,
+      pagination: { current: 1, pageSize: this.store.getState().pagination.pageSize },
+      selectedRowKeys: [],
+      selectedRows: [],
+    });
   }
 
   setPage(current: number): void {
-    const prev = this._state.pagination;
-    this._state.pagination = { ...prev, current };
-    this._notify('pagination', prev);
+    this.store.setState((prev) => ({ pagination: { ...prev.pagination, current } }));
   }
 
   setPageSize(pageSize: number): void {
-    const prevPagination = this._state.pagination;
-    const prevSelectedRowKeys = this._state.selectedRowKeys;
-    const prevSelectedRows = this._state.selectedRows;
-
-    this._state.pagination = { current: 1, pageSize };
-    this._state.selectedRowKeys = [];
-    this._state.selectedRows = [];
-
-    this._notify('pagination', prevPagination);
-    this._notify('selectedRowKeys', prevSelectedRowKeys);
-    this._notify('selectedRows', prevSelectedRows);
+    this.store.setState({
+      pagination: { current: 1, pageSize },
+      selectedRowKeys: [],
+      selectedRows: [],
+    });
   }
 
   setSorter(field?: string, order?: 'ascend' | 'descend'): void {
-    const prev = this._state.sorter;
-    const prevPagination = this._state.pagination;
-
-    this._state.sorter = { field, order };
-    this._state.pagination = { ...prevPagination, current: 1 };
-
-    this._notify('sorter', prev);
-    this._notify('pagination', prevPagination);
+    this.store.setState((prev) => ({
+      sorter: { field, order },
+      pagination: { ...prev.pagination, current: 1 },
+    }));
   }
 
   setFilters(filters: Record<string, string[]>): void {
-    const prev = this._state.filters;
-    const prevPagination = this._state.pagination;
-
-    this._state.filters = filters;
-    this._state.pagination = { ...prevPagination, current: 1 };
-
-    this._notify('filters', prev);
-    this._notify('pagination', prevPagination);
+    this.store.setState((prev) => ({
+      filters,
+      pagination: { ...prev.pagination, current: 1 },
+    }));
   }
 
   // ==================== 选择操作 ====================
 
   setSelectedRows(keys: (string | number)[], rows: T[]): void {
-    const prevKeys = this._state.selectedRowKeys;
-    const prevRows = this._state.selectedRows;
-
-    this._state.selectedRowKeys = keys;
-    this._state.selectedRows = rows;
-
-    this._notify('selectedRowKeys', prevKeys);
-    this._notify('selectedRows', prevRows);
+    this.store.setState({ selectedRowKeys: keys, selectedRows: rows });
   }
 
   clearSelected(): void {
-    const prevKeys = this._state.selectedRowKeys;
-    const prevRows = this._state.selectedRows;
-
-    this._state.selectedRowKeys = [];
-    this._state.selectedRows = [];
-
-    this._notify('selectedRowKeys', prevKeys);
-    this._notify('selectedRows', prevRows);
+    this.store.setState({ selectedRowKeys: [], selectedRows: [] });
   }
 
   // ==================== 轮询操作 ====================
 
   setPolling(isPolling: boolean, interval?: number): void {
-    const prevIsPolling = this._state.isPolling;
-    const prevInterval = this._state.pollingInterval;
-
-    this._state.isPolling = isPolling;
-    this._state.pollingInterval = interval;
-
-    this._notify('isPolling', prevIsPolling);
-    this._notify('pollingInterval', prevInterval);
+    this.store.setState({ isPolling, pollingInterval: interval });
   }
 
   startPolling(): void {
-    const prev = this._state.isPolling;
-    this._state.isPolling = true;
-    this._notify('isPolling', prev);
+    this.store.setState({ isPolling: true });
   }
 
   stopPolling(): void {
-    const prevIsPolling = this._state.isPolling;
-    const prevInterval = this._state.pollingInterval;
-
-    this._state.isPolling = false;
-    this._state.pollingInterval = undefined;
-
-    this._notify('isPolling', prevIsPolling);
-    this._notify('pollingInterval', prevInterval);
+    this.store.setState({ isPolling: false, pollingInterval: undefined });
   }
 
   // ==================== 批量操作 ====================
 
   reload(): void {
-    // 触发重新加载事件，由外部监听并执行
-    const event = new CustomEvent('protable:reload', { detail: this._state });
+    const event = new CustomEvent('protable:reload', { detail: this.store.getState() });
     window.dispatchEvent(event);
   }
 
   reset(): void {
-    const prevState = { ...this._state };
-
-    this._state.query = this._initialQuery;
-    this._state.pagination = this._initialPagination;
-    this._state.sorter = {};
-    this._state.filters = {};
-    this._state.selectedRowKeys = [];
-    this._state.selectedRows = [];
-    this._state.error = undefined;
-
-    // 通知所有变化
-    this._listeners.forEach((listener) => listener(this._state, prevState));
+    this.store.reset();
   }
 
   // ==================== Getter 访问器 ====================
 
   get dataSource(): T[] {
-    return this._state.dataSource;
+    return this.store.getState().dataSource;
   }
 
   get loading(): boolean {
-    return this._state.loading;
+    return this.store.getState().loading;
   }
 
   get error(): Error | undefined {
-    return this._state.error;
+    return this.store.getState().error;
   }
 
   get total(): number {
-    return this._state.total;
+    return this.store.getState().total;
   }
 
   get query(): Record<string, unknown> {
-    return this._state.query;
+    return this.store.getState().query;
   }
 
   get pagination(): { current: number; pageSize: number } {
-    return this._state.pagination;
+    return this.store.getState().pagination;
   }
 
   get sorter(): { field?: string; order?: 'ascend' | 'descend' } {
-    return this._state.sorter;
+    return this.store.getState().sorter;
   }
 
   get filters(): Record<string, string[]> {
-    return this._state.filters;
+    return this.store.getState().filters;
   }
 
   get selectedRowKeys(): (string | number)[] {
-    return this._state.selectedRowKeys;
+    return this.store.getState().selectedRowKeys;
   }
 
   get selectedRows(): T[] {
-    return this._state.selectedRows;
+    return this.store.getState().selectedRows;
   }
 
   get isPolling(): boolean {
-    return this._state.isPolling;
+    return this.store.getState().isPolling;
   }
 
   get pollingInterval(): number | undefined {
-    return this._state.pollingInterval;
+    return this.store.getState().pollingInterval;
   }
 }
 

@@ -10,6 +10,7 @@
 import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconDownload } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import type { ExportButtonProps, ExportButtonRef } from './types';
 
 /**
@@ -92,17 +93,13 @@ export const ExportButton = forwardRef<ExportButtonRef, ExportButtonProps>(
       [handleExport, loading],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        void handleExport();
-      },
-      [onClick, handleExport],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleExport,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} icon={icon} loading={loading} onClick={handleClick} {...restProps}>

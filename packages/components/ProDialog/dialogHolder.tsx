@@ -15,7 +15,7 @@
 
 import { deepMerge } from '@lania-pro-components/utils';
 import React, { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createImperativeInstance } from '@lania-pro-components/shared';
 import { IconInfoCircle, IconCheckCircle, IconExclamationCircle, IconCloseCircle } from '@arco-design/web-react/icon';
 import type {
   OpenDialogConfig,
@@ -141,35 +141,30 @@ function DialogHolder<TValues, T>({ config, onClose }: DialogHolderProps<TValues
  * ```
  */
 export function createDialogHolder<TValues, T>(config: OpenDialogConfig<TValues, T>): DialogReturnProps {
-  // 创建挂载容器
-  const container = document.createElement('div');
-  document.body.appendChild(container);
+  // 使用 createImperativeInstance 管理命令式渲染
+  const manager = createImperativeInstance<{ config: OpenDialogConfig<TValues, T>; onClose: () => void }>(
+    ({ config: cfg, onClose }) => (
+      <DialogHolder<TValues, T> config={cfg as OpenDialogConfig<TValues, T>} onClose={onClose} />
+    ),
+  );
 
-  // 创建 React 18 的 root
-  const root = createRoot(container);
+  const dialogHandle: { current: { close: () => void } } = { current: { close: () => {} } };
+  dialogHandle.current = manager.open({ config, onClose: () => dialogHandle.current.close() });
 
-  /** 关闭并清理 DOM */
-  const close = () => {
-    root.unmount();
-    if (container.parentNode) {
-      container.parentNode.removeChild(container);
-    }
-  };
-
-  /** 运行时更新弹窗配置 */
   const update: DialogReturnProps['update'] = (newConfig) => {
-    root.render(
-      <DialogHolder<TValues, T> config={{ ...config, ...newConfig } as OpenDialogConfig<TValues, T>} onClose={close} />,
-    );
+    dialogHandle.current = manager.open({
+      config: { ...config, ...newConfig } as OpenDialogConfig<TValues, T>,
+      onClose: () => dialogHandle.current.close(),
+    });
   };
 
-  /** 销毁弹窗 */
+  const close = () => {
+    dialogHandle.current.close();
+  };
+
   const destroy = () => {
-    close();
+    manager.closeAll();
   };
-
-  // 初始渲染
-  root.render(<DialogHolder<TValues, T> config={config} onClose={close} />);
 
   return {
     update,

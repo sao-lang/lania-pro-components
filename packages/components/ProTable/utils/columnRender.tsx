@@ -71,6 +71,16 @@ import {
   copyToClipboard as copyToClipboardPure,
   getTagColor,
 } from '@lania-pro-components/utils';
+import {
+  renderNumber as sharedRenderNumber,
+  renderMoney as sharedRenderMoney,
+  renderPercent as sharedRenderPercent,
+  renderDate as sharedRenderDate,
+  renderDateTime as sharedRenderDateTime,
+  renderTime as sharedRenderTime,
+  renderOption as sharedRenderOption,
+  renderSwitch as sharedRenderSwitch,
+} from '@lania-pro-components/shared';
 
 const { Text } = Typography;
 
@@ -147,13 +157,11 @@ const renderText = (text: unknown, column: ProColumnType): ReactNode => {
  */
 const renderNumber = (text: unknown, column: ProColumnType): ReactNode => {
   const { precision = 0, thousandsSeparator = true } = column;
-  const emptyText = getEmptyText(column);
-
-  if (text === null || text === undefined || text === '') {
-    return emptyText;
-  }
-
-  return formatNumber(text as string | number, { precision, thousandsSeparator });
+  return sharedRenderNumber(text, {
+    precision,
+    thousandsSeparator,
+    emptyText: getEmptyText(column) as string | undefined,
+  });
 };
 
 /**
@@ -161,17 +169,12 @@ const renderNumber = (text: unknown, column: ProColumnType): ReactNode => {
  */
 const renderMoney = (text: unknown, column: ProColumnType): ReactNode => {
   const { moneySymbol = '¥', precision = 2, thousandsSeparator = true } = column;
-  const emptyText = getEmptyText(column);
-
-  if (text === null || text === undefined || text === '') {
-    return emptyText;
-  }
-
-  return (
-    <Text style={{ fontFamily: 'monospace', margin: 0, padding: 0 }}>
-      {formatMoney(text as string | number, moneySymbol, { precision, thousandsSeparator })}
-    </Text>
-  );
+  return sharedRenderMoney(text, {
+    symbol: moneySymbol,
+    precision,
+    thousandsSeparator,
+    emptyText: getEmptyText(column) as string | undefined,
+  });
 };
 
 /**
@@ -179,26 +182,7 @@ const renderMoney = (text: unknown, column: ProColumnType): ReactNode => {
  */
 const renderPercent = (text: unknown, column: ProColumnType): ReactNode => {
   const { precision = 2 } = column;
-  const emptyText = getEmptyText(column);
-
-  if (text === null || text === undefined || text === '') {
-    return emptyText;
-  }
-
-  const num = typeof text === 'string' ? parseFloat(text) : (text as number);
-  let color: string | undefined;
-
-  if (num > 0) {
-    color = '#00b42a';
-  } else if (num < 0) {
-    color = '#f53f3f';
-  }
-
-  return (
-    <Text style={{ color, fontFamily: 'monospace', margin: 0, padding: 0 }}>
-      {formatPercent(text as string | number, { precision })}
-    </Text>
-  );
+  return sharedRenderPercent(text, { precision, emptyText: getEmptyText(column) as string | undefined });
 };
 
 /**
@@ -207,24 +191,16 @@ const renderPercent = (text: unknown, column: ProColumnType): ReactNode => {
 const renderDate = (text: unknown, column: ProColumnType): ReactNode => {
   const { dateFormat = 'YYYY-MM-DD', ellipsis } = column;
   const emptyText = getEmptyText(column);
-
-  if (!text) {
-    return emptyText;
-  }
-
-  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
-
-  if (ellipsis) {
-    content = (
-      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
-        <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
-          {content}
-        </Text>
-      </Tooltip>
-    );
-  }
-
-  return content;
+  const formatted = sharedRenderDate(text, { format: dateFormat, emptyText: emptyText as string | undefined });
+  return ellipsis && formatted ? (
+    <Tooltip content={String(text)}>
+      <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
+        {formatted}
+      </Text>
+    </Tooltip>
+  ) : (
+    formatted
+  );
 };
 
 /**
@@ -233,24 +209,16 @@ const renderDate = (text: unknown, column: ProColumnType): ReactNode => {
 const renderDateTime = (text: unknown, column: ProColumnType): ReactNode => {
   const { dateFormat = 'YYYY-MM-DD HH:mm:ss', ellipsis } = column;
   const emptyText = getEmptyText(column);
-
-  if (!text) {
-    return emptyText;
-  }
-
-  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
-
-  if (ellipsis) {
-    content = (
-      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
-        <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
-          {content}
-        </Text>
-      </Tooltip>
-    );
-  }
-
-  return content;
+  const formatted = sharedRenderDateTime(text, { format: dateFormat, emptyText: emptyText as string | undefined });
+  return ellipsis && formatted ? (
+    <Tooltip content={String(text)}>
+      <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
+        {formatted}
+      </Text>
+    </Tooltip>
+  ) : (
+    formatted
+  );
 };
 
 /**
@@ -259,24 +227,16 @@ const renderDateTime = (text: unknown, column: ProColumnType): ReactNode => {
 const renderTime = (text: unknown, column: ProColumnType): ReactNode => {
   const { dateFormat = 'HH:mm:ss', ellipsis } = column;
   const emptyText = getEmptyText(column);
-
-  if (!text) {
-    return emptyText;
-  }
-
-  let content: ReactNode = formatDate(text as string | number | Date, dateFormat);
-
-  if (ellipsis) {
-    content = (
-      <Tooltip content={formatDate(text as string | number | Date, dateFormat)}>
-        <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
-          {content}
-        </Text>
-      </Tooltip>
-    );
-  }
-
-  return content;
+  const formatted = sharedRenderTime(text, { format: dateFormat, emptyText: emptyText as string | undefined });
+  return ellipsis && formatted ? (
+    <Tooltip content={String(text)}>
+      <Text ellipsis style={{ maxWidth: column.width || 200, margin: 0, padding: 0 }}>
+        {formatted}
+      </Text>
+    </Tooltip>
+  ) : (
+    formatted
+  );
 };
 
 /**

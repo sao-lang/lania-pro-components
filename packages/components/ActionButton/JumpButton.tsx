@@ -8,6 +8,7 @@
 import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconArrowRight } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import type { JumpButtonProps, JumpButtonRef } from './types';
 
 /**
@@ -73,17 +74,13 @@ export const JumpButton = forwardRef<JumpButtonRef, JumpButtonProps>(
       [handleJump],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        void handleJump();
-      },
-      [onClick, handleJump],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleJump,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} icon={icon} onClick={handleClick} {...restProps}>

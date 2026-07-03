@@ -4,9 +4,8 @@ import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions
 import { useProForm } from './useProForm';
 import { FormField } from './FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
-import { useVirtualScroll } from './hooks/useVirtualScroll';
+import { useVirtualScroll } from '@lania-pro-components/shared';
 import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
-import { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
 import { performanceMonitor } from '@lania-pro-components/utils';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
@@ -365,14 +364,13 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     ]);
 
     // ===== 性能优化：渲染性能监控 =====
+    // 始终打点，监控 UI 由使用方通过 <PerformanceMonitor> 组合接入
     useEffect(() => {
-      if (performance?.monitor?.enabled) {
-        performanceMonitor.mark('form-render-start');
-        return () => {
-          performanceMonitor.measure('form-render', 'form-render-start');
-        };
-      }
-    }, [visibleSchemas, performance?.monitor?.enabled]);
+      performanceMonitor.mark('form-render-start');
+      return () => {
+        performanceMonitor.measure('form-render', 'form-render-start');
+      };
+    }, [visibleSchemas]);
 
     // 处理表单提交
     const handleFinish = async (values: Record<string, unknown>) => {
@@ -690,14 +688,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
                 );
               })()
             : FormComponent}
-          {/* 性能监控组件 */}
-          {performance?.monitor?.enabled && (
-            <FormPerformanceMonitor
-              enabled={true}
-              position={performance.monitor.position || 'bottom-right'}
-              refreshInterval={performance.monitor.refreshInterval || 1000}
-            />
-          )}
+          {/* 性能监控组件已迁移到 @lania-pro-components/shared，请使用组合方式接入 <PerformanceMonitor> */}
         </LayoutContextProvider>
       </RootContextProvider>
     );

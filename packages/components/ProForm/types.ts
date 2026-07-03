@@ -31,7 +31,8 @@ export interface ValidationResult {
 }
 
 /**
- * 表单布局模式
+ * @deprecated 请从 @lania-pro-components/shared 导入 LayoutMode
+ * 此类型为向后兼容保留的本地副本
  */
 export type LayoutMode = 'horizontal' | 'vertical' | 'inline' | 'compact';
 
@@ -63,7 +64,8 @@ export interface FieldBehavior {
 }
 
 /**
- * 虚拟滚动配置
+ * @deprecated 请从 @lania-pro-components/shared 导入 VirtualScrollConfig
+ * 此类型为向后兼容保留的本地副本
  */
 export interface VirtualScrollConfig {
   /** 是否启用虚拟滚动 */
@@ -77,7 +79,8 @@ export interface VirtualScrollConfig {
 }
 
 /**
- * 懒加载配置
+ * @deprecated 请从 @lania-pro-components/shared 导入 LazyLoadConfig
+ * 此类型为向后兼容保留的本地副本
  */
 export interface LazyLoadConfig {
   /** 是否启用懒加载 */
@@ -97,7 +100,8 @@ export interface LazyLoadConfig {
 }
 
 /**
- * 批量更新配置
+ * @deprecated 请从 @lania-pro-components/shared 导入 BatchUpdateConfig
+ * 此类型为向后兼容保留的本地副本
  */
 export interface BatchUpdateConfig {
   /** 是否启用批量更新 */
@@ -109,19 +113,10 @@ export interface BatchUpdateConfig {
 }
 
 /**
- * 性能监控配置
- */
-export interface PerformanceMonitorConfig {
-  /** 是否启用性能监控 */
-  enabled?: boolean;
-  /** 刷新间隔（毫秒） */
-  refreshInterval?: number;
-  /** 监控位置 */
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-}
-
-/**
  * ProForm 性能优化配置
+ *
+ * 注意：monitor 字段已移除（P0-3 破坏性变更），
+ * 监控 UI 请使用组合方式接入 <PerformanceMonitor> 组件。
  */
 export interface ProFormPerformanceConfig {
   /** 虚拟滚动配置 */
@@ -130,8 +125,6 @@ export interface ProFormPerformanceConfig {
   lazyLoad?: LazyLoadConfig;
   /** 批量更新配置 */
   batchUpdate?: BatchUpdateConfig;
-  /** 性能监控配置 */
-  monitor?: PerformanceMonitorConfig;
 }
 
 /**
@@ -610,6 +603,11 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   getFocusedField: () => string | undefined;
   /** 获取指定字段的聚焦状态 */
   getFieldFocused: (name: string) => boolean;
+  /** 获取性能统计 */
+  getStats: () => {
+    fieldCount: number;
+    renderStats: { avg: number; min: number; max: number; count: number } | null;
+  };
 }
 
 /**

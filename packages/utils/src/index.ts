@@ -50,6 +50,21 @@ export * from './fileType';
 // 导出：compressImage
 export * from './image';
 
+// ======================== 实例注册中心 ========================
+// 通用实例注册表，支持注册/注销/查询/订阅
+// 导出：InstanceRegistry, createInstanceRegistry
+export * from './instanceRegistry';
+
+// ======================== Store 工厂 ========================
+// 轻量级状态管理底座
+// 导出：createStore, Store, StoreListener
+export * from './store';
+
+// ======================== 草稿引擎 ========================
+// 表单草稿持久化引擎，支持多种存储策略
+// 导出：DraftEngine, DraftData, DraftStorage, localStorageStrategy, sessionStorageStrategy
+export * from './draftEngine';
+
 // ======================== 颜色工具 ========================
 // 标签颜色映射、状态颜色转换等
 // 导出：getTagColor

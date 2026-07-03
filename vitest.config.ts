@@ -13,13 +13,18 @@ export default defineConfig({
     alias: {
       // 测试直接跑 utils 源码，无需先 build
       '@lania-pro-components/utils': path.resolve(__dirname, 'packages/utils/src/index.ts'),
+      '@lania-pro-components/shared': path.resolve(__dirname, 'packages/shared/src/index.ts'),
     },
   },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['test/**/*.{test,spec}.{ts,tsx}', 'packages/components/test/**/*.{test,spec}.{ts,tsx}', 'packages/components/*/test/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'test/**/*.{test,spec}.{ts,tsx}',
+      'packages/components/test/**/*.{test,spec}.{ts,tsx}',
+      'packages/components/*/test/**/*.{test,spec}.{ts,tsx}',
+    ],
     exclude: ['node_modules', '**/dist/**', 'docs', '.vitepress'],
     css: {
       // Arco Design 会引入大量 CSS，测试时不需要真实样式

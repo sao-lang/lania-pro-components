@@ -35,23 +35,15 @@
 import React, { ReactNode, useState } from 'react';
 import { Image, Tag, Space } from '@arco-design/web-react';
 import { IconEye, IconFile, IconLink, IconPlayCircle } from '@arco-design/web-react/icon';
-function formatDate(date: Date, formatStr: string): string {
-  const pad = (num: number): string => String(num).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-
-  return formatStr
-    .replace('YYYY', String(year))
-    .replace('MM', month)
-    .replace('DD', day)
-    .replace('HH', hours)
-    .replace('mm', minutes)
-    .replace('ss', seconds);
-}
+import {
+  renderText,
+  renderNumber as sharedRenderNumber,
+  renderMoney as sharedRenderMoney,
+  renderPercent as sharedRenderPercent,
+  renderDate as sharedRenderDate,
+  renderOption as sharedRenderOption,
+  renderSwitch as sharedRenderSwitch,
+} from '@lania-pro-components/shared';
 import type { ReadonlyRenderer, ReadonlyRendererRegistry, ReadonlyRenderConfig } from '../types';
 
 /**
@@ -74,9 +66,7 @@ function formatEmpty(value: unknown, emptyText: string = DEFAULT_EMPTY_TEXT): st
  */
 function withAffix(content: ReactNode, config: ReadonlyRenderConfig): ReactNode {
   const { prefix, suffix } = config;
-  if (!prefix && !suffix) {
-    return content;
-  }
+  if (!prefix && !suffix) return content;
   return (
     <span>
       {prefix && <span style={{ marginRight: 4 }}>{prefix}</span>}
@@ -86,264 +76,138 @@ function withAffix(content: ReactNode, config: ReadonlyRenderConfig): ReactNode 
   );
 }
 
-/**
- * 格式化数字（千分位）
- */
-function formatNumber(num: number, thousands = false, precision?: number): string {
-  let formatted = precision !== undefined ? num.toFixed(precision) : String(num);
-  if (thousands) {
-    const parts = formatted.split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    formatted = parts.join('.');
-  }
-  return formatted;
-}
-
 // ========== 基础渲染器 ==========
 
 /**
  * 文本渲染器
  */
 export const textRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  let text = String(value);
-  if (config.maxLength && text.length > config.maxLength) {
-    text = text.slice(0, config.maxLength) + (config.ellipsis || '...');
-  }
-  return <span>{withAffix(text, config)}</span>;
+  const rendered = renderText(value, {
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+    maxLength: config.maxLength,
+    ellipsis: config.ellipsis,
+    prefix: config.prefix,
+    suffix: config.suffix,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 多行文本渲染器
  */
 export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const text = String(value);
-  const lines = text.split('\n');
-  return (
-    <span>
-      {withAffix(
-        lines.map((line, i) => (
-          <React.Fragment key={i}>
-            {line}
-            {i < lines.length - 1 && <br />}
-          </React.Fragment>
-        )),
-        config,
-      )}
-    </span>
-  );
+  const rendered = renderText(value, {
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+    preserveNewlines: true,
+    prefix: config.prefix,
+    suffix: config.suffix,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 选项渲染器
  */
 export const optionRenderer: ReadonlyRenderer = (value, options = [], config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const separator = config.separator || ', ';
-
-  if (Array.isArray(value)) {
-    const labels = value.map((v) => {
-      const opt = options.find((o) => o.value === v);
-      return opt?.label || v;
-    });
-
-    if (config.mode === 'tag') {
-      return (
-        <Space wrap>
-          {labels.map((label, i) => (
-            <Tag key={i} color={config.tagColors?.[value[i]]}>
-              {label}
-            </Tag>
-          ))}
-        </Space>
-      );
-    }
-
-    return <span>{withAffix(labels.join(separator), config)}</span>;
-  }
-
-  const option = options.find((o) => o.value === value);
-  const label = option?.label ?? String(value);
-
-  if (config.mode === 'tag') {
-    return <Tag color={config.tagColors?.[String(value)]}>{label}</Tag>;
-  }
-
-  return <span>{withAffix(String(label), config)}</span>;
+  const rendered = sharedRenderOption(value, options as { value: string | number; label: ReactNode }[], {
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+    separator: config.separator,
+    tagMode: config.mode === 'tag',
+    tagColors: config.tagColors,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 多选框渲染器
  */
 export const checkboxRenderer: ReadonlyRenderer = (value, options = [], config = {}) => {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  const empty = formatEmpty(values.length > 0 ? values : null, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const selected = options.filter((opt) => values.includes(opt.value));
-
-  return (
-    <Space wrap>
-      {selected.map((opt, i) => (
-        <Tag key={i} color={config.tagColors?.[String(opt.value)]}>
-          {opt.label}
-        </Tag>
-      ))}
-    </Space>
-  );
+  return optionRenderer(value, options, { ...config, mode: 'tag' });
 };
 
 /**
  * Switch 渲染器
  */
-export const switchRenderer: ReadonlyRenderer = (value, _options, config = {}, componentProps = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const { checkedText, uncheckedText, trueText, falseText } = componentProps;
-  const trueLabel = checkedText || trueText || '是';
-  const falseLabel = uncheckedText || falseText || '否';
-
-  const isChecked = value === true || value === 'true' || value === 1 || value === '1';
-
-  return <Tag color={isChecked ? 'green' : 'gray'}>{(isChecked ? trueLabel : falseLabel) as string}</Tag>;
+export const switchRenderer: ReadonlyRenderer = (value, _options, _config = {}, componentProps = {}) => {
+  const { checkedText, uncheckedText, trueText, falseText } = componentProps as Record<string, string>;
+  const rendered = sharedRenderSwitch(value, {
+    trueText: checkedText || trueText || '是',
+    falseText: uncheckedText || falseText || '否',
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 日期渲染器
  */
 export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const format = config.format || 'YYYY-MM-DD';
-
-  if (Array.isArray(value)) {
-    const start = value[0] ? formatDate(new Date(value[0]), format) : '';
-    const end = value[1] ? formatDate(new Date(value[1]), format) : '';
-    return <span>{withAffix(`${start} ~ ${end}`, config)}</span>;
-  }
-
-  const dateValue = value instanceof Date ? value : new Date(value as string | number);
-  return <span>{withAffix(formatDate(dateValue, format), config)}</span>;
+  const rendered = sharedRenderDate(value, {
+    format: config.format || 'YYYY-MM-DD',
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 时间渲染器
  */
 export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const format = config.format || 'HH:mm:ss';
-
-  if (Array.isArray(value)) {
-    const start = value[0] ? formatDate(new Date(value[0]), format) : '';
-    const end = value[1] ? formatDate(new Date(value[1]), format) : '';
-    return <span>{withAffix(`${start} ~ ${end}`, config)}</span>;
-  }
-
-  const timeValue = value instanceof Date ? value : new Date(value as string | number);
-  return <span>{withAffix(formatDate(timeValue, format), config)}</span>;
+  const formatted = sharedRenderDate(value, {
+    format: config.format || 'HH:mm:ss',
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{formatted}</span>;
 };
 
 /**
  * 日期时间渲染器
  */
 export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const format = config.format || 'YYYY-MM-DD HH:mm:ss';
-
-  if (Array.isArray(value)) {
-    const start = value[0] ? formatDate(new Date(value[0]), format) : '';
-    const end = value[1] ? formatDate(new Date(value[1]), format) : '';
-    return <span>{withAffix(`${start} ~ ${end}`, config)}</span>;
-  }
-
-  const dateTimeValue = value instanceof Date ? value : new Date(value as string | number);
-  return <span>{withAffix(formatDate(dateTimeValue, format), config)}</span>;
+  const formatted = sharedRenderDate(value, {
+    format: config.format || 'YYYY-MM-DD HH:mm:ss',
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{formatted}</span>;
 };
 
 /**
  * 数字渲染器
  */
 export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
-  const num = Number(value);
-  if (isNaN(num)) {
-    return <span>{withAffix(String(value), config)}</span>;
-  }
-
-  const formatted = formatNumber(num, config.thousands, config.precision);
-  return <span>{withAffix(formatted, config)}</span>;
+  const rendered = sharedRenderNumber(value, {
+    precision: config.precision ?? 2,
+    thousandsSeparator: config.thousands !== false,
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 百分比渲染器
  */
 export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
   const num = Number(value);
-  if (isNaN(num)) {
-    return <span>{withAffix(String(value), config)}</span>;
-  }
-
-  const precision = config.precision ?? 2;
-  const formatted = formatNumber(num, config.thousands, precision);
-  return <span>{withAffix(`${formatted}%`, config)}</span>;
+  if (isNaN(num)) return <span>{String(value)}</span>;
+  const rendered = sharedRenderPercent(value, {
+    precision: config.precision ?? 2,
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**
  * 货币渲染器
  */
 export const currencyRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const empty = formatEmpty(value, config.emptyText);
-  if (empty !== null) {
-    return <span>{withAffix(empty, config)}</span>;
-  }
-
   const num = Number(value);
-  if (isNaN(num)) {
-    return <span>{withAffix(String(value), config)}</span>;
-  }
-
-  const symbol = config.currencySymbol || '¥';
-  const precision = config.precision ?? 2;
-  const formatted = formatNumber(num, config.thousands ?? true, precision);
-  return <span>{withAffix(`${symbol}${formatted}`, config)}</span>;
+  if (isNaN(num)) return <span>{String(value)}</span>;
+  const rendered = sharedRenderMoney(value, {
+    symbol: config.currencySymbol || '¥',
+    precision: config.precision ?? 2,
+    thousandsSeparator: config.thousands ?? true,
+    emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
+  });
+  return <span>{rendered}</span>;
 };
 
 /**

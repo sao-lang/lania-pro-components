@@ -8,6 +8,7 @@
 import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconDelete } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import { ProDialog } from '../ProDialog';
 import type { DeleteButtonProps, DeleteButtonRef } from './types';
 
@@ -90,17 +91,13 @@ export const DeleteButton = forwardRef<DeleteButtonRef, DeleteButtonProps>(
       [handleOpenConfirm, loading],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        handleOpenConfirm();
-      },
-      [onClick, handleOpenConfirm],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleOpenConfirm,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} status={status} icon={icon} loading={loading} onClick={handleClick} {...restProps}>

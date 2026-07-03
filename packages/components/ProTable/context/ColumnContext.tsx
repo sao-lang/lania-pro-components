@@ -11,7 +11,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ProColumnType, TableDensity, ProTableProps } from '../types';
-import { useResponsive, type Breakpoints } from '../hooks';
+import { useResponsive, type Breakpoints } from '@lania-pro-components/shared';
 
 export interface ColumnContextValue<T = Record<string, unknown>> {
   columns: ProColumnType<T>[];

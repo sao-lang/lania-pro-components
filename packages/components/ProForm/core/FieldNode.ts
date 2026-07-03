@@ -16,6 +16,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI } from '../types';
 import { computed, watch, ref, type ComputedRef } from '@lania-pro-components/utils';
+import { executeRule, executeRules } from './ruleEngine';
 
 /**
  * 计算行为值
@@ -314,47 +315,35 @@ export class FieldNode implements FieldNodeAPI {
   }
 
   /**
-   * 验证字段
+   * 验证字段（委托给 ruleEngine）
    */
-  validate(): Promise<string | undefined> {
-    // 如果字段隐藏，不验证
-    if (this._status.value === 'hidden') {
-      return Promise.resolve(undefined);
-    }
+  async validate(): Promise<string | undefined> {
+    if (this._status.value === 'hidden') return undefined;
 
-    // 获取显示用的字段名（数组类型使用第一个字段名）
     const displayName = Array.isArray(this.name) ? this.name[0] : this.name;
+    const label = (this.schema.label as string) || displayName;
+    const { value } = this._value;
 
-    // 检查必填
+    // required 检查
     if (this._computedBehavior.value.required) {
-      const { value } = this._value;
-      const isEmpty =
-        value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
-
-      if (isEmpty) {
-        const error = `${this.schema.label || displayName} 不能为空`;
+      const error = await executeRule({ required: true, message: `${label} 不能为空` }, value, {}, label);
+      if (error) {
         this.setError(error);
-        return Promise.resolve(error);
+        return error;
       }
     }
 
-    // 执行自定义验证规则
-    if (this.schema.rules) {
-      for (const rule of this.schema.rules) {
-        // 检查 required 规则
-        if ('required' in rule && rule.required && !this._value.value) {
-          const requiredRule = rule as { required: true; message?: string };
-          const errorMsg = requiredRule.message || `${this.schema.label || displayName} 不能为空`;
-          this.setError(errorMsg);
-          return Promise.resolve(errorMsg);
-        }
-
-        // 可以扩展更多验证规则
+    // rules 数组
+    if (this.schema.rules && this.schema.rules.length > 0) {
+      const error = await executeRules(this.schema.rules, value, {}, label);
+      if (error) {
+        this.setError(error);
+        return error;
       }
     }
 
     this.setError(undefined);
-    return Promise.resolve(undefined);
+    return undefined;
   }
 
   /**

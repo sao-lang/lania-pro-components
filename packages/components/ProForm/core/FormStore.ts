@@ -22,6 +22,7 @@
 
 import type { FormStoreAPI, FieldNodeAPI, FieldReaction, ValidationRule } from '../types';
 import { reactive, batchUpdate, watch } from '@lania-pro-components/utils';
+import { executeRule } from './ruleEngine';
 
 /**
  * 值变化监听器类型
@@ -385,158 +386,10 @@ export class FormStore implements FormStoreAPI {
   }
 
   /**
-   * 执行验证规则
+   * 执行验证规则（委托给 ruleEngine）
    */
   private async executeRule(rule: ValidationRule, value: unknown, fieldName: string): Promise<string | undefined> {
-    // required 规则
-    if (rule.required) {
-      const isEmpty = value === undefined || value === null || value === '';
-      if (isEmpty) {
-        return rule.message || `${fieldName} 不能为空`;
-      }
-    }
-
-    // pattern 规则
-    if (rule.pattern && value !== undefined && value !== null && value !== '') {
-      const pattern = typeof rule.pattern === 'string' ? new RegExp(rule.pattern) : rule.pattern;
-      let valueStr: string;
-      if (typeof value === 'string') {
-        valueStr = value;
-      } else if (typeof value === 'number' || typeof value === 'boolean') {
-        valueStr = String(value);
-      } else {
-        return rule.message || `${fieldName} 格式不正确`;
-      }
-      if (!pattern.test(valueStr)) {
-        return rule.message || `${fieldName} 格式不正确`;
-      }
-    }
-
-    // min/max 规则（字符串长度或数组长度）
-    if (rule.min !== undefined || rule.max !== undefined) {
-      let length: number;
-      if (Array.isArray(value)) {
-        length = value.length;
-      } else if (typeof value === 'string') {
-        length = value.length;
-      } else if (typeof value === 'number' || typeof value === 'boolean') {
-        length = String(value).length;
-      } else {
-        length = 0;
-      }
-      if (rule.min !== undefined && length < rule.min) {
-        return rule.message || `${fieldName} 长度不能小于 ${rule.min}`;
-      }
-      if (rule.max !== undefined && length > rule.max) {
-        return rule.message || `${fieldName} 长度不能大于 ${rule.max}`;
-      }
-    }
-
-    // len 规则（固定长度）
-    if (rule.len !== undefined) {
-      let length: number;
-      if (Array.isArray(value)) {
-        length = value.length;
-      } else if (typeof value === 'string') {
-        length = value.length;
-      } else if (typeof value === 'number' || typeof value === 'boolean') {
-        length = String(value).length;
-      } else {
-        length = 0;
-      }
-      if (length !== rule.len) {
-        return rule.message || `${fieldName} 长度必须为 ${rule.len} 个字符`;
-      }
-    }
-
-    // precision 规则（小数精度）
-    if (rule.precision !== undefined && typeof value === 'number') {
-      const decimalPart = String(value).split('.')[1];
-      const actualPrecision = decimalPart ? decimalPart.length : 0;
-      if (actualPrecision > rule.precision) {
-        return rule.message || `${fieldName} 最多保留 ${rule.precision} 位小数`;
-      }
-    }
-
-    // step 规则（数字步长）
-    if (rule.step !== undefined && typeof value === 'number') {
-      if (rule.step > 0) {
-        const remainder = value % rule.step;
-        if (Math.abs(remainder) > Number.EPSILON) {
-          return rule.message || `${fieldName} 值必须是 ${rule.step} 的倍数`;
-        }
-      }
-    }
-
-    // type 规则（值类型）
-    if (rule.type !== undefined) {
-      let isValid = false;
-      switch (rule.type) {
-        case 'number':
-          isValid = typeof value === 'number' && !Number.isNaN(value);
-          break;
-        case 'integer':
-          isValid = Number.isInteger(value);
-          break;
-        case 'float':
-          isValid = typeof value === 'number' && !Number.isNaN(value) && !Number.isInteger(value);
-          break;
-        case 'string':
-          isValid = typeof value === 'string';
-          break;
-        case 'boolean':
-          isValid = typeof value === 'boolean';
-          break;
-      }
-      if (!isValid) {
-        return rule.message || `${fieldName} 值类型必须为 ${rule.type}`;
-      }
-    }
-
-    // sign 规则（正负零）
-    if (rule.sign !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
-      let isValid = false;
-      switch (rule.sign) {
-        case 'positive':
-          isValid = value > 0;
-          break;
-        case 'negative':
-          isValid = value < 0;
-          break;
-        case 'zero':
-          isValid = value === 0;
-          break;
-      }
-      if (!isValid) {
-        const signLabels: Record<string, string> = {
-          positive: '正数',
-          negative: '负数',
-          zero: '零',
-        };
-        return rule.message || `${fieldName} 值必须为${signLabels[rule.sign]}`;
-      }
-    }
-
-    // whitespace 规则（不允许空白）
-    if (rule.whitespace) {
-      if (typeof value === 'string' && value.trim() === '') {
-        return rule.message || `${fieldName} 不允许输入空白字符`;
-      }
-    }
-
-    // validator 规则
-    if (rule.validator) {
-      try {
-        const result = await rule.validator(value, this.getValues());
-        if (result !== undefined) {
-          return typeof result === 'string' ? result : rule.message || `${fieldName} 验证失败`;
-        }
-      } catch {
-        return rule.message || `${fieldName} 验证失败`;
-      }
-    }
-
-    return undefined;
+    return executeRule(rule, value, this.getValues(), fieldName);
   }
 
   /**

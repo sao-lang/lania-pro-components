@@ -1,11 +1,11 @@
 /**
  * ProForm 实例注册中心
  *
+ * @deprecated 请优先从 @lania-pro-components/utils 导入 createInstanceRegistry / InstanceRegistry
+ * 此文件为向后兼容保留的 re-export 壳
+ *
  * 提供表单实例的全局注册和订阅功能。
  * 通过为表单指定 name 属性，可以在应用的任何位置获取表单实例。
- *
- * 与 ProDialog 的 InstanceRegistry 设计一致，
- * 额外支持实例变化订阅（subscribe），可在实例注册/注销时收到通知。
  *
  * @example
  * ```ts
@@ -14,6 +14,7 @@
  * form?.setValues({ name: 'Alice' });
  * ```
  */
+import { createInstanceRegistry } from '@lania-pro-components/utils';
 import type { FormStoreAPI } from '../types';
 
 /**
@@ -21,8 +22,7 @@ import type { FormStoreAPI } from '../types';
  * 用于通过 instance name 获取已注册的 ProForm 实例
  */
 class ProFormInstanceRegistry {
-  private instances: Map<string, FormStoreAPI> = new Map();
-  private listeners: Map<string, Set<() => void>> = new Map();
+  private registry = createInstanceRegistry<FormStoreAPI>();
 
   /**
    * 注册 ProForm 实例
@@ -30,11 +30,7 @@ class ProFormInstanceRegistry {
    * @param instance ProForm 实例 (FormStore)
    */
   register(name: string, instance: FormStoreAPI): void {
-    if (this.instances.has(name)) {
-      console.warn(`ProForm instance with name "${name}" already exists, it will be overwritten.`);
-    }
-    this.instances.set(name, instance);
-    this.notify(name);
+    this.registry.register(name, instance);
   }
 
   /**
@@ -42,8 +38,7 @@ class ProFormInstanceRegistry {
    * @param name 实例名称
    */
   unregister(name: string): void {
-    this.instances.delete(name);
-    this.notify(name);
+    this.registry.unregister(name);
   }
 
   /**
@@ -52,7 +47,7 @@ class ProFormInstanceRegistry {
    * @returns ProForm 实例，如果不存在则返回 undefined
    */
   get(name: string): FormStoreAPI | undefined {
-    return this.instances.get(name);
+    return this.registry.get(name);
   }
 
   /**
@@ -61,7 +56,7 @@ class ProFormInstanceRegistry {
    * @returns 是否存在
    */
   has(name: string): boolean {
-    return this.instances.has(name);
+    return this.registry.has(name);
   }
 
   /**
@@ -69,15 +64,14 @@ class ProFormInstanceRegistry {
    * @returns 实例名称数组
    */
   getAllNames(): string[] {
-    return Array.from(this.instances.keys());
+    return this.registry.getAllNames();
   }
 
   /**
    * 清空所有实例
    */
   clear(): void {
-    this.instances.clear();
-    this.listeners.clear();
+    this.registry.clear();
   }
 
   /**
@@ -87,32 +81,9 @@ class ProFormInstanceRegistry {
    * @returns 取消订阅函数
    */
   subscribe(name: string, listener: () => void): () => void {
-    const set = this.listeners.get(name) ?? new Set();
-    set.add(listener);
-    this.listeners.set(name, set);
-    return () => {
-      const current = this.listeners.get(name);
-      if (!current) {
-        return;
-      }
-      current.delete(listener);
-      if (current.size === 0) {
-        this.listeners.delete(name);
-      }
-    };
-  }
-
-  private notify(name: string): void {
-    const set = this.listeners.get(name);
-    if (!set) {
-      return;
-    }
-    set.forEach((fn) => {
-      try {
-        fn();
-      } catch {
-        // ignore
-      }
+    return this.registry.subscribe(name, () => {
+      const instance = this.registry.get(name);
+      listener();
     });
   }
 }
@@ -125,7 +96,7 @@ export const instanceRegistry = new ProFormInstanceRegistry();
 /**
  * 直接获取 ProForm 实例（非 Hook 版本）
  * @param name 实例名称
- * @returns ProForm 实例，如果不存在则返回 undefined
+ * @returns ProForm 实例，如果不存在则 undefined
  */
 export function getProFormInstance(name: string): FormStoreAPI | undefined {
   return instanceRegistry.get(name);

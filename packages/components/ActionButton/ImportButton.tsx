@@ -8,6 +8,7 @@
 import React, { useCallback, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button, Upload } from '@arco-design/web-react';
 import { IconUpload } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import { ProDialog } from '../ProDialog';
 import type { ImportButtonProps, ImportButtonRef } from './types';
 
@@ -174,17 +175,13 @@ export const ImportButton = forwardRef<ImportButtonRef, ImportButtonProps>(
       [handleOpen, uploading],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        handleOpen();
-      },
-      [onClick, handleOpen],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleOpen,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} icon={icon} onClick={handleClick} {...restProps}>

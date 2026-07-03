@@ -19,6 +19,8 @@
       "@lania-pro-components/components/*": ["packages/components/*"],
       "@lania-pro-components/utils": ["packages/utils/src"],
       "@lania-pro-components/utils/*": ["packages/utils/src/*"],
+      "@lania-pro-components/shared": ["packages/shared/src"],
+      "@lania-pro-components/shared/*": ["packages/shared/src/*"],
       "@lania-pro/theme": ["packages/theme"],
       "@lania-pro/theme/*": ["packages/theme/*"]
     },

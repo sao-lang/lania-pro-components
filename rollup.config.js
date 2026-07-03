@@ -29,6 +29,7 @@ const baseConfig = {
     '@arco-design/web-react/icon',
     // 工作区内部包：external 化，避免 dts 插件把兄弟包源码打进彼此 dist（类型泄漏）
     '@lania-pro-components/utils',
+    '@lania-pro-components/shared',
     '@lania-pro-components/theme',
     // dayjs 由消费者提供（utils 的 formatDate 依赖）
     'dayjs',
@@ -116,6 +117,34 @@ const themeConfig = [
   },
 ];
 
+const sharedConfig = [
+  {
+    ...baseConfig,
+    input: path.resolve(__dirname, 'packages/shared/src/index.ts'),
+    output: [
+      {
+        file: path.resolve(__dirname, 'packages/shared/dist/index.cjs'),
+        format: 'cjs',
+        sourcemap: true,
+        exports: 'named',
+      },
+      {
+        file: path.resolve(__dirname, 'packages/shared/dist/index.esm.js'),
+        format: 'esm',
+        sourcemap: true,
+      },
+    ],
+  },
+  {
+    input: path.resolve(__dirname, 'packages/shared/src/index.ts'),
+    output: {
+      file: path.resolve(__dirname, 'packages/shared/dist/index.d.ts'),
+      format: 'esm',
+    },
+    plugins: [dts()],
+  },
+];
+
 const utilsConfig = [
   {
     ...baseConfig,
@@ -178,5 +207,6 @@ export default defineConfig([
   },
   ...componentConfigs,
   ...themeConfig,
+  ...sharedConfig,
   ...utilsConfig,
 ]);

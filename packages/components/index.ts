@@ -91,10 +91,3 @@ export type { ProSelectProps } from './ProSelect/types';
 
 export { ProUpload } from './ProUpload';
 export type { ProUploadProps } from './ProUpload/types';
-
-// ===== 草稿引擎 =====
-export { DraftEngine, createDraftEngine } from './ProForm/core/DraftEngine';
-export type { DraftData, DraftStorage, DraftEngineConfig, DraftStatus } from './ProForm/core/DraftEngine';
-export { localStorageStrategy, sessionStorageStrategy } from './ProForm/core/DraftEngine';
-export { useDraft } from './ProForm/hooks/useDraft';
-export type { UseDraftOptions, UseDraftReturn } from './ProForm/hooks/useDraft';

@@ -8,6 +8,7 @@
 import React, { useCallback, useState, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconSelectAll } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import { ProDialog } from '../ProDialog';
 import type { BatchButtonProps, BatchButtonRef } from './types';
 
@@ -141,17 +142,13 @@ export const BatchButton = forwardRef<BatchButtonRef, BatchButtonProps>(
       [handleExecute, loading],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        void handleExecute();
-      },
-      [onClick, handleExecute],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleExecute,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} status={status} icon={icon} loading={loading} onClick={handleClick} {...restProps}>

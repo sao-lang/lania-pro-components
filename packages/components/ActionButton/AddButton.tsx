@@ -8,6 +8,7 @@
 import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconPlus } from '@arco-design/web-react/icon';
+import { useActionButton } from '@lania-pro-components/shared';
 import { ProDialog } from '../ProDialog';
 import type { AddButtonProps, AddButtonRef } from './types';
 
@@ -91,17 +92,13 @@ export const AddButton = forwardRef<AddButtonRef, AddButtonProps>(
       [handleOpen],
     );
 
-    const handleClick = useCallback(
-      (e: Event) => {
-        onClick?.(e);
-        void handleOpen();
-      },
-      [onClick, handleOpen],
-    );
+    const { handleClick, shouldRender } = useActionButton({
+      visible,
+      onClick,
+      onTrigger: handleOpen,
+    });
 
-    if (!visible) {
-      return null;
-    }
+    if (!shouldRender) return null;
 
     return (
       <Button type={type} icon={icon} onClick={handleClick} {...restProps}>

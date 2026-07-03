@@ -66,7 +66,8 @@
     "dist"
   ],
   "dependencies": {
-    "@lania-pro-components/utils": "workspace:*"
+    "@lania-pro-components/utils": "workspace:*",
+    "@lania-pro-components/shared": "workspace:*"
   },
   "peerDependencies": {
     "@arco-design/web-react": "^2.66.0",

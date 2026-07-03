@@ -53,7 +53,6 @@ export type {
   ProFormPerformanceConfig,
   LazyLoadConfig,
   BatchUpdateConfig,
-  PerformanceMonitorConfig,
 } from './types';
 
 // 核心组件
@@ -119,7 +118,7 @@ export {
   useDynamicVirtualScroll,
   type VirtualScrollConfig,
   type VirtualScrollState,
-} from './hooks/useVirtualScroll';
+} from '@lania-pro-components/shared';
 
 export {
   useLazyField,
@@ -151,8 +150,8 @@ export {
 // Schema 处理工具
 // Note: schemaUtils 已移除，功能集成到 ProForm 组件中
 
-// 性能监控组件
-export { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
+// 性能监控组件（已废弃，请使用 @lania-pro-components/shared 的 PerformanceMonitor）
+// export { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
 
 // 只读渲染器（导入以执行注册）
 import './core/customRenderers';

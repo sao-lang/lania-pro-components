@@ -14,7 +14,28 @@
 export * from './useUrlSync';
 export * from './useSearchSchema';
 export * from './useProTable';
-export * from './useVirtualScroll';
+export { useVirtualScroll, useDynamicVirtualScroll } from '@lania-pro-components/shared';
+export type {
+  VirtualScrollConfig,
+  VirtualScrollState,
+  UseVirtualScrollReturn,
+  DynamicVirtualScrollConfig,
+  UseDynamicVirtualScrollReturn,
+} from '@lania-pro-components/shared';
 export * from './useDragSort';
-export * from './useCache';
-export * from './useResponsive';
+export {
+  useCache,
+  getGlobalCache,
+  removeGlobalCache,
+  clearAllGlobalCaches,
+  CacheStorage,
+} from '@lania-pro-components/shared';
+export type { CacheConfig, UseCacheReturn } from '@lania-pro-components/shared';
+export { useResponsive, useResponsiveColumns } from '@lania-pro-components/shared';
+export type {
+  Breakpoints,
+  ResponsiveConfig,
+  ResponsiveState,
+  Breakpoint,
+  UseResponsiveReturn,
+} from '@lania-pro-components/shared';

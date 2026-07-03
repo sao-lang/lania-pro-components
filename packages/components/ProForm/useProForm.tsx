@@ -1,7 +1,9 @@
-import React, { useRef, useState, useCallback, useMemo, useContext, createContext } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import type { ProFormInstance, ProFormSchema, FieldStatus, ProFormProps } from './types';
 import { FormStore, createFormStore } from './core/FormStore';
 import { useArcoForm, type ArcoFormInstance } from './hooks/useArcoForm';
+import { performanceMonitor } from '@lania-pro-components/utils';
+import { createProProvider } from '@lania-pro-components/shared';
 import { useFieldNavigation, type UseFieldNavigationReturn } from './hooks/useFieldNavigation';
 
 /**
@@ -13,18 +15,21 @@ export interface ProFormContextValue<TValues = Record<string, unknown>> {
   arcoForm: ArcoFormInstance | null;
 }
 
-export const ProFormContext = createContext<ProFormContextValue>({
-  formStore: null,
-  instance: null,
-  arcoForm: null,
-});
+const {
+  Provider: ProFormProviderInner,
+  useContext: useProFormContextInner,
+  Context: ProFormContext,
+} = createProProvider<ProFormContextValue>('ProForm');
+
+// 重新导出，保持命名一致
+export { ProFormContext };
 
 /**
  * 使用 ProFormContext 的 Hook
  * 与 ProTable 的 useProTableContext 保持一致的 API 风格
  */
 export const useProFormContext = <TValues = Record<string, unknown>,>(): ProFormContextValue<TValues> => {
-  return useContext(ProFormContext) as ProFormContextValue<TValues>;
+  return useProFormContextInner() as ProFormContextValue<TValues>;
 };
 
 /**
@@ -366,6 +371,10 @@ export const useProForm = <TValues = Record<string, unknown>,>(
     focusPrevField: fieldNavigation.focusPrevField,
     getFocusedField: () => fieldNavigation.focusedField,
     getFieldFocused,
+    getStats: () => ({
+      fieldCount: document.querySelectorAll('[data-field-name]').length,
+      renderStats: performanceMonitor.getStats('form-render'),
+    }),
   };
 
   /**

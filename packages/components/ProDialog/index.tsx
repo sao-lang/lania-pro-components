@@ -28,6 +28,7 @@
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
 import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
+import { createPromiseConfirm } from '@lania-pro-components/shared';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import type {
   ProDialogProps,
@@ -645,13 +646,7 @@ const ProDialogComponent = <
             setConfirmDisabled: (disabled: boolean) => dialogInstance.setConfirmDisabled(disabled),
             setLoading: (loading: boolean) => dialogInstance.setLoading(loading),
             confirm: (config: Omit<ConfirmDialogConfig, 'type'>) =>
-              new Promise<boolean>((resolve) => {
-                Modal.confirm({
-                  ...config,
-                  onOk: () => resolve(true),
-                  onCancel: () => resolve(false),
-                } as ConfirmProps);
-              }),
+              createPromiseConfirm(config as Parameters<typeof createPromiseConfirm>[0]),
             info: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
             success: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
             warning: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),
@@ -697,13 +692,7 @@ const ProDialogComponent = <
             setConfirmDisabled: (disabled: boolean) => dialogInstance.setConfirmDisabled(disabled),
             setLoading: (loading: boolean) => dialogInstance.setLoading(loading),
             confirm: (config: Omit<ConfirmDialogConfig, 'type'>) =>
-              new Promise<boolean>((resolve) => {
-                Modal.confirm({
-                  ...config,
-                  onOk: () => resolve(true),
-                  onCancel: () => resolve(false),
-                } as ConfirmProps);
-              }),
+              createPromiseConfirm(config as Parameters<typeof createPromiseConfirm>[0]),
             info: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
             success: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
             warning: (config: Omit<ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),

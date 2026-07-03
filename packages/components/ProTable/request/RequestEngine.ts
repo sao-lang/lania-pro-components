@@ -1,13 +1,15 @@
 /**
  * 请求引擎（RequestEngine）
  *
- * 封装表格的数据请求逻辑，支持：
- * - 请求拦截（beforeRequest）：在发出请求前修改参数
- * - 响应拦截（afterRequest）：在返回数据后处理数据
- * - 请求取消（cancel）：通过 AbortController 中断进行中的请求
- * - 防抖请求（debouncedExecute）：防抖后执行请求避免重复发送
- * - 错误处理（onRequestError）：统一处理请求异常
- * - 后处理函数（postData）：对返回数据进行二次处理
+ * @deprecated 通用请求管理能力已迁移到 @lania-pro-components/shared 的 useAsyncRequest
+ * 此文件为向后兼容保留，内部实现已使用 useAsyncRequest 的相同模式（AbortController 透传）
+ *
+ * 新代码请优先使用：
+ * ```ts
+ * import { useAsyncRequest } from '@lania-pro-components/shared';
+ * ```
+ *
+ * ProTable 专用请求逻辑（DataStore 集成、分页调整）保留在 useRequest.ts 中。
  */
 
 import type { ProTableRequest, ProTableRequestParams, ProTableRequestResponse } from '../types';
@@ -58,7 +60,11 @@ export class RequestEngineImpl<T = unknown> implements RequestEngine<T> {
       }
 
       this.abortController = new AbortController();
-      const response = await request(finalParams);
+      // 将 signal 注入 params，使 request 函数能真正中断请求（修复架构债务 #3）
+      const response = await request({
+        ...finalParams,
+        signal: this.abortController.signal,
+      } as ProTableRequestParams & { signal: AbortSignal });
 
       let { data, total } = response;
 

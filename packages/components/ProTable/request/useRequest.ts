@@ -1,22 +1,32 @@
 /**
  * 表格数据请求 Hook
  *
- * 封装 ProTable 的数据请求流程：
- * - 自动/手动触发请求（manual 参数控制）
- * - 防抖请求（debounceTime）
- * - 轮询（polling）
- * - 请求/响应拦截（beforeRequest / afterRequest）
- * - 错误处理（onRequestError）
- * - 缓存（cache + cacheKey）
- * - 首次加载自动请求
+ * 封装 ProTable 的数据请求流程，基于 @lania-pro-components/shared 的 useAsyncRequest。
+ *
+ * 职责划分：
+ * - shared useAsyncRequest：通用请求生命周期（AbortController / 防抖 / 轮询 / 拦截器）
+ * - 本文件：ProTable 特有逻辑（DataStore 集成、分页自动调整、缓存、store 订阅刷新）
+ *
+ * 迁移至 shared useAsyncRequest 后，已受益：
+ * - ✅ 修复 AbortController 透传（架构债务 #3）
+ * - ✅ 统一的请求取消语义
+ * - ✅ 通用的 beforeRequest / afterRequest 拦截器
+ *
+ * 仍保留在本层的 ProTable 特有逻辑：
+ * - DataStore 状态同步（store.setLoading / setDataSource / setTotal）
+ * - ⭐ 分页自动调整（删除最后一条数据时自动回退）
+ * - DataStore 订阅自动触发请求
+ * - 缓存集成（cache + cacheKey）
+ * - window 'protable:reload' 事件监听
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { createRequestEngine } from './RequestEngine';
+import { useAsyncRequest } from '@lania-pro-components/shared';
 import type { RequestEngine, RequestEngineOptions } from './RequestEngine';
-import type { ProTableRequestParams } from '../types';
+import type { ProTableRequestParams, ProTableRequestResponse } from '../types';
 import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState } from '../store/types';
-import type { UseCacheReturn } from '../hooks/useCache';
+import type { UseCacheReturn } from '@lania-pro-components/shared';
 
 export interface UseRequestOptions<T extends Record<string, unknown> = Record<string, unknown>>
   extends RequestEngineOptions<T> {
@@ -64,10 +74,10 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
   } = options;
 
   // ===== Refs（持久引用，不触发重新渲染） =====
-  const engineRef = useRef<RequestEngine<T> | null>(null); // 请求引擎实例
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 防抖定时器
-  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 轮询定时器
-  const isPollingEnabledRef = useRef(true); // 轮询是否可用
+  const engineRef = useRef<RequestEngine<T> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPollingEnabledRef = useRef(true);
 
   // ===== 创建请求引擎（仅在组件挂载时创建一次） =====
   if (!engineRef.current) {
@@ -77,23 +87,21 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
 
   /**
    * 从 DataStore 获取当前请求参数
-   * 包含：分页信息、排序字段/方向、筛选条件、查询参数
    */
   const getRequestParams = useCallback(
     (): ProTableRequestParams => ({
-      current: store.pagination.current, // 当前页码
-      pageSize: store.pagination.pageSize, // 每页条数
-      sortField: store.sorter.field, // 排序字段
-      sortOrder: store.sorter.order, // 排序方向（ascend/descend）
-      filters: store.filters, // 筛选条件
-      params: store.query, // 查询参数
+      current: store.pagination.current,
+      pageSize: store.pagination.pageSize,
+      sortField: store.sorter.field,
+      sortOrder: store.sorter.order,
+      filters: store.filters,
+      params: store.query,
     }),
     [store],
   );
 
   /**
    * 生成缓存键
-   * 如果指定了 cacheKey，则前缀+参数序列化；否则直接参数序列化
    */
   const generateCacheKey = useCallback(
     (params: ProTableRequestParams): string =>
@@ -101,97 +109,83 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     [cacheKey],
   );
 
-  /**
-   * 核心：执行数据请求
-   *
-   * 请求流程：
-   * 1. 设置 loading → true，清除旧错误
-   * 2. 组装请求参数
-   * 3. 检查缓存 → 命中则直接返回
-   * 4. 发送请求 → 检查响应是否需要调整分页（核心优化）
-   * 5. 更新 DataStore（dataSource / total）
-   * 6. 写入缓存
-   * 7. 触发轮询
-   *
-   * ⭐ 分页自动调整机制：
-   * 当最后一页的数据被删除时，当前页可能为空（totalPages < current），
-   * 此时自动回退到上一页，避免显示空白页。
-   */
-  const fetchData = useCallback(async () => {
-    if (!engineOptions.request) {
-      return; // 没有配置 request 函数，不执行请求
-    }
-
-    // 设置 loading 状态，确保 UI 及时响应
-    store.setLoading(true);
-    store.setError(undefined);
-
-    try {
-      const params = getRequestParams();
-
-      // ===== 缓存检查 =====
-      if (cacheEnabled && cache) {
-        const cachedKey = generateCacheKey(params);
-        const cachedData = cache.getCache(cachedKey);
-        if (cachedData) {
-          // 缓存命中：直接从缓存恢复数据，不发请求
-          store.setDataSource(cachedData.data);
-          store.setTotal(cachedData.total);
-          store.setLoading(false);
-          if (polling && isPollingEnabledRef.current) {
-            startPollingWithData(cachedData.data);
-          }
-          return;
-        }
-      }
-
-      // ===== 发送请求 =====
-      const response = await engine.execute(params);
-
+  // ===== 基于 shared useAsyncRequest 的通用请求管理 =====
+  const asyncRequest = useAsyncRequest<ProTableRequestParams, ProTableRequestResponse<T>>({
+    request: async (params) => {
+      // 委托给 RequestEngine，它内部已修复 AbortController 透传
+      return engine.execute(params);
+    },
+    manual: true, // 由 DataStore 订阅控制触发时机
+    debounceTime: 0, // 防抖由本层自行管理（需与 DataStore 集成）
+    onSuccess: (response, params) => {
       // ===== ⭐ 分页自动调整（核心逻辑） =====
       const { current, pageSize } = store.pagination;
       const totalPages = Math.ceil(response.total / pageSize);
 
-      // 场景1：当前页 > 总页数（通常是删除最后一条数据导致）
       if (current > totalPages && totalPages > 0) {
-        store.setPage(totalPages); // 跳转到最后一页
-        return; // 触发下一轮请求（setPage 会触发 subscribe）
+        store.setPage(totalPages);
+        return;
       }
 
-      // 场景2：当前页无数据但总记录数 > 0（页码变化导致）
       if (response.data.length === 0 && current > 1 && response.total > 0) {
-        store.setPage(current - 1); // 回退到上一页
-        return; // 触发下一轮请求
+        store.setPage(current - 1);
+        return;
       }
 
-      // ===== 更新数据 =====
       store.setDataSource(response.data);
       store.setTotal(response.total);
       store.setLoading(false);
 
-      // ===== 写入缓存 =====
+      // 写入缓存
       if (cacheEnabled && cache) {
         const cachedKey = generateCacheKey(params);
         cache.setCache(cachedKey, response);
       }
-
-      // ===== 触发轮询 =====
-      if (polling && isPollingEnabledRef.current) {
-        startPollingWithData(response.data);
-      }
-    } catch (err) {
-      // 请求异常处理：设置错误状态并停止轮询
-      const error = err instanceof Error ? err : new Error(String(err));
+    },
+    onError: (error) => {
       store.setError(error);
       store.setLoading(false);
       store.stopPolling();
+    },
+  });
+
+  /**
+   * 核心：执行数据请求
+   *
+   * DataStore 集成版，支持：
+   * - 缓存检查（命中则不走网络）
+   * - loading/error 状态同步到 DataStore
+   * - 分页自动调整
+   */
+  const fetchData = useCallback(async () => {
+    if (!engineOptions.request) return;
+
+    store.setLoading(true);
+    store.setError(undefined);
+
+    const params = getRequestParams();
+
+    // ===== 缓存检查 =====
+    if (cacheEnabled && cache) {
+      const cachedKey = generateCacheKey(params);
+      const cachedData = cache.getCache(cachedKey);
+      if (cachedData) {
+        store.setDataSource(cachedData.data);
+        store.setTotal(cachedData.total);
+        store.setLoading(false);
+        if (polling && isPollingEnabledRef.current) {
+          startPollingWithData(cachedData.data);
+        }
+        return;
+      }
     }
-  }, [store, engine, getRequestParams, engineOptions.request, polling, cacheEnabled, cache, generateCacheKey]);
+
+    // 委托给 useAsyncRequest.execute，它已包含 AbortController + 拦截器
+    await asyncRequest.execute(params);
+  }, [engineOptions.request, store, getRequestParams, cacheEnabled, cache, generateCacheKey, polling, asyncRequest]);
 
   /**
    * 防抖请求
-   * 在 debounceTime 内连续调用只会执行最后一次
-   * 用于搜索输入、切换分页等高频操作场景
    */
   const debouncedFetchData = useCallback(() => {
     if (debounceTimerRef.current) {
@@ -202,40 +196,34 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     }, debounceTime);
   }, [fetchData, debounceTime]);
 
-  /** 取消进行中的请求（通过 AbortController）和防抖定时器 */
+  /**
+   * 取消进行中的请求
+   */
   const cancelRequest = useCallback(() => {
-    engine.cancel(); // 取消 HTTP 请求
+    asyncRequest.cancel();
+    engine.cancel();
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-  }, [engine]);
+  }, [asyncRequest, engine]);
 
   /**
    * 使用当前数据启动轮询
-   * polling 可以是固定数字（固定间隔）或函数（动态计算下一轮间隔）
    */
   const startPollingWithData = useCallback(
     (data: T[]) => {
-      if (!polling || !isPollingEnabledRef.current) {
-        return;
-      }
+      if (!polling || !isPollingEnabledRef.current) return;
       const interval = typeof polling === 'function' ? polling(data) : polling;
-      if (!interval || interval <= 0) {
-        return;
-      }
+      if (!interval || interval <= 0) return;
       store.setPolling(true, interval);
-      pollingTimerRef.current = setTimeout(() => {
-        fetchData();
-      }, interval);
+      pollingTimerRef.current = setTimeout(() => fetchData(), interval);
     },
     [polling, store, fetchData],
   );
 
   /** 开始轮询 */
   const startPolling = useCallback(() => {
-    if (!polling) {
-      return;
-    }
+    if (!polling) return;
     isPollingEnabledRef.current = true;
     startPollingWithData(store.dataSource);
   }, [polling, store, startPollingWithData]);
@@ -247,39 +235,30 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
       clearTimeout(pollingTimerRef.current);
       pollingTimerRef.current = null;
     }
+    asyncRequest.stopPolling();
     store.stopPolling();
-  }, [store]);
+  }, [store, asyncRequest]);
 
   // ===== 核心：监听 DataStore 状态变化自动触发请求 =====
   useEffect(() => {
-    // 手动模式或未配置 request 时不自动请求
-    if (manual || !engineOptions.request) {
-      return;
-    }
+    if (manual || !engineOptions.request) return;
 
-    /**
-     * 订阅 DataStore 的状态变化
-     * 当分页/排序/筛选/查询参数变化时，自动触发防抖请求
-     * 使用 deep compare (JSON.stringify) 避免引用变化导致的误触发
-     */
     const unsubscribe = store.subscribe((state: DataStoreState<T>, prevState: DataStoreState<T>) => {
       const shouldFetch =
-        state.pagination.current !== prevState.pagination.current || // 页码变化
-        state.pagination.pageSize !== prevState.pagination.pageSize || // 每页条数变化
-        state.sorter.field !== prevState.sorter.field || // 排序字段变化
-        state.sorter.order !== prevState.sorter.order || // 排序方向变化
-        JSON.stringify(state.filters) !== JSON.stringify(prevState.filters) || // 筛选变化
-        JSON.stringify(state.query) !== JSON.stringify(prevState.query); // 查询参数变化
+        state.pagination.current !== prevState.pagination.current ||
+        state.pagination.pageSize !== prevState.pagination.pageSize ||
+        state.sorter.field !== prevState.sorter.field ||
+        state.sorter.order !== prevState.sorter.order ||
+        JSON.stringify(state.filters) !== JSON.stringify(prevState.filters) ||
+        JSON.stringify(state.query) !== JSON.stringify(prevState.query);
 
       if (shouldFetch) {
         debouncedFetchData();
       }
     });
 
-    // 组件挂载时发起首次请求
     fetchData();
 
-    // 组件卸载时清理订阅和定时器，防止内存泄漏
     return () => {
       unsubscribe();
       cancelRequest();
@@ -287,17 +266,11 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     };
   }, [manual, engineOptions.request, store, fetchData, debouncedFetchData, cancelRequest, stopPolling]);
 
-  // ===== 监听通过 CustomEvent 触发的 reload 请求 =====
+  // ===== 监听 'protable:reload' CustomEvent =====
   useEffect(() => {
-    const handleReload = () => {
-      fetchData();
-    };
-
-    // DataStore 的 reload() 方法会派发 'protable:reload' 事件
+    const handleReload = () => void fetchData();
     window.addEventListener('protable:reload', handleReload);
-    return () => {
-      window.removeEventListener('protable:reload', handleReload);
-    };
+    return () => window.removeEventListener('protable:reload', handleReload);
   }, [fetchData]);
 
   return {

@@ -1,291 +1,76 @@
 /**
  * URL 参数同步 Hook（useUrlSync）
  *
- * 将 ProTable 的查询/排序/分页状态同步到 URL 参数中，
- * 支持刷新/分享时恢复表格状态：
- * - 双向同步：URL → store（初始化读取）、store → URL（变更写入）
- * - 自定义前缀/包含/排除参数
- * - 支持 replace 和 push 两种写入模式
+ * @deprecated 请从 @lania-pro-components/shared 导入 useUrlSync
+ * 此文件为向后兼容保留的 DataStore 集成壳
  */
-/**
- * URL 参数同步 Hook（useUrlSync）
- *
- * 将 ProTable 的查询/排序/分页状态同步到 URL 参数中：
- * - 初始化时从 URL 读取并还原状态
- * - 状态变化时自动更新 URL（支持 replace 和 push 模式）
- * - 刷新/分享链接可恢复表格状态
- *
- * 同步范畴：
- * - 查询参数（query）→ URL params
- * - 排序字段/方向（sorter）→ URL sortField/sortOrder
- * - 分页（pagination）→ URL current/pageSize
- * - 筛选条件（filters）→ URL filters
- */
-import { useEffect, useCallback, useRef } from 'react';
+import { useUrlSync as useUrlSyncShared } from '@lania-pro-components/shared';
 import type { DataStoreImpl } from '../store/DataStore';
 
 export interface UrlSyncConfig {
-  /** URL 参数前缀 */
   prefix?: string;
-  /** 包含的参数 */
   include?: string[];
-  /** 排除的参数 */
   exclude?: string[];
 }
 
 export interface UseUrlSyncOptions<T = Record<string, unknown>> {
-  /** 是否启用 URL 同步 */
   enabled: boolean;
-  /** DataStore 实例 */
   store: DataStoreImpl<T>;
-  /** 同步配置 */
   config?: UrlSyncConfig;
-  /** 同步延迟时间（防抖） */
   debounceTime?: number;
 }
 
-/**
- * 解析 URL 查询参数
- */
-const parseUrlParams = (): Record<string, string> => {
-  const params = new URLSearchParams(window.location.search);
-  const result: Record<string, string> = {};
-  params.forEach((value, key) => {
-    result[key] = value;
-  });
-  return result;
-};
-
-/**
- * 更新 URL 查询参数
- */
-const updateUrlParams = (params: Record<string, string | undefined>, replace = false) => {
-  const url = new URL(window.location.href);
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === '' || value === null) {
-      url.searchParams.delete(key);
-    } else {
-      url.searchParams.set(key, value);
-    }
-  });
-
-  if (replace) {
-    window.history.replaceState({}, '', url.toString());
-  } else {
-    window.history.pushState({}, '', url.toString());
-  }
-};
-
-/**
- * 过滤参数
- */
-const filterParams = (params: Record<string, unknown>, config: UrlSyncConfig): Record<string, string> => {
-  const { prefix = '', include, exclude } = config;
-  const result: Record<string, string> = {};
-
-  Object.entries(params).forEach(([key, value]) => {
-    // 应用前缀
-    const paramKey = prefix ? `${prefix}${key}` : key;
-
-    // 检查 include
-    if (include && !include.includes(key)) {
-      return;
-    }
-
-    // 检查 exclude
-    if (exclude && exclude.includes(key)) {
-      return;
-    }
-
-    // 转换值为字符串
-    if (value !== undefined && value !== null && value !== '') {
-      if (typeof value === 'object') {
-        result[paramKey] = JSON.stringify(value);
-      } else {
-        result[paramKey] = String(value);
-      }
-    }
-  });
-
-  return result;
-};
-
-/**
- * 从 URL 参数恢复值
- */
 const parseParamValue = (value: string): unknown => {
   try {
     return JSON.parse(value);
   } catch {
-    // 尝试转换为数字
-    if (/^\d+$/.test(value)) {
-      return parseInt(value, 10);
-    }
-    // 尝试转换为布尔值
-    if (value === 'true') {
-      return true;
-    }
-    if (value === 'false') {
-      return false;
-    }
+    if (/^\d+$/.test(value)) return parseInt(value, 10);
+    if (value === 'true') return true;
+    if (value === 'false') return false;
     return value;
   }
 };
 
-/**
- * URL 同步 Hook
- * 将表格状态同步到 URL 参数
- */
+const filterParams = (params: Record<string, unknown>, config: UrlSyncConfig): Record<string, string> => {
+  const { prefix = '', include, exclude } = config;
+  const result: Record<string, string> = {};
+  Object.entries(params).forEach(([key, value]) => {
+    const paramKey = prefix ? `${prefix}${key}` : key;
+    if (include && !include.includes(key)) return;
+    if (exclude && exclude.includes(key)) return;
+    if (value !== undefined && value !== null && value !== '') {
+      result[paramKey] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    }
+  });
+  return result;
+};
+
 export const useUrlSync = <T extends Record<string, unknown> = Record<string, unknown>>(
   options: UseUrlSyncOptions<T>,
 ) => {
   const { enabled, store, config = {}, debounceTime = 300 } = options;
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isRestoringRef = useRef(false);
-
   const { prefix = '' } = config;
 
-  /**
-   * 同步状态到 URL
-   */
-  const syncToUrl = useCallback(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const state = store.getState();
-
-    // 构建参数对象
-    const params: Record<string, unknown> = {
-      current: state.pagination.current,
-      pageSize: state.pagination.pageSize,
-      ...state.query,
-    };
-
-    // 添加排序参数
-    if (state.sorter.field) {
-      params.sortField = state.sorter.field;
-      params.sortOrder = state.sorter.order;
-    }
-
-    // 过滤并转换参数
-    const filteredParams = filterParams(params, config);
-
-    // 更新 URL
-    updateUrlParams(filteredParams);
-  }, [enabled, store, config]);
-
-  /**
-   * 从 URL 恢复状态
-   */
-  const restoreFromUrl = useCallback(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const urlParams = parseUrlParams();
-    const state: Record<string, unknown> = {};
-
-    Object.entries(urlParams).forEach(([key, value]) => {
-      // 移除前缀
-      const stateKey = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
-
-      state[stateKey] = parseParamValue(value);
-    });
-
-    // 恢复分页
-    if (state.current || state.pageSize) {
-      const current = typeof state.current === 'number' ? state.current : 1;
-      const pageSize = typeof state.pageSize === 'number' ? state.pageSize : 20;
-      store.setPage(current);
-      store.setPageSize(pageSize);
-    }
-
-    // 恢复查询参数
-    const queryParams = { ...state };
-    delete queryParams.current;
-    delete queryParams.pageSize;
-    delete queryParams.sortField;
-    delete queryParams.sortOrder;
-
-    if (Object.keys(queryParams).length > 0) {
-      store.setQuery(queryParams);
-    }
-
-    // 恢复排序
-    if (state.sortField && state.sortOrder) {
-      store.setSorter(String(state.sortField), state.sortOrder as 'ascend' | 'descend');
-    }
-  }, [enabled, store, prefix]);
-
-  // 监听状态变化，同步到 URL
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const unsubscribe = store.subscribe(() => {
-      if (isRestoringRef.current) {
-        return;
-      }
-
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-
-      timerRef.current = setTimeout(() => {
-        syncToUrl();
-      }, debounceTime);
-    });
-
-    return () => {
-      unsubscribe();
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [enabled, store, syncToUrl, debounceTime]);
-
-  // 初始加载时从 URL 恢复
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    isRestoringRef.current = true;
-    restoreFromUrl();
-
-    // 恢复完成后重置标志
-    setTimeout(() => {
-      isRestoringRef.current = false;
-    }, 0);
-  }, [enabled, restoreFromUrl]);
-
-  // 监听浏览器前进/后退
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const handlePopState = () => {
-      isRestoringRef.current = true;
-      restoreFromUrl();
-      setTimeout(() => {
-        isRestoringRef.current = false;
-      }, 0);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [enabled, restoreFromUrl]);
-
-  return {
-    syncToUrl,
-    restoreFromUrl,
-  };
+  return useUrlSyncShared({
+    enabled,
+    getState: () => store.getState(),
+    setState: (partial: Record<string, unknown>) => {
+      if (partial.current && typeof partial.current === 'number') store.setPage(partial.current);
+      if (partial.pageSize && typeof partial.pageSize === 'number') store.setPageSize(partial.pageSize);
+      if (partial.sortField)
+        store.setSorter(String(partial.sortField), partial.sortOrder as 'ascend' | 'descend' | undefined);
+      if (partial.params) store.setQuery(partial.params as Record<string, unknown>);
+    },
+    serialize: (state) =>
+      filterParams({ current: state.pagination.current, pageSize: state.pagination.pageSize, ...state.query }, config),
+    deserialize: (params) => {
+      const state: Record<string, unknown> = {};
+      Object.entries(params).forEach(([key, value]) => {
+        const stateKey = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+        state[stateKey] = parseParamValue(value);
+      });
+      return state;
+    },
+    debounceTime,
+  });
 };
-
-export default useUrlSync;

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { getSizeWidth, getFooterJustify } from './utils';
 import { deepMerge } from '@lania-pro-components/utils';
 import { createRoot } from 'react-dom/client';
+import { createPromiseConfirm } from '@lania-pro-components/shared';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
 import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';
 import type {
@@ -170,12 +171,13 @@ const InternalDialog = <TValues extends Record<string, unknown>, T extends Recor
     if (confirmOnClose) {
       const editing = typeof isEditing === 'function' ? isEditing() : isEditing;
       if (editing) {
-        Modal.confirm({
+        void createPromiseConfirm({
           title: confirmTitle,
           content: confirmContent,
-          onOk: () => {
+        }).then((confirmed) => {
+          if (confirmed) {
             performClose();
-          },
+          }
         });
         return;
       }
@@ -325,13 +327,7 @@ const InternalDialog = <TValues extends Record<string, unknown>, T extends Recor
       setConfirmDisabled: (disabled) => setState((prev) => ({ ...prev, confirmDisabled: disabled })),
       setLoading: (loading) => setState((prev) => ({ ...prev, contentLoading: loading })),
       confirm: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) =>
-        new Promise<boolean>((resolve) => {
-          Modal.confirm({
-            ...config,
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false),
-          } as ConfirmProps);
-        }),
+        createPromiseConfirm(config as import('@lania-pro-components/shared').PromiseConfirmOptions),
       info: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.info(config as ConfirmProps),
       success: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.success(config as ConfirmProps),
       warning: (config: Omit<import('./types').ConfirmDialogConfig, 'type'>) => Modal.warning(config as ConfirmProps),

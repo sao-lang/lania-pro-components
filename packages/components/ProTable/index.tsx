@@ -41,7 +41,8 @@ import { createDataStore } from './store/DataStore';
 import { useRequest } from './request/useRequest';
 import { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation } from './features';
 import { openDialog, confirm } from './features/TableDialog';
-import { useUrlSync, useSearchSchema, useProTable, useVirtualScroll, useDragSort, useCache } from './hooks';
+import { useUrlSync, useSearchSchema, useProTable, useDragSort } from './hooks';
+import { useVirtualScroll, useCache } from '@lania-pro-components/shared';
 import { useEditableTable } from './editable';
 import { CardView, ViewModeSwitch, SearchSchemaSelector } from './components';
 
@@ -302,11 +303,11 @@ const ProTableComponent = forwardRef<
     scrollToIndex,
     scrollToTop: scrollToTopVirtual,
     scrollToBottom: scrollToBottomVirtual,
-  } = useVirtualScroll<T>({
-    dataSource: dragSortedDataSource,
-    config: virtualScrollConfig || undefined,
+  } = useVirtualScroll<T>(dragSortedDataSource, {
+    itemHeight: typeof virtualScrollConfig === 'object' ? (virtualScrollConfig.itemHeight ?? 50) : 50,
+    overscan: typeof virtualScrollConfig === 'object' ? (virtualScrollConfig.overscan ?? 5) : 5,
     enabled: !!virtualScroll && viewMode === 'table',
-    containerHeight: typeof virtualScrollConfig === 'object' ? virtualScrollConfig.itemHeight : 400,
+    containerHeight: 400,
   });
 
   // 默认展开所有行
