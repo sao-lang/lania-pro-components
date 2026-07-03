@@ -4,6 +4,7 @@ dist/
 .DS_Store
 *.tsbuildinfo
 .pnpm-store
-.vitepress
-.trae
 graphify-out
+cache
+docs/.vitepress/dist
+docs/.vitepress/cache
