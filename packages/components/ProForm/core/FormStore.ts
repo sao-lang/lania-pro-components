@@ -1,3 +1,25 @@
+/**
+ * FormStore — 响应式表单状态管理
+ *
+ * 基于 @lania-pro-components/utils 的响应式系统（reactive / batchUpdate / watch）
+ * 实现表单级别的状态管理，与 UI 框架解耦。
+ *
+ * 管理的状态：
+ * - values: 表单所有字段的值
+ * - fields: 已注册的字段实例
+ * - errors: 字段错误信息
+ * - touched: 字段触摸状态
+ * - reactions: 字段联动规则
+ *
+ * 核心功能：
+ * - 字段注册/注销
+ * - 值读写（单个/批量）
+ * - 值变化通知（Listner 模式）
+ * - 字段联动（dependencies → reactions）
+ * - 字段验证
+ * - 重置（单个/全部）
+ */
+
 import type { FormStoreAPI, FieldNodeAPI, FieldReaction, ValidationRule } from '../types';
 import { reactive, batchUpdate, watch } from '@lania-pro-components/utils';
 

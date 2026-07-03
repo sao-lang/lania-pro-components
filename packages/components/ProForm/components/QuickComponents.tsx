@@ -1,3 +1,20 @@
+/**
+ * 快捷组件（QuickComponents）
+ *
+ * 预封装的高频业务场景组件集合，通过 componentRegistry 注册后，
+ * 可在 ProForm 的 Schema 中直接通过组件名使用。
+ *
+ * 涵盖的快捷组件：
+ * - PasswordInput: 密码输入框（支持显示/隐藏切换）
+ * - YesNoSelect / MaleFemaleSelect / EnableDisableSelect / StatusSelect / OpenCloseSelect: 常用下拉选择
+ * - PhoneInput / EmailInput / IdCardInput: 常用输入框（含基本格式校验）
+ * - AmountInput / PercentageInput: 金额/百分比输入
+ * - YearPicker / MonthPicker / WeekPicker / QuarterPicker / RangePicker / TimeRangePicker: 日期快捷选择
+ * - VerificationCode: 验证码输入（支持发送验证码逻辑）
+ * - ImageList: 图片列表
+ * - QuickInputWithSuffix: 带后缀的 Input（如 ${Input}元）
+ * - QuickInputNumberWithSuffix: 带后缀的 InputNumber（如 ${InputNumber}%）
+ */
 import React, { FC, useState, useCallback } from 'react';
 import { Input, InputNumber, Select, Radio, Button, Image, DatePicker, TimePicker } from '@arco-design/web-react';
 import { IconEye, IconEyeInvisible } from '@arco-design/web-react/icon';

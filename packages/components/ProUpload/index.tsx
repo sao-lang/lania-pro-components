@@ -1,3 +1,32 @@
+/**
+ * ProUpload 组件 — 增强版上传组件
+ *
+ * 基于 Arco Design Upload 封装的高级上传组件，支持以下特性：
+ * - 多类型上传（图片/视频/文件），自动识别并校验
+ * - 图片压缩（compressConfig）
+ * - 图片尺寸限制校验（imageConfig.limitSize）
+ * - 视频时长限制校验（videoConfig.limitDuration）
+ * - 拖拽上传（draggable）
+ * - 文件列表排序（sortable + onSort）
+ * - 预览（图片/视频 Modal 预览）
+ * - 上传失败重试（retryCount + retryInterval）
+ * - 自定义上传逻辑（customUpload + onRequest）
+ * - 自定义文件列表/按钮/进度渲染
+ * - ref 暴露 upload / remove / retry / getStats 等方法
+ *
+ * @example
+ * ```tsx
+ * <ProUpload
+ *   type="image"
+ *   config={{ maxCount: 5, maxSize: 10, compressConfig: { enable: true, quality: 0.8 } }}
+ *   customUpload={async (file, onProgress) => {
+ *     const url = await uploadToOSS(file, onProgress);
+ *     return url;
+ *   }}
+ *   onChange={(fileList) => setFieldValue('images', fileList)}
+ * />
+ * ```
+ */
 import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useMemo } from 'react';
 import { Upload, Button, Message, Image, Modal, Progress, Space, Tooltip } from '@arco-design/web-react';
 import type { UploadInstance } from '@arco-design/web-react/es/Upload';

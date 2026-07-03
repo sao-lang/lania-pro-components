@@ -1,3 +1,21 @@
+/**
+ * DragSortTable — 拖拽排序表格组件
+ *
+ * 独立的可拖拽排序表格，与 ProTable 解耦使用：
+ * - 通过拖拽行句柄调整行顺序
+ * - 支持排序完成后回调（onChange）
+ * - 自动管理内部数据状态
+ */
+/**
+ * DragSortTable — 独立的拖拽排序表格组件
+ *
+ * 与 ProTable 解耦，可直接在任意场景下使用：
+ * - 基于 useDragSort Hook 实现拖拽逻辑
+ * - 自动管理内部数据状态
+ * - 排序完成后通过 onChange 回调通知外部
+ * - 内置拖拽句柄列（拖动图标）
+ * - 支持 onDragStart / onDragEnd 事件
+ */
 import React, { useState, useCallback } from 'react';
 import { Table, Space } from '@arco-design/web-react';
 import { IconDragArrow } from '@arco-design/web-react/icon';

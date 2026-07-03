@@ -1,25 +1,51 @@
 /**
  * 响应式系统核心模块
- * 基于 Proxy 实现自动依赖收集
+ *
+ * 基于 ES6 Proxy 实现的一套轻量级响应式数据系统，核心功能包括：
+ * - reactive: 创建响应式对象（基于 Proxy 拦截 get/set/deleteProperty）
+ * - effect: 创建副作用函数（自动收集依赖并在数据变化时重新执行）
+ * - computed: 创建计算属性（惰性求值 + 缓存，依赖变化时标记脏数据）
+ * - watch: 监听数据变化并执行回调
+ * - ref: 基本类型的响应式包装（内部复用 reactive）
+ * - batchUpdate / asyncBatchUpdate: 批量更新优化
+ *
+ * 与 Vue 响应式系统的核心设计思路类似，但更加轻量化。
+ * 适用于组件内部状态管理、表单数据的响应式绑定等场景。
  */
 
-// 当前正在执行的 effect
+// ======================== 全局状态 ========================
+
+/** 当前正在执行的 effect 函数，用于依赖收集阶段建立 effect ↔ Dep 的关联 */
 let activeEffect: (() => void) | null = null;
-// effect 栈，用于处理嵌套 effect
+
+/** effect 栈，处理嵌套 effect 的场景（effect 内部又调用 effect） */
 const effectStack: (() => void)[] = [];
-// 批量更新队列
+
+/** 批量更新时的 effect 暂存集合（去重，确保同一 effect 只执行一次） */
 const batchQueue: Set<() => void> = new Set();
+
+/** 是否处于批量更新模式 */
 let isBatching = false;
 
+// ======================== 依赖收集器 ========================
+
 /**
- * 依赖收集器
- * 每个响应式属性对应一个 Dep 实例
+ * 依赖收集器（Dep，Dependency 的缩写）
+ *
+ * 每个响应式对象属性的 getter 触发时，当前正在执行的 effect 会被添加到 Dep 中。
+ * setter 触发时，Dep 通知所有订阅的 effect 重新执行。
+ *
+ * 这是响应式系统的核心数据结构，实现了"发布-订阅"模式。
  */
 class Dep {
+  /** 订阅该依赖的所有 effect 函数集合（Set 去重） */
   private subscribers: Set<() => void> = new Set();
 
   /**
-   * 添加订阅者
+   * 依赖收集
+   *
+   * 在属性的 getter 中被调用。
+   * 将当前正在执行的 activeEffect 添加到订阅者集合中。
    */
   depend() {
     if (activeEffect && !this.subscribers.has(activeEffect)) {
@@ -28,39 +54,69 @@ class Dep {
   }
 
   /**
-   * 通知所有订阅者
+   * 通知更新
+   *
+   * 在属性的 setter 或 deleteProperty 中被调用。
+   * 通知所有订阅该属性的 effect 重新执行。
+   *
+   * 批量更新模式：暂存到 batchQueue，等待 batchUpdate 结束后一次性执行
+   * 非批量更新模式：立即执行
    */
   notify() {
     this.subscribers.forEach((effect) => {
       if (isBatching) {
+        // 批量更新：暂存到全局队列
         batchQueue.add(effect);
       } else {
+        // 非批量更新：立即执行
         effect();
       }
     });
   }
 
   /**
-   * 移除订阅者
+   * 移除指定的 effect 订阅者
+   *
+   * @param effect - 要移除的 effect 函数
    */
   remove(effect: () => void) {
     this.subscribers.delete(effect);
   }
 }
 
-// 存储对象到 Dep 的映射
+// ======================== 核心映射表 ========================
+
+/**
+ * 全局 WeakMap：对象 → (属性Key → Dep 实例)
+ *
+ * 使用 WeakMap 的优势：
+ * 1. 对象被垃圾回收时，对应的 Dep 映射也会自动清除（无内存泄漏风险）
+ * 2. 不枚举属性，对 GC 更加友好
+ *
+ * 结构示意：
+ * targetMap: {
+ *   [objA] => Map { 'name' => Dep, 'age' => Dep }
+ *   [objB] => Map { 'count' => Dep }
+ * }
+ */
 const targetMap = new WeakMap<object, Map<string | symbol, Dep>>();
 
 /**
- * 获取属性的 Dep 实例
+ * 获取（或创建）指定对象指定属性的 Dep 实例
+ *
+ * @param target - 目标对象
+ * @param key - 属性键（字符串或 Symbol）
+ * @returns 对应的 Dep 实例
  */
 function getDep(target: object, key: string | symbol): Dep {
+  // 获取目标对象的属性→Dep 映射表，不存在则创建
   let depsMap = targetMap.get(target);
   if (!depsMap) {
     depsMap = new Map();
     targetMap.set(target, depsMap);
   }
 
+  // 获取指定属性的 Dep，不存在则创建
   let dep = depsMap.get(key);
   if (!dep) {
     dep = new Dep();
@@ -70,27 +126,66 @@ function getDep(target: object, key: string | symbol): Dep {
   return dep;
 }
 
+// ======================== reactive ========================
+
 /**
  * 创建响应式对象
+ *
+ * 通过 Proxy 拦截目标对象的 get、set、deleteProperty 操作，
+ * 实现自动依赖收集和变更通知。
+ *
+ * 关键行为：
+ * - get: 收集依赖（当前 activeEffect 订阅该属性）+ 递归代理嵌套对象
+ * - set: 值真正变化时才通知订阅者更新（新旧值严格不等判断）
+ * - deleteProperty: 删除属性时通知订阅者
+ *
+ * 注意事项：
+ * - 已经是响应式的对象会直接返回（避免重复代理）
+ * - 嵌套对象会在 getter 中惰性地创建响应式代理（访问时才代理）
+ * - 数组也是对象，但 Proxy 可以拦截数组方法（push/pop/splice 等）
+ *
+ * @param target - 需要变为响应式的普通对象
+ * @returns 代理后的响应式对象
+ *
+ * @example
+ * ```ts
+ * const state = reactive({ count: 0, nested: { value: 1 } });
+ *
+ * effect(() => {
+ *   console.log('count changed:', state.count);
+ * });
+ *
+ * state.count++; // 控制台输出: count changed: 1
+ * state.nested.value = 2; // 也会触发（嵌套属性也是响应式的）
+ * ```
  */
 export function reactive<T extends object>(target: T): T {
+  // 非对象类型直接返回（基本类型无法代理）
   if (!isObject(target)) {
     return target;
   }
 
-  // 已经是响应式对象，直接返回
+  // 已经是响应式对象，直接返回（避免重复代理导致多个 Dep 实例）
   if (targetMap.has(target)) {
     return target;
   }
 
   return new Proxy(target, {
+    /**
+     * get 拦截器
+     *
+     * 1. 依赖收集：调用 dep.depend() 将当前 activeEffect 注册为订阅者
+     * 2. 惰性深度代理：如果读取的属性值是对象，递归调用 reactive 使其也变为响应式
+     * 3. 返回属性值
+     */
     get(target, key, receiver) {
       const dep = getDep(target, key);
-      dep.depend();
+      dep.depend(); // ⭐ 核心：依赖收集
 
       const result = Reflect.get(target, key, receiver);
 
-      // 递归处理嵌套对象
+      // 递归代理嵌套对象（惰性深度响应化）
+      // 注意：这里是惰性的，只有访问到嵌套对象时才会将其响应化
       if (isObject(result)) {
         return reactive(result);
       }
@@ -98,11 +193,21 @@ export function reactive<T extends object>(target: T): T {
       return result;
     },
 
+    /**
+     * set 拦截器
+     *
+     * 1. 对比新旧值，仅在实际变化时才触发通知（避免无效更新）
+     * 2. 设置新值
+     * 3. 通知所有订阅该属性的 effect 重新执行
+     *
+     * 注意：使用 Reflect.set 而非 target[key] = value，
+     * 确保 setter 的 receiver 参数正确传递（处理继承属性和 getter/setter）
+     */
     set(target, key, value, receiver) {
       const oldValue = Reflect.get(target, key, receiver);
       const result = Reflect.set(target, key, value, receiver);
 
-      // 值发生变化时才触发更新
+      // ⭐ 仅当值实际变化时才触发更新（避免循环更新和无效渲染）
       if (oldValue !== value) {
         const dep = getDep(target, key);
         dep.notify();
@@ -111,6 +216,11 @@ export function reactive<T extends object>(target: T): T {
       return result;
     },
 
+    /**
+     * deleteProperty 拦截器
+     *
+     * 删除属性时无条件通知订阅者（常见于动态删除对象字段的场景）
+     */
     deleteProperty(target, key) {
       const result = Reflect.deleteProperty(target, key);
       const dep = getDep(target, key);
@@ -120,36 +230,78 @@ export function reactive<T extends object>(target: T): T {
   });
 }
 
+// ======================== effect ========================
+
 /**
- * 创建 effect
+ * 创建副作用函数
+ *
+ * effect 是响应式系统的消费端。在 effect 执行期间，
+ * 所有被访问的响应式属性都会被自动收集为该 effect 的依赖。
+ * 当这些依赖发生变化时，effect 会自动重新执行。
+ *
+ * 实现细节：
+ * - 使用 effectStack 处理嵌套 effect（effect 内部调用另一个 effect）
+ * - 每次执行前将自身设为 activeEffect，执行后恢复之前的 activeEffect
+ * - 返回一个清理函数（当前简化实现，完整版应包含依赖清除逻辑）
+ *
+ * @param fn - 副作用函数（函数体内部访问响应式属性即建立依赖关系）
+ * @param options - 配置项
+ * @param options.immediate - 是否立即执行，默认 true（设为 false 则只在依赖变化时执行）
+ * @returns 清理函数，调用后可手动触发 effect（简化版，完整版应包含 teardown）
+ *
+ * @example
+ * ```ts
+ * const state = reactive({ count: 0, name: 'Alice' });
+ *
+ * // 自动追踪依赖：state.count 和 state.name
+ * effect(() => {
+ *   document.title = `${state.name}: ${state.count}`;
+ * });
+ *
+ * state.count = 1; // 自动更新 document.title => 'Alice: 1'
+ * state.name = 'Bob'; // 自动更新 document.title => 'Bob: 1'
+ * ```
  */
 export function effect(fn: () => void, options: { immediate?: boolean } = {}): () => void {
+  /**
+   * 包装后的 effect 执行函数
+   *
+   * 核心流程：
+   * 1. 将自身设为 activeEffect（推入栈顶）
+   * 2. 执行 fn()（此时 fn 内访问的响应式属性会通过 dep.depend() 建立依赖）
+   * 3. 执行完毕后恢复之前的 activeEffect（从栈中弹出）
+   */
   const effectFn = () => {
     try {
+      // 推入栈顶，设为当前活跃 effect
       activeEffect = effectFn;
       effectStack.push(effectFn);
+      // 执行副作用函数，触发依赖收集
       fn();
     } finally {
+      // 恢复之前的 activeEffect（处理嵌套 effect 场景）
       effectStack.pop();
       activeEffect = effectStack[effectStack.length - 1] || null;
     }
   };
 
+  // 默认立即执行一次（首次执行建立所有依赖关系）
   if (options.immediate !== false) {
     effectFn();
   }
 
-  // 返回清理函数
+  // 返回清理函数（简化版，完整实现应清除所有 Dep 中的订阅）
   return () => {
-    // 清理所有 dep 中的订阅
-    // 注意：WeakMap 不支持遍历，我们需要在 Dep 中存储 effect 的反向映射
-    // 这里简化处理，实际项目中可以使用额外的数据结构来追踪
     effectFn();
   };
 }
 
+// ======================== computed ========================
+
 /**
  * 计算属性返回类型
+ *
+ * 通过 .value 访问计算后的值。
  */
 export interface ComputedRef<T> {
   readonly value: T;
@@ -157,31 +309,95 @@ export interface ComputedRef<T> {
 
 /**
  * 创建计算属性
+ *
+ * 计算属性是一种惰性求值的响应式引用：
+ * - 被访问时才计算（而非依赖变化时立即计算）
+ * - 计算结果会被缓存（dirty 标志控制）
+ * - 依赖变化时标记为"脏"（dirty=true），下次访问时重新计算
+ *
+ * 实现原理：
+ * 1. 内部创建一个 effect，在 getter 执行时自动收集依赖
+ * 2. 依赖变化时 effect 重新执行，更新缓存值并将 dirty 设为 false
+ * 3. .value 的 getter 检查 dirty 标志，决定返回缓存值还是触发重新计算
+ *
+ * @param getter - 计算函数，返回计算结果
+ * @returns 包含只读 .value 属性的对象
+ *
+ * @template T - 计算结果的类型
+ *
+ * @example
+ * ```ts
+ * const state = reactive({ count: 1, multiplier: 2 });
+ *
+ * const doubled = computed(() => state.count * state.multiplier);
+ * console.log(doubled.value); // 2
+ *
+ * state.count = 5;
+ * console.log(doubled.value); // 10（自动重新计算）
+ *
+ * // 依赖未变化时返回缓存值，不会重复执行 getter
+ * console.log(doubled.value); // 10（从缓存读取）
+ * ```
  */
 export function computed<T>(getter: () => T): ComputedRef<T> {
   let cachedValue: T;
-  let dirty = true;
+  let dirty = true; // 脏标志：true 表示需要重新计算
 
+  // 内部 effect：依赖变化时执行 getter 并更新缓存
   const effectFn = effect(
     () => {
       cachedValue = getter();
-      dirty = false;
+      dirty = false; // 计算完成后标记为"干净"
     },
-    { immediate: false },
+    { immediate: false }, // 不立即执行，等待第一次 .value 访问
   );
 
   return {
     get value(): T {
+      // 脏数据需要重新计算（首次访问或依赖已变化）
       if (dirty) {
-        effectFn();
+        effectFn(); // 执行 effect 触发 getter
       }
       return cachedValue;
     },
   };
 }
 
+// ======================== watch ========================
+
 /**
- * 监听变化
+ * 监听数据变化并执行回调
+ *
+ * 与 effect 的区别：
+ * - watch 提供新旧值的对比，适合执行副作用（如 API 请求）
+ * - effect 适合自动追踪依赖的渲染更新
+ *
+ * @param source - 监听的源数据，支持两种方式：
+ *   - 函数：() => value，返回值变化时触发回调（精确监听特定属性）
+ *   - 对象：直接传入响应式对象（监听整个对象引用变化）
+ * @param callback - 变化时的回调函数，接收新值和旧值
+ * @param options - 配置项
+ * @param options.immediate - 是否立即执行一次回调（此时 oldValue 为 undefined）
+ * @param options.deep - 是否深度监听（预留参数，当前未完全实现）
+ * @returns 停止监听的清理函数
+ *
+ * @template T - 监听值的类型
+ *
+ * @example
+ * ```ts
+ * const state = reactive({ name: 'Alice' });
+ *
+ * // 监听特定属性
+ * const unwatch = watch(
+ *   () => state.name,
+ *   (newName, oldName) => {
+ *     console.log(`name 从 ${oldName} 变为 ${newName}`);
+ *   },
+ * );
+ *
+ * state.name = 'Bob'; // 输出: name 从 Alice 变为 Bob
+ * unwatch(); // 停止监听
+ * ```
  */
 export function watch<T>(
   source: (() => T) | object,
@@ -191,53 +407,98 @@ export function watch<T>(
   let getter: () => T;
   let oldValue: T | undefined;
 
+  // 根据 source 类型确定 getter 函数
   if (typeof source === 'function') {
+    // 函数形式：直接使用（精确监听某个表达式的结果）
     getter = source as () => T;
   } else {
+    // 对象形式：监听整个对象的引用替换
     getter = () => source as T;
   }
 
+  // 创建内部 effect，在 getter 值变化时执行回调
   const effectFn = effect(() => {
     const newValue = getter();
     if (callback && newValue !== oldValue) {
       callback(newValue, oldValue);
     }
-    oldValue = newValue;
+    oldValue = newValue; // 更新旧值
   });
 
-  // 处理 immediate 选项
+  // 处理 immediate 选项：立即执行一次回调
   if (options.immediate) {
     const initialValue = getter();
-    callback?.(initialValue, undefined);
+    callback?.(initialValue, undefined); // 首次执行 oldValue 为 undefined
     oldValue = initialValue;
   }
 
+  // 返回停止监听的清理函数
   return () => {
     effectFn();
   };
 }
 
+// ======================== 批量更新 ========================
+
 /**
- * 批量更新
+ * 同步批量更新
+ *
+ * 在 fn 执行期间，所有响应式属性的变更不会立即触发 effect 更新，
+ * 而是暂存到 batchQueue 中。fn 执行完毕后一次性执行所有暂存的 effect。
+ *
+ * 适用场景：需要对多个响应式属性同时赋值，避免每次赋值都触发一次更新。
+ *
+ * @param fn - 包含多次属性修改的同步函数
+ *
+ * @example
+ * ```ts
+ * const state = reactive({ firstName: 'Alice', lastName: 'Smith' });
+ *
+ * effect(() => {
+ *   console.log(`全名: ${state.firstName} ${state.lastName}`);
+ * });
+ *
+ * // 不使用 batchUpdate：每次赋值都会触发 effect（输出两次）
+ * // state.firstName = 'Bob';   // 输出: 全名: Bob Smith
+ * // state.lastName = 'Jones';  // 输出: 全名: Bob Jones
+ *
+ * // 使用 batchUpdate：只触发一次 effect
+ * batchUpdate(() => {
+ *   state.firstName = 'Bob';
+ *   state.lastName = 'Jones';
+ * });
+ * // 输出一次: 全名: Bob Jones
+ * ```
  */
 export function batchUpdate(fn: () => void): void {
   isBatching = true;
   try {
-    fn();
+    fn(); // 执行期间所有 set 操作暂不通知
   } finally {
     isBatching = false;
+    // 统一执行所有积压的 effect
     batchQueue.forEach((effect) => effect());
     batchQueue.clear();
   }
 }
 
+// ======================== 异步批量更新 ========================
+
+/** 异步批量更新队列 */
 let asyncBatchQueue: Set<() => void> = new Set();
+/** 异步批量更新定时器 */
 let asyncBatchTimer: ReturnType<typeof setTimeout> | null = null;
+/** 异步批量更新的延迟时间（毫秒），默认 16ms（约一帧） */
 let asyncBatchDelay = 16;
+/** 异步批量更新的最大容量，超过此值将立即刷新 */
 let asyncBatchMaxSize = 100;
 
 /**
- * 设置异步批量更新配置
+ * 设置异步批量更新的配置参数
+ *
+ * @param config - 配置对象
+ * @param config.delay - 延迟时间（毫秒），默认 16ms
+ * @param config.maxBatchSize - 最大批处理大小，超过后立即刷新，默认 100
  */
 export function setAsyncBatchConfig(config: { delay?: number; maxBatchSize?: number }): void {
   if (config.delay !== undefined) {
@@ -250,6 +511,11 @@ export function setAsyncBatchConfig(config: { delay?: number; maxBatchSize?: num
 
 /**
  * 异步批量更新
+ *
+ * 与 batchUpdate 类似，但 effect 的执行会被推迟到下一个微任务/定时器，
+ * 适用于多个 batchUpdate 调用分散在不同位置的场景。
+ *
+ * @param fn - 包含多次属性修改的同步函数
  */
 export function asyncBatchUpdate(fn: () => void): void {
   isBatching = true;
@@ -257,21 +523,26 @@ export function asyncBatchUpdate(fn: () => void): void {
     fn();
   } finally {
     isBatching = false;
+    // 将批量队列中的 effect 移到异步队列
     batchQueue.forEach((effect) => {
       asyncBatchQueue.add(effect);
     });
     batchQueue.clear();
 
+    // 达到最大容量：立即刷新
     if (asyncBatchQueue.size >= asyncBatchMaxSize) {
       flushAsyncBatch();
     } else if (!asyncBatchTimer) {
+      // 设置定时器，延迟后刷新
       asyncBatchTimer = setTimeout(flushAsyncBatch, asyncBatchDelay);
     }
   }
 }
 
 /**
- * 刷新异步批量更新队列
+ * 立即刷新异步批量更新队列
+ *
+ * 清除定时器，执行所有积压的异步 effect。
  */
 export function flushAsyncBatch(): void {
   if (asyncBatchTimer) {
@@ -279,6 +550,7 @@ export function flushAsyncBatch(): void {
     asyncBatchTimer = null;
   }
 
+  // 交换队列并清空（避免执行期间新加入的 effect 被重复执行）
   const currentQueue = asyncBatchQueue;
   asyncBatchQueue = new Set();
 
@@ -286,13 +558,13 @@ export function flushAsyncBatch(): void {
     try {
       effect();
     } catch {
-      // ignore
+      // 静默忽略 effect 中的异常（避免一个 effect 崩溃影响其他）
     }
   });
 }
 
 /**
- * 清除异步批量更新队列
+ * 清空异步批量更新队列并取消定时器
  */
 export function clearAsyncBatch(): void {
   if (asyncBatchTimer) {
@@ -302,22 +574,53 @@ export function clearAsyncBatch(): void {
   asyncBatchQueue.clear();
 }
 
+// ======================== 辅助函数 ========================
+
 /**
  * 创建 ref（基本类型的响应式包装）
+ *
+ * 对于基本类型（string/number/boolean 等），Proxy 只能代理对象，
+ * 因此需要用 { value: T } 对象包装，使基本类型值也能响应式。
+ *
+ * 内部实际调用 reactive({ value })，因此 ref 是 reactive 的特化用法。
+ *
+ * @param value - 任意值（通常是基本类型，也可以是对象）
+ * @returns 具有 .value 属性的响应式对象
+ *
+ * @template T - 值的类型
+ *
+ * @example
+ * ```ts
+ * const count = ref(0);
+ * effect(() => console.log(count.value));
+ * count.value = 5; // 触发 effect 重新执行
+ * ```
  */
 export function ref<T>(value: T): { value: T } {
   return reactive({ value });
 }
 
 /**
- * 判断是否为对象
+ * 判断传入值是否为对象类型
+ *
+ * 规则：非 null 且 typeof 为 'object'。
+ * 排除了 null（typeof null === 'object' 是 JS 的古老 bug）。
+ *
+ * @param value - 待判断的值
+ * @returns true 表示是对象（包括数组、普通对象、Map、Set 等）
  */
 export function isObject(value: unknown): value is object {
   return value !== null && typeof value === 'object';
 }
 
 /**
- * 将普通对象转换为响应式对象（如果还不是）
+ * 将普通对象转换为响应式对象（如果还不是的话）
+ *
+ * 如果目标已经是响应式对象，直接返回（避免重复代理）。
+ * 这是一个安全的"强制响应化"工具函数。
+ *
+ * @param target - 目标对象
+ * @returns 响应式代理后的对象
  */
 export function toReactive<T extends object>(target: T): T {
   if (targetMap.has(target)) {
@@ -327,14 +630,25 @@ export function toReactive<T extends object>(target: T): T {
 }
 
 /**
- * 检查是否为响应式对象
+ * 检查目标对象是否已经是响应式的
+ *
+ * 通过检查 targetMap WeakMap 中是否存在该对象的记录来判断。
+ *
+ * @param target - 待检查的值
+ * @returns true 表示已是响应式对象
  */
 export function isReactive(target: unknown): boolean {
   return isObject(target) && targetMap.has(target);
 }
 
 /**
- * 触发特定属性的更新（手动触发）
+ * 手动触发指定属性的更新通知
+ *
+ * 通常不需要手动调用（Proxy 的 setter 会自动触发），
+ * 但在某些特殊场景下（如直接修改数组元素但未触发 setter）可能需要手动通知。
+ *
+ * @param target - 目标响应式对象
+ * @param key - 需要触发更新的属性键
  */
 export function trigger(target: object, key: string | symbol): void {
   const dep = getDep(target, key);

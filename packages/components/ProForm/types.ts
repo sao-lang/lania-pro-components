@@ -337,6 +337,26 @@ export interface KeyboardNavigationConfig {
 }
 
 /**
+ * 草稿持久化配置
+ */
+export interface DraftConfig {
+  /** 表单标识（必填，用于多实例隔离，建议格式：`模块-表单名-ID`） */
+  formKey: string;
+  /** 是否启用自动保存，默认 true */
+  enabled?: boolean;
+  /** 自动保存防抖延迟（毫秒），默认 3000ms */
+  autoSaveDelay?: number;
+  /** 草稿过期时间（毫秒），默认 24 小时 */
+  ttl?: number;
+  /** 存储类型：'localStorage' | 'sessionStorage' | 自定义策略 */
+  storage?: 'localStorage' | 'sessionStorage' | import('./core/DraftEngine').DraftStorage;
+  /** 草稿恢复时的回调（用于展示恢复确认 UI） */
+  onDraftRestored?: (values: Record<string, unknown>) => void;
+  /** 发现草稿时的回调（用于展示提示） */
+  onDraftAvailable?: (data: import('./core/DraftEngine').DraftData) => void;
+}
+
+/**
  * ProForm 组件属性
  */
 export interface ProFormProps<TValues = Record<string, unknown>> {
@@ -458,6 +478,8 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
   schemaProcessOptions?: SchemaProcessOptions;
   /** 键盘导航配置 */
   keyboardNavigation?: KeyboardNavigationConfig;
+  /** 草稿持久化配置（启用后自动保存表单草稿到 localStorage） */
+  draftStorage?: DraftConfig;
 }
 
 /**

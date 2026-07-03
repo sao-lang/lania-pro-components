@@ -1,3 +1,37 @@
+/**
+ * ProTable 组件 — 基于 Arco Design Table 的高级表格组件
+ *
+ * 核心架构（三层 Context 设计）：
+ * - RootContext: 全局配置层（props、rowKey、事件回调）
+ * - DataContext: 数据状态层（DataStore + action 方法）
+ * - ColumnContext: 列配置层（columns、密度、显隐）
+ *
+ * 功能特性：
+ * - 查询表单（QueryForm）与表格联动
+ * - 工具栏（Toolbar）按钮组
+ * - 行操作按钮列（OprColumn）
+ * - 批量操作（BatchOperation）
+ * - 分页（Pagination）
+ * - 可编辑表格（Editable）
+ * - 虚拟滚动（VirtualScroll）
+ * - 拖拽排序（DragSort）
+ * - URL 参数同步（UrlSync）
+ * - 卡片视图切换（CardView）
+ * - TableDialog 命令式弹窗
+ * - 自定义列渲染器（columnRender / cellMerge）
+ *
+ * @example
+ * ```tsx
+ * // 基础用法
+ * <ProTable
+ *   columns={[...]}
+ *   request={async (params) => {
+ *     const res = await fetchData(params);
+ *     return { data: res.list, total: res.total };
+ *   }}
+ * />
+ * ```
+ */
 import React, { useImperativeHandle, forwardRef, useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { Card } from '@arco-design/web-react';
 import type { ProTableProps, ProTableActionType, ProTableRequest, ProTableNEventHandlers } from './types';

@@ -1,3 +1,37 @@
+/**
+ * 只读/预览渲染器注册表
+ *
+ * 为 ProForm 的只读/预览模式提供字段值渲染。
+ * 内置 20+ 种默认渲染器，涵盖常见的只读展示场景：
+ *
+ * 基础渲染器：
+ * - textRenderer: 纯文本
+ * - textareaRenderer: 多行文本（保留换行）
+ * - optionRenderer: 选项值→标签映射（支持 tag 模式）
+ * - checkboxRenderer: 多选值→Tag 展示
+ * - switchRenderer: 开关值→是/否 Tag
+ *
+ * 格式化渲染器：
+ * - numberRenderer: 数字千分位
+ * - percentageRenderer: 百分比
+ * - currencyRenderer: 货币
+ * - dateRenderer / timeRenderer / dateTimeRenderer: 日期/时间格式化
+ *
+ * 富媒体渲染器：
+ * - imageRenderer: 图片缩略图+预览
+ * - videoRenderer: 视频缩略图+预览播放
+ * - fileRenderer: 文件链接列表
+ * - linkRenderer: 链接
+ *
+ * 脱敏渲染器：
+ * - phoneRenderer: 手机号脱敏（138****1234）
+ * - emailRenderer: 邮箱脱敏（u***@example.com）
+ * - idCardRenderer: 身份证脱敏
+ *
+ * 快捷组件渲染器：
+ * - yesNoRenderer / maleFemaleRenderer / enableDisableRenderer 等
+ * - statusRenderer: 状态标签
+ */
 import React, { ReactNode, useState } from 'react';
 import { Image, Tag, Space } from '@arco-design/web-react';
 import { IconEye, IconFile, IconLink, IconPlayCircle } from '@arco-design/web-react/icon';

@@ -1,3 +1,14 @@
+/**
+ * 扩展上下文（ExtensionContext）
+ *
+ * 提供表单的插件化扩展能力，通过 Context 传递扩展能力：
+ * - 权限扩展（PermissionExtension）：表单字段级别的权限控制
+ * - 审计扩展（AuditExtension）：表单操作的审计日志记录
+ * - 国际化扩展（I18nExtension）：表单字段的多语言支持
+ *
+ * 使用方式：将自定义扩展通过 ExtensionContextProvider 注入，
+ * 表单子组件通过 useExtension(name) 获取对应扩展能力。
+ */
 import React, { createContext, useContext, ReactNode, useMemo, useRef, useCallback } from 'react';
 
 /**

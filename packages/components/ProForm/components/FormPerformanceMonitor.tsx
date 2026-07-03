@@ -1,3 +1,12 @@
+/**
+ * 表单性能监控组件（FormPerformanceMonitor）
+ *
+ * 渲染性能监控器组件，显示表单渲染耗时统计。
+ * 仅在开发环境下可见，帮助开发者识别性能瓶颈。
+ *
+ * 通过 @lania-pro-components/utils 的 PerformanceMonitor 采集数据，
+ * 统计每次渲染的耗时，支持平均/最小/最大耗时和渲染次数统计。
+ */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { performanceMonitor } from '@lania-pro-components/utils';
 

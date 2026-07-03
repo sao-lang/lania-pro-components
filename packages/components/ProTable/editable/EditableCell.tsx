@@ -1,3 +1,25 @@
+/**
+ * EditableCell — 可编辑单元格组件
+ *
+ * 在表格单元格内渲染编辑控件：
+ * - 根据字段类型自动选择控件（Input/Select/DatePicker/Switch 等）
+ * - 支持自定义控件渲染
+ * - 支持编辑模式/预览模式切换
+ * - 行验证错误显示
+ */
+/**
+ * EditableCell — 可编辑单元格组件
+ *
+ * 在表格单元格内渲染编辑控件，根据字段数据类型自动选择合适的编辑器：
+ * - Input: text/textarea 类型
+ * - InputNumber: number 类型
+ * - Select: select/radio 类型
+ * - DatePicker: date/dateTime 类型
+ * - Switch: boolean 类型
+ *
+ * 编辑模式下显示控件，非编辑模式下显示原始值，
+ * 支持行验证失败的红色边框提示。
+ */
 import React, { useMemo, useCallback } from 'react';
 import { Input, InputNumber, Select, DatePicker, Switch } from '@arco-design/web-react';
 import type { EditableCellConfig, EditableTableInstance } from './types';

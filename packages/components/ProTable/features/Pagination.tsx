@@ -1,3 +1,11 @@
+/**
+ * Pagination — 表格分页组件
+ *
+ * 在表格底部渲染分页器，与 DataStore 的 pagination 状态双向绑定：
+ * - 页码/每页数量变更时自动更新 DataStore
+ * - 支持自定义每页数量选项
+ * - 页码变化自动触发数据请求
+ */
 import React from 'react';
 import { Pagination as ArcoPagination } from '@arco-design/web-react';
 import { useDataContext } from '../context';

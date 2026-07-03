@@ -1,3 +1,19 @@
+/**
+ * 验证引擎（ValidationEngine）
+ *
+ * 集中管理表单验证逻辑，支持丰富的验证规则：
+ * - required: 必填检查（空值/空数组）
+ * - min / max: 数值范围
+ * - minLength / maxLength / len: 字符串/数组长度
+ * - precision: 小数精度
+ * - step: 数字步长
+ * - type: 值类型（number/integer/float/string/boolean）
+ * - sign: 正负零（positive/negative/zero）
+ * - whitespace: 不允许空白字符
+ * - pattern: 正则表达式匹配
+ * - validator: 自定义验证函数（支持异步）
+ */
+
 import type { FieldNodeAPI, FormStoreAPI, ValidationRule, ValidationResult } from '../types';
 
 /**

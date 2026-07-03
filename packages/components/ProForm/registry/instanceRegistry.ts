@@ -1,3 +1,19 @@
+/**
+ * ProForm 实例注册中心
+ *
+ * 提供表单实例的全局注册和订阅功能。
+ * 通过为表单指定 name 属性，可以在应用的任何位置获取表单实例。
+ *
+ * 与 ProDialog 的 InstanceRegistry 设计一致，
+ * 额外支持实例变化订阅（subscribe），可在实例注册/注销时收到通知。
+ *
+ * @example
+ * ```ts
+ * import { getProFormInstance } from '@/components/ProForm';
+ * const form = getProFormInstance('user-form');
+ * form?.setValues({ name: 'Alice' });
+ * ```
+ */
 import type { FormStoreAPI } from '../types';
 
 /**

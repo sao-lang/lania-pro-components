@@ -1,3 +1,10 @@
+/**
+ * 跳转按钮组件
+ *
+ * 封装了"点击按钮 → 页面跳转"的完整交互流程。
+ * 支持当前窗口跳转和新窗口打开两种方式，可通过 onBeforeJump 在跳转前进行拦截校验。
+ * 可通过 ref.jump() 进行命令式调用。
+ */
 import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconArrowRight } from '@arco-design/web-react/icon';

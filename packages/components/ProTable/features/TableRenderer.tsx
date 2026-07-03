@@ -1,3 +1,25 @@
+/**
+ * TableRenderer — 表格渲染器
+ *
+ * 负责将 ProTable 的数据和列配置转换为 Arco Design Table 组件：
+ * - 列转换（ProColumnType → Arco TableColumnProps）
+ * - 行选择（checkbox/radio）
+ * - 行展开/行操作按钮列
+ * - 拖拽行句柄
+ * - 骨架屏/空状态/加载状态
+ * - 单元格合并
+ */
+/**
+ * TableRenderer — 表格渲染器组件
+ *
+ * 核心渲染组件：
+ * 1. 从 DataContext/ColumnContext/RootContext 读取合并后的配置
+ * 2. 使用 convertColumns 将 ProColumnType 转换为 Arco TableColumnProps
+ * 3. 注入行选择、行展开、行操作按钮列
+ * 4. 根据状态渲染不同内容：loading → SkeletonTable | error → 错误提示 | empty → Empty
+ * 5. 支持拖拽行、可编辑表格、单元格合并
+ * 6. 通过 ProTableActionType 暴露命令式操作方法
+ */
 import React, { useMemo } from 'react';
 import { Table, Spin, ConfigProvider, Empty } from '@arco-design/web-react';
 import type { TableProps, PaginationProps } from '@arco-design/web-react';

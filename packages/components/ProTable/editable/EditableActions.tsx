@@ -1,3 +1,21 @@
+/**
+ * EditableActions — 编辑操作按钮
+ *
+ * 在可编辑表格行中渲染编辑/保存/取消等操作按钮：
+ * - 编辑模式：显示保存/取消按钮
+ * - 预览模式：显示编辑/删除按钮
+ * - 支持自定义按钮文本
+ */
+/**
+ * EditableActions — 可编辑表格操作按钮
+ *
+ * 在可编辑表格的操作列中渲染编辑/保存/取消按钮：
+ * - 预览模式：显示"编辑"按钮（可点击进入编辑状态）
+ * - 编辑模式：显示"保存"/"取消"按钮
+ * - 支持隐藏编辑/删除按钮、自定义按钮文本
+ *
+ * 按钮点击后调用 useEditableTable 暴露的 startEditable / saveEditable / cancelEditable 方法。
+ */
 import React from 'react';
 import { Button, Space } from '@arco-design/web-react';
 import type { EditableConfig, EditableTableInstance } from './types';

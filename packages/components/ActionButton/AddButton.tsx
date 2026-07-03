@@ -1,3 +1,10 @@
+/**
+ * 新增按钮组件
+ *
+ * 封装了"点击按钮 → 打开表单弹窗 → 提交"的完整交互流程。
+ * 基于 ProDialog.form 打开 Schema 驱动的表单弹窗，支持自定义字段配置和提交逻辑。
+ * 可通过 ref.open() 进行命令式调用。
+ */
 import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconPlus } from '@arco-design/web-react/icon';

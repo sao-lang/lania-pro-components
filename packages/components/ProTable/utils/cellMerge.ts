@@ -1,3 +1,32 @@
+/**
+ * 单元格合并工具模块
+ *
+ * 提供 ProTable 的单元格合并能力：
+ * - createRowMerge: 创建行合并策略（连续的相同值合并）
+ * - createColMerge: 创建列合并策略（固定跨列合并）
+ * - combineMerge: 组合多个合并策略
+ * - calculateMergeState: 计算合并状态
+ * - getCellMergeProps: 获取合并后的单元格属性
+ */
+/**
+ * 单元格合并工具模块
+ *
+ * 提供 ProTable 单元格合并的能力，支持三种合并策略：
+ *
+ * 1. 行合并（createRowMerge）：
+ *    同一列中连续相同的值自动合并为一个单元格
+ *    适用于：状态列、类型列等
+ *
+ * 2. 列合并（createColMerge）：
+ *    固定跨列合并，指定列数
+ *    适用于：表头分组、跨列展示
+ *
+ * 3. 组合合并（combineMerge）：
+ *    将多个合并策略组合使用
+ *    适用于：复杂的多维度合并场景
+ *
+ * 每个策略返回 (record, index, columnKey) => { rowSpan, colSpan } 格式。
+ */
 import type { ReactNode } from 'react';
 import type { ProColumnType } from '../types';
 

@@ -1,3 +1,10 @@
+/**
+ * 批量操作按钮组件
+ *
+ * 封装了"选择校验 → 可选二次确认 → 执行批量操作"的完整交互流程。
+ * 支持选中数量上下限校验、自定义警告文案、二次确认弹窗。
+ * 通过 ref.execute() 进行命令式调用，ref 同时暴露 selectedKeys/selectedRows 的 setter。
+ */
 import React, { useCallback, useState, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconSelectAll } from '@arco-design/web-react/icon';

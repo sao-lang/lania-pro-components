@@ -1,3 +1,27 @@
+/**
+ * @lania-pro-components/components
+ *
+ * Lania Pro Components 组件库统一入口
+ *
+ * 基于 Arco Design + Schema 驱动的企业级组件集合，包含：
+ * - ActionButton: 预封装 CRUD 操作按钮组（新增/编辑/删除/查看/导出/导入/跳转/批量操作）
+ * - ProDialog: 高级弹窗组件（支持 Modal/Drawer、表单/表格/普通内容）
+ * - ProForm: Schema 驱动的表单引擎（支持动态列表、分步表单、只读预览）
+ * - ProTable: 高级表格组件（支持查询/分页/排序/筛选/编辑/虚拟滚动/拖拽）
+ * - ProSelect: 增强版选择器（支持远程搜索、分页加载、虚拟滚动、动态创建）
+ * - ProUpload: 增强版上传组件（支持图片/视频/文件、压缩、校验、重试）
+ *
+ * 每个组件模块都独立导出，支持按需引入。
+ *
+ * @example
+ * ```tsx
+ * // 按需引入
+ * import { ProTable, useProTable } from '@lania-pro-components/components';
+ * // 或直接引入子路径
+ * import { ProForm } from '@lania-pro-components/components/ProForm';
+ * ```
+ */
+
 export {
   AddButton,
   EditButton,
@@ -67,3 +91,10 @@ export type { ProSelectProps } from './ProSelect/types';
 
 export { ProUpload } from './ProUpload';
 export type { ProUploadProps } from './ProUpload/types';
+
+// ===== 草稿引擎 =====
+export { DraftEngine, createDraftEngine } from './ProForm/core/DraftEngine';
+export type { DraftData, DraftStorage, DraftEngineConfig, DraftStatus } from './ProForm/core/DraftEngine';
+export { localStorageStrategy, sessionStorageStrategy } from './ProForm/core/DraftEngine';
+export { useDraft } from './ProForm/hooks/useDraft';
+export type { UseDraftOptions, UseDraftReturn } from './ProForm/hooks/useDraft';

@@ -1,3 +1,14 @@
+/**
+ * useEditableTable — 可编辑表格核心 Hook
+ *
+ * 管理表格的编辑状态：
+ * - 单行/多行编辑模式
+ * - 编辑行管理（startEditable / cancelEditable / saveEditable）
+ * - 行验证（validateRow）
+ * - 编辑状态跟踪
+ * - 编辑变化回调（onChange）
+ * - 新增/删除行（deleteEditable）
+ */
 import { useState, useCallback, useRef, useMemo } from 'react';
 import type { EditableConfig, EditableRowState, EditableTableInstance } from './types';
 

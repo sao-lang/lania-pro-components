@@ -1,3 +1,23 @@
+/**
+ * 搜索方案管理 Hook（useSearchSchema）
+ *
+ * 为 ProTable 的查询表单提供"保存/切换查询方案"功能：
+ * - 保存当前查询条件为方案
+ * - 切换不同方案（自动应用方案参数）
+ * - 删除/重命名方案
+ * - 方案持久化（localStorage）
+ */
+/**
+ * 搜索方案管理 Hook（useSearchSchema）
+ *
+ * 为 ProTable 查询表单提供"保存/切换查询方案"功能：
+ * - 保存当前查询条件为方案（命名 + 持久化）
+ * - 切换不同方案时自动应用方案中的参数到 DataStore
+ * - 删除/重命名已有方案
+ * - 方案持久化（localStorage），刷新后自动恢复
+ *
+ * 使用场景：用户在不同查询条件间快速切换，无需每次手动输入。
+ */
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 export interface SearchSchema {

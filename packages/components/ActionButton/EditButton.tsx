@@ -1,3 +1,10 @@
+/**
+ * 编辑按钮组件
+ *
+ * 封装了"点击按钮 → 加载初始数据 → 打开表单弹窗（数据回填） → 提交"的完整交互流程。
+ * 通过 getInitialValues 异步获取回填数据，弹窗加载期间显示 loading 状态。
+ * 可通过 ref.open() 进行命令式调用。
+ */
 import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconEdit } from '@arco-design/web-react/icon';

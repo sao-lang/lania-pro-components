@@ -9,6 +9,10 @@ import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
 import { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
 import { performanceMonitor } from '@lania-pro-components/utils';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
+import { useDraft } from './hooks/useDraft';
+import type { DraftData } from './core/DraftEngine';
+import { localStorageStrategy, sessionStorageStrategy } from './core/DraftEngine';
+import type { DraftConfig } from './types';
 
 const { Row, Col } = Grid;
 
@@ -72,6 +76,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       performance,
       schemaProcessOptions,
       keyboardNavigation,
+      draftStorage,
     } = props;
 
     const {
@@ -194,6 +199,30 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         return () => clearTimeout(timer);
       }
     }, [initialValues, arcoForm, formStore]);
+
+    // ===== 草稿持久化 =====
+    const resolveDraftStorage = (storage: DraftConfig['storage']) => {
+      if (!storage || storage === 'localStorage') return localStorageStrategy;
+      if (storage === 'sessionStorage') return sessionStorageStrategy;
+      return storage as import('./core/DraftEngine').DraftStorage;
+    };
+
+    const { discardDraft } = useDraft({
+      formKey: draftStorage?.formKey || '',
+      formStore,
+      enabled: !!(draftStorage?.formKey && (draftStorage?.enabled ?? true)),
+      autoSaveDelay: draftStorage?.autoSaveDelay ?? 3000,
+      ttl: draftStorage?.ttl,
+      storage: draftStorage?.storage ? resolveDraftStorage(draftStorage.storage) : undefined,
+      onDraftAvailable: (data: DraftData) => draftStorage?.onDraftAvailable?.(data),
+      onDraftRestored: (values: Record<string, unknown>) => {
+        if (arcoForm) {
+          arcoForm.setFieldsValue(values);
+        }
+        formStore.setValues(values);
+        draftStorage?.onDraftRestored?.(values);
+      },
+    });
 
     // 设置批量更新配置
     useEffect(() => {
@@ -349,6 +378,10 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     const handleFinish = async (values: Record<string, unknown>) => {
       try {
         await onFinish?.(values);
+        // 提交成功后清除草稿
+        if (draftStorage?.formKey) {
+          discardDraft();
+        }
       } catch (error) {
         console.error('Form submission error:', error);
       }

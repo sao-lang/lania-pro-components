@@ -1,3 +1,10 @@
+/**
+ * 查看按钮组件
+ *
+ * 封装了"点击按钮 → 打开详情展示弹窗"的完整交互流程。
+ * 弹窗内容通过 renderContent 自定义渲染，不包含表单，纯展示用途。
+ * 可通过 ref.open() 进行命令式调用。
+ */
 import React, { useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconEye } from '@arco-design/web-react/icon';

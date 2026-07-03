@@ -1,3 +1,12 @@
+/**
+ * 自定义只读渲染器
+ *
+ * 作为 side-effect 自动注册 ProUpload/ProSelect 等自定义组件的只读渲染器。
+ * 通过 import 此文件即完成注册。
+ *
+ * - ProUpload 渲染器：自动识别图片/视频/文件，提供缩略图预览和下载
+ * - ProSelect 渲染器：复用 optionRenderer
+ */
 import React, { useState } from 'react';
 import { Image, Space } from '@arco-design/web-react';
 import { IconDownload, IconPlayCircle, IconEye } from '@arco-design/web-react/icon';

@@ -1,3 +1,10 @@
+/**
+ * DataContext — 表格数据上下文（数据状态层）
+ *
+ * 向子组件暴露 DataStore 的完整状态（dataSource/loading/pagination 等）
+ * 和操作方法（setQuery/setPage/reload 等），以及 ProTable action 实例。
+ * 子组件通过 useDataContext() 获取这些数据和操作。
+ */
 import React, { createContext, useContext, useMemo, useEffect, useRef, useState } from 'react';
 import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState, DataStoreActions } from '../store/types';

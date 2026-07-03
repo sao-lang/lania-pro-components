@@ -1,3 +1,30 @@
+/**
+ * ProDialog 组件 — 基于 Arco Design 的高级弹窗组件
+ *
+ * 支持三种内容模式：
+ * 1. **普通模式**（children）：渲染任意子内容，适合简单弹窗
+ * 2. **表单模式**（schemas + formProps）：自动渲染 ProForm，支持 Schema 驱动
+ * 3. **表格选择模式**（columns + request/onSelect）：渲染 ProTable，用于弹窗内数据选择
+ *
+ * 支持两种展示模式：
+ * - modal: Arco Design Modal（模态框，居中弹出，支持拖拽/缩放）
+ * - drawer: Arco Design Drawer（抽屉，从侧边滑出）
+ *
+ * 高级特性：
+ * - 拖拽（draggable）、调整大小（resizable）、全屏（fullscreen）
+ * - 自定义按钮组（buttons）、确认关闭拦截（confirmOnClose）
+ * - 实例注册（instance prop + InstanceRegistry）
+ * - ref 暴露完整的弹窗控制 API
+ *
+ * 还提供命令式调用 API：
+ * - ProDialog.open(config): 打开普通弹窗
+ * - ProDialog.form(config): 打开表单弹窗
+ * - ProDialog.table(config): 打开表格弹窗
+ * - ProDialog.confirm(config): 打开确认对话框
+ * - ProDialog.message: 全局消息提示（info/success/warning/error/loading）
+ * - ProDialog.notification: 全局通知提醒
+ * - ProDialog.popconfirm: 气泡确认框
+ */
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect, useMemo } from 'react';
 import { Modal, Drawer, Button, Space, Spin } from '@arco-design/web-react';
 import type { ConfirmProps } from '@arco-design/web-react/es/Modal/confirm';

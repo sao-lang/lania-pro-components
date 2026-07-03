@@ -1,3 +1,19 @@
+/**
+ * 数据存储（DataStore）
+ *
+ * ProTable 的核心数据管理层，基于原生 JavaScript 实现：
+ * - 不依赖外部状态管理库（Redux/Zustand）
+ * - 通过 Listener 机制实现状态变更通知
+ * - 支持 reset 恢复到初始状态
+ *
+ * 管理的数据维度：
+ * - data: 表格数据列表
+ * - loading: 加载状态
+ * - selectedRowKeys / selectedRows: 选中状态
+ * - pagination: 分页信息
+ * - queryParams / sorter / filters: 查询/排序/筛选参数
+ */
+
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { DataStoreState, DataStoreActions, CreateDataStoreOptions } from './types';
 

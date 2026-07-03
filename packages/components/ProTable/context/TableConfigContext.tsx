@@ -1,3 +1,9 @@
+/**
+ * TableConfigContext — 表格全局配置上下文
+ *
+ * 合并用户传入的 props 和系统默认值，提供最终的表格配置。
+ * 子组件可通过 useMergedConfig() 获取合并后的配置快照。
+ */
 import React, { createContext, useContext, useMemo, useCallback } from 'react';
 import type { ProTableProps } from '../types';
 

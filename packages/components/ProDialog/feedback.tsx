@@ -1,3 +1,14 @@
+/**
+ * ProDialog 反馈组件模块
+ *
+ * 提供与弹窗相关的轻量级反馈组件，封装了 Arco Design 的 Popconfirm、Message、Notification：
+ * - ProPopconfirm: 气泡确认框（声明式 + 命令式）
+ * - ProMessage: 全局消息提示（info / success / warning / error / loading）
+ * - ProNotification: 全局通知提醒（带标题和内容的结构化通知）
+ * - ProNotify: 简化版通知 API（双参数调用）
+ *
+ * 这些组件作为 ProDialog 的静态属性挂载，可通过 `ProDialog.message.success('操作成功')` 等方式调用。
+ */
 import React from 'react';
 import { Popconfirm, Message, Notification, Modal } from '@arco-design/web-react';
 import type { PopconfirmConfig, MessageConfig, NotificationConfig, MessageReturn, NotificationReturn } from './types';

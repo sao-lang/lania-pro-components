@@ -1,3 +1,18 @@
+/**
+ * FieldNode — 字段运行时实例
+ *
+ * 每个表单字段对应一个 FieldNode 实例，管理字段的运行时状态：
+ * - 字段值（响应式，通过 ref 包装）
+ * - 字段错误
+ * - 字段状态（edit / readonly / disabled / hidden / preview）
+ * - 计算行为（visible / display / required 等，通过 computed 自动追踪依赖）
+ * - 值变化/状态变化订阅
+ * - 字段生命周期（onInit / onValueChange / onFocus 等）
+ *
+ * 使用 @lania-pro-components/utils 的响应式系统（reactive/ref/computed/watch）
+ * 实现字段级别的响应式状态管理。
+ */
+
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI } from '../types';
 import { computed, watch, ref, type ComputedRef } from '@lania-pro-components/utils';

@@ -1,3 +1,14 @@
+/**
+ * ColumnContext — 表格列上下文（列配置层）
+ *
+ * 管理表格列配置的响应式状态：
+ * - columns: 当前列配置（支持显隐/排序/拖拽）
+ * - density: 表格密度（default/middle/small）
+ * - 列显隐切换（handleColumnsChange）
+ * - 响应式列管理（useResponsive）
+ *
+ * 子组件通过 useColumnContext() 获取列配置。
+ */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ProColumnType, TableDensity, ProTableProps } from '../types';
 import { useResponsive, type Breakpoints } from '../hooks';

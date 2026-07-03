@@ -1,3 +1,21 @@
+/**
+ * Toolbar — 表格工具栏
+ *
+ * 位于表格顶部的操作栏，支持：
+ * - 左侧按钮组：新增/导出/导入等操作按钮
+ * - 右侧按钮组：刷新/列设置/密度切换/全屏等
+ * - 自定义额外渲染区域
+ * - ActionButton 配置驱动的事件处理
+ */
+/**
+ * Toolbar — 表格工具栏组件
+ *
+ * 位于表格顶部的操作栏，包含：
+ * - 左侧操作按钮组：由 toolbar.leftActions 配置驱动，支持 add/export/import/jump/custom/more 类型
+ * - 右侧功能按钮组：刷新（refresh）、列设置（columns setting）、密度切换（density）、全屏（fullscreen）
+ * - 额外渲染区（extraRender）：用于插入视图切换器、查询方案选择器
+ * - 事件处理：按钮点击事件通过 handlers（ProTableNEventHandlers）传递
+ */
 import React, { useState, useRef, useCallback } from 'react';
 import { Space, Button, Tooltip, Trigger, Checkbox, Radio, Divider } from '@arco-design/web-react';
 import {

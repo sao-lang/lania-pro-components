@@ -1,3 +1,21 @@
+/**
+ * 拖拽排序 Hook（useDragSort）
+ *
+ * 为 ProTable 提供行拖拽排序能力：
+ * - 支持整行拖拽（type: 'row'）和拖拽句柄两种模式
+ * - 支持自定义拖拽反馈样式
+ * - 支持排序前后回调（onDragStart / onDragEnd / onSort）
+ * - 支持重置排序（resetSort）
+ */
+/**
+ * 拖拽排序 Hook（useDragSort）
+ *
+ * 基于 HTML5 Drag & Drop API 实现表格行拖拽排序：
+ * - 支持整行拖拽（type: 'row'）和拖拽句柄（type: 'handle'）两种模式
+ * - 拖拽前保存原始顺序，onDragSortEnd 时返回新旧数据源对比
+ * - 通过 ref 追踪数据源变化，避免不必要的重排
+ * - 拖拽过程中高亮显示目标位置
+ */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 

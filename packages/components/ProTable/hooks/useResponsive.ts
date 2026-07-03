@@ -1,3 +1,21 @@
+/**
+ * 响应式适配 Hook（useResponsive）
+ *
+ * 为 ProTable 提供响应式断点检测和列隐藏能力：
+ * - 预定义断点：xxs / xs / sm / md / lg / xl / xxl
+ * - 自定义断点配置
+ * - 自动列隐藏（根据断点调整列显隐）
+ * - 提供当前断点状态
+ */
+/**
+ * 响应式适配 Hook（useResponsive）
+ *
+ * 通过 window.matchMedia 监听视口尺寸变化，提供响应式断点检测：
+ * - 预定义断点：xxs(320) / xs(480) / sm(576) / md(768) / lg(992) / xl(1200) / xxl(1600)
+ * - 根据当前断点自动决定哪些列应该隐藏
+ * - 支持自定义断点配置
+ * - 组件销毁时自动清理监听
+ */
 import { useState, useEffect, useCallback } from 'react';
 
 /**

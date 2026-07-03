@@ -1,3 +1,38 @@
+/**
+ * 列渲染工具模块
+ *
+ * 提供 ProTable 列渲染的完整解决方案：
+ * - renderColumnByValueType: 根据值类型自动生成列渲染器
+ * - createColumnRender: 创建自定义列渲染器
+ * - convertColumns: ProColumnType → Arco TableColumnProps 转换
+ * - customRendererRegistry: 自定义单元格渲染器注册系统
+ *     注册：registerCellRenderer(componentType, renderer)
+ *     获取：getCellRenderer(componentType)
+ *
+ * 内置值类型渲染器：
+ * text/number/money/percent/date/dateTime/time/select/radio/checkbox/
+ * switch/tag/avatar/image/link/progress/rate/color/badge
+ */
+/**
+ * 列渲染工具模块
+ *
+ * 提供 ProTable 的列渲染解决方案，包含三个核心功能：
+ *
+ * 1. renderColumnByValueType:
+ *    根据 ProColumnValueType 自动生成对应的单元格渲染器
+ *    支持的渲染类型：text/number/money/percent/date/dateTime/time/select/radio/
+ *    checkbox/switch/tag/avatar/image/link/progress/rate/color/badge 等
+ *
+ * 2. convertColumns:
+ *    将 ProColumnType[] 转换为 Arco TableColumnProps[]
+ *    自动注入 render 函数（基于 valueType）、search 配置等
+ *
+ * 3. customRendererRegistry:
+ *    自定义单元格渲染器注册系统
+ *    registerCellRenderer(type, renderer): 注册
+ *    getCellRenderer(type): 获取
+ *    用于扩展自定义渲染类型
+ */
 import React, { ReactNode, useState } from 'react';
 import {
   Tag,

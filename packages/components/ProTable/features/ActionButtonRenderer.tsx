@@ -1,3 +1,27 @@
+/**
+ * ActionButtonRenderer — 操作列按钮渲染器
+ *
+ * 根据 ActionButton 配置渲染表格操作列的按钮组：
+ * - 支持 8 种预定义按钮类型（add/edit/view/delete/export/import/jump/more）
+ * - 超出 maxCount 自动折叠到"更多"下拉菜单
+ * - 按钮显隐/禁用支持函数式配置（根据行数据动态判断）
+ * - onClick 回调传入行数据和 table action
+ */
+/**
+ * ActionButtonRenderer — 表格操作列按钮渲染器
+ *
+ * 根据配置在表格操作列中渲染按钮组。
+ * 支持 8 种预定义按钮类型：
+ * - add/edit/view/delete: 对应 ProDialog 弹窗操作
+ * - export/import: 对应导出/导入操作
+ * - jump: 页面跳转操作
+ * - custom: 自定义渲染
+ * - more: 下拉菜单聚合
+ *
+ * 按钮显隐/禁用支持函数式配置（传入行数据动态计算），
+ * 超出 maxCount 的按钮自动折叠到"更多"下拉菜单中。
+ * 点击按钮时的回调携带行数据（record）和索引（index）。
+ */
 import React from 'react';
 import { Space, Button, Dropdown, Menu } from '@arco-design/web-react';
 import {
@@ -130,7 +154,8 @@ const renderEditButton = (
     }
 
     const id = ((record.id as string | number | undefined) || (record.key as string | number | undefined)) as
-      string | number;
+      | string
+      | number;
 
     ProDialog.form({
       title: config.title || '编辑',

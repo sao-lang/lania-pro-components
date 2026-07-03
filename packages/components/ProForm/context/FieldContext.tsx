@@ -1,3 +1,16 @@
+/**
+ * 字段上下文（FieldContext）
+ *
+ * 向表单字段的子组件暴露当前字段的运行时状态，包括：
+ * - value / values: 当前值
+ * - status: 字段状态
+ * - focused: 焦点状态
+ * - computedBehavior: 计算后的行为
+ * - error: 错误信息
+ *
+ * 子组件可通过 useFieldContext() 获取这些信息，
+ * 实现自定义组件与表单字段状态的绑定。
+ */
 import React, { createContext, useContext, ReactNode } from 'react';
 import type { FieldStatus, FieldNodeAPI } from '../types';
 import type { FormState } from './RootContext';

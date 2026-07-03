@@ -1,5 +1,10 @@
 /**
- * DataStore 状态类型
+ * DataStore 类型定义
+ *
+ * 定义 ProTable 数据存储的状态结构和操作接口：
+ * - DataStoreState: 数据/查询/选择/轮询状态
+ * - DataStoreActions: 所有状态的操作方法
+ * - CreateDataStoreOptions: 创建 Store 时的初始值
  */
 export interface DataStoreState<T = unknown> {
   // 数据状态

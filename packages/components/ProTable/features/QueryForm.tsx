@@ -1,3 +1,27 @@
+/**
+ * QueryForm — 表格查询表单
+ *
+ * 自动从表格列的 search 配置生成查询表单：
+ * - 自动识别列类型生成对应的查询控件（Input/Select/DatePicker 等）
+ * - 与 ProTable 的 DataStore 双向绑定
+ * - 支持展开/收起（collapsible）
+ * - 点击查询/重置自动触发数据刷新
+ */
+/**
+ * QueryForm — 表格查询表单组件
+ *
+ * 根据表格列的 search 配置自动生成查询表单：
+ * 1. 遍历 columns，读取 title 和 valueType 生成 ProFormSchema
+ * 2. 将 Schema 传递给 ProForm 渲染查询控件
+ * 3. 查询/重置操作自动同步到 DataStore
+ * 4. 支持展开/收起（collapsible）和折叠行数（collapsedRows）
+ * 5. 支持自定义底部渲染（footerRender）
+ *
+ * 类型映射规则：
+ * text → Input | money/number/percent → InputNumber
+ * select/tag/enum → Select | date/dateTime → DatePicker
+ * switch → Switch 等
+ */
 import React, { useMemo, useCallback, useEffect, useRef } from 'react';
 import { ProForm } from '../../ProForm';
 import type { ProFormInstance, ProFormSchema } from '../../ProForm/types';

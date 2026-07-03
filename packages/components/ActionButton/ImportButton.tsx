@@ -1,3 +1,10 @@
+/**
+ * 导入按钮组件
+ *
+ * 封装了"点击按钮 → 打开文件上传弹窗 → 提交上传"的完整交互流程。
+ * 支持拖拽/点击上传、重复文件检测、自定义上传区域渲染。
+ * 可通过 ref.open() 进行命令式调用。
+ */
 import React, { useCallback, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button, Upload } from '@arco-design/web-react';
 import { IconUpload } from '@arco-design/web-react/icon';

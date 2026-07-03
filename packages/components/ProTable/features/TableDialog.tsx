@@ -1,3 +1,27 @@
+/**
+ * TableDialog — 表格内弹窗工具
+ *
+ * 为 ProTable 提供命令式的弹窗调用能力：
+ * - openDialog: 打开表格选择弹窗（用于选择数据场景）
+ * - confirm / info / success / warning / error: 确认/提示弹窗
+ * - 弹窗内容可以是 ReactNode 或表格组件
+ */
+/**
+ * TableDialog — 表格内弹窗工具模块
+ *
+ * 为 ProTable 提供命令式弹窗调用 API：
+ * - openDialog: 在弹窗中渲染 ProTable，用于数据选择场景
+ * - confirm / info / success / warning / error: 基于 ProDialog 的确认/提示弹窗
+ *
+ * 使用方式：
+ * ```ts
+ * // 在 ProTable action 上调用
+ * action.openDialog({ title: '选择用户', columns: [...], onSelect: (keys, rows) => {} });
+ * action.confirm({ title: '确认删除', content: '确定要删除吗？', onConfirm: async () => {} });
+ * ```
+ *
+ * 每次调用都会动态创建一个 ReactDOM root，调用后自动清理 DOM。
+ */
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Modal, Button } from '@arco-design/web-react';

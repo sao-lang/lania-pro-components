@@ -1,3 +1,13 @@
+/**
+ * 表单配置上下文（FormConfigContext）
+ *
+ * 通过 FormConfigProvider 向子组件树提供表单全局配置。
+ * 与 ProFormProvider 配合使用，支持表单实例的注册和全局访问。
+ *
+ * 使用场景：
+ * - 跨组件层级获取表单实例
+ * - 表单命名和标识
+ */
 import React, { createContext, useContext, useRef, useMemo, useCallback } from 'react';
 import type { FormStoreAPI } from '../types';
 

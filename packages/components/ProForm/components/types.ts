@@ -1,3 +1,9 @@
+/**
+ * ProForm 高级组件类型定义
+ *
+ * 定义 ProFormList（动态列表）和 ProFormSteps（分步表单）的 Props 和实例接口。
+ */
+
 import type { ProFormSchema } from '../types';
 
 /**

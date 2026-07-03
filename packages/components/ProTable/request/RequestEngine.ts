@@ -1,3 +1,15 @@
+/**
+ * 请求引擎（RequestEngine）
+ *
+ * 封装表格的数据请求逻辑，支持：
+ * - 请求拦截（beforeRequest）：在发出请求前修改参数
+ * - 响应拦截（afterRequest）：在返回数据后处理数据
+ * - 请求取消（cancel）：通过 AbortController 中断进行中的请求
+ * - 防抖请求（debouncedExecute）：防抖后执行请求避免重复发送
+ * - 错误处理（onRequestError）：统一处理请求异常
+ * - 后处理函数（postData）：对返回数据进行二次处理
+ */
+
 import type { ProTableRequest, ProTableRequestParams, ProTableRequestResponse } from '../types';
 
 export interface RequestEngineOptions<T = unknown> {

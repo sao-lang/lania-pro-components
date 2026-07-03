@@ -1,3 +1,26 @@
+/**
+ * URL 参数同步 Hook（useUrlSync）
+ *
+ * 将 ProTable 的查询/排序/分页状态同步到 URL 参数中，
+ * 支持刷新/分享时恢复表格状态：
+ * - 双向同步：URL → store（初始化读取）、store → URL（变更写入）
+ * - 自定义前缀/包含/排除参数
+ * - 支持 replace 和 push 两种写入模式
+ */
+/**
+ * URL 参数同步 Hook（useUrlSync）
+ *
+ * 将 ProTable 的查询/排序/分页状态同步到 URL 参数中：
+ * - 初始化时从 URL 读取并还原状态
+ * - 状态变化时自动更新 URL（支持 replace 和 push 模式）
+ * - 刷新/分享链接可恢复表格状态
+ *
+ * 同步范畴：
+ * - 查询参数（query）→ URL params
+ * - 排序字段/方向（sorter）→ URL sortField/sortOrder
+ * - 分页（pagination）→ URL current/pageSize
+ * - 筛选条件（filters）→ URL filters
+ */
 import { useEffect, useCallback, useRef } from 'react';
 import type { DataStoreImpl } from '../store/DataStore';
 

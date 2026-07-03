@@ -1,3 +1,11 @@
+/**
+ * BatchOperation — 批量操作栏
+ *
+ * 在表格顶部（或底部）显示已选行数和批量操作按钮：
+ * - 显示已选行数
+ * - 清空选择
+ * - 绑定工具栏中的批量操作按钮配置
+ */
 import React from 'react';
 import { Space, Button, Alert } from '@arco-design/web-react';
 import { useDataContext, useRootContext } from '../context';

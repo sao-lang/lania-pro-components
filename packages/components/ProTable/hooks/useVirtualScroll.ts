@@ -1,3 +1,22 @@
+/**
+ * 虚拟滚动 Hook（ProTable 版本）
+ *
+ * 为 ProTable 的大数据量表格提供虚拟滚动优化：
+ * - 固定高度虚拟滚动
+ * - 可配置每项高度和视口外渲染数
+ * - 滚动到指定行（scrollToIndex）
+ * - 与 ProTable 的 DataStore 和 TableRenderer 配合使用
+ */
+/**
+ * 虚拟滚动 Hook（ProTable 版本）
+ *
+ * 为 ProTable 的大数据量场景提供虚拟滚动优化：
+ * - 只渲染可视区域内的少量行，通过 translateY 模拟滚动效果
+ * - 固定高度模式，计算简单性能好
+ * - 可配置每项高度（itemHeight）和视口外预留行数（overscan）
+ * - 提供 scrollToIndex 支持编程式滚动
+ * - 与 ProTable 的 TableRenderer 配合使用
+ */
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 
 /**

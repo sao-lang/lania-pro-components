@@ -1,3 +1,10 @@
+/**
+ * 删除按钮组件
+ *
+ * 封装了"点击按钮 → 弹出二次确认弹窗 → 执行删除"的完整交互流程。
+ * 支持自定义确认文案、按钮文本，删除过程中显示 loading 状态。
+ * 可通过 ref.openConfirm() 进行命令式调用。
+ */
 import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconDelete } from '@arco-design/web-react/icon';

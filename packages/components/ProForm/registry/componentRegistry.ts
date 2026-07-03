@@ -1,3 +1,16 @@
+/**
+ * 组件注册表
+ *
+ * 提供表单组件的注册与查找机制，支持动态扩展表单控件。
+ *
+ * 快捷组件语法（parseQuickComponent）：
+ * - "${Input}元" → 带后缀"元"的 Input
+ * - "￥${InputNumber}" → 带前缀"￥"的 InputNumber
+ * - "QuickName" → 已注册的快捷组件配置
+ *
+ * 这种语法使 Schema 中的 component 字段可以简洁地表达带前缀/后缀的组件，
+ * 而无需指定完整的 componentProps。
+ */
 import React from 'react';
 import type { ComponentRegistry, QuickComponentConfig } from '../types';
 

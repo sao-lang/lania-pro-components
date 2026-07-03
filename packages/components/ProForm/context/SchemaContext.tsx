@@ -1,3 +1,15 @@
+/**
+ * Schema 上下文（SchemaContext）
+ *
+ * 向当前字段的子组件暴露 Schema 配置信息，包括：
+ * - 字段名称 / 标签
+ * - 组件类型 / 组件属性
+ * - 验证规则 / 行为配置 / 联动规则
+ * - 生命周期配置
+ * - 只读渲染模式 / 配置
+ *
+ * 子组件通过 useSchemaContext() 获取这些配置。
+ */
 import React, { createContext, useContext, ReactNode } from 'react';
 import type { FieldBehavior, FieldReaction, FieldLifecycle, ReadonlyRenderConfig, ValidationRule } from '../types';
 

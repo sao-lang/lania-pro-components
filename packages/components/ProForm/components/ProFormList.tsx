@@ -1,3 +1,32 @@
+/**
+ * 动态列表表单（ProFormList）
+ *
+ * 支持动态增删行的数组表单组件。适用于：
+ * - 动态联系方式
+ * - 多项地址输入
+ * - 子表单列表
+ *
+ * 特性：
+ * - 动态添加/删除行
+ * - 最小/最大行数限制
+ * - 卡片模式（每行用 Card 包裹）
+ * - 自定义行标题
+ * - 每行独立的字段 Schema
+ *
+ * @example
+ * ```tsx
+ * <ProFormList
+ *   name="contacts"
+ *   label="联系人"
+ *   schemas={[
+ *     { name: 'name', label: '姓名', component: 'Input' },
+ *     { name: 'phone', label: '电话', component: 'PhoneInput' },
+ *   ]}
+ *   min={1}
+ *   max={5}
+ * />
+ * ```
+ */
 import React, { FC, useCallback, useMemo } from 'react';
 import { Button, Card } from '@arco-design/web-react';
 import { IconPlus, IconDelete } from '@arco-design/web-react/icon';

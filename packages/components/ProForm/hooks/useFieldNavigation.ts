@@ -1,3 +1,12 @@
+/**
+ * 字段键盘导航 Hook
+ *
+ * 管理表单字段的键盘导航行为：
+ * - Tab/Shift+Tab 切换字段（tabBehavior: 'next' 模式）
+ * - 上下箭头切换字段（arrowKeyNavigation）
+ * - 自动聚焦首个字段（autoFocusFirstField）
+ * - 字段聚焦/失焦的注册与通知
+ */
 /* eslint-disable max-lines-per-function */
 import React, { useRef, useCallback, useEffect } from 'react';
 import type { KeyboardNavigationConfig } from '../types';

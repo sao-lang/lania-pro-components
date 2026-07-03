@@ -1,3 +1,30 @@
+/**
+ * 分步表单（ProFormSteps）
+ *
+ * 将复杂表单拆分为多个步骤，引导用户逐步完成填写。
+ * 每步可以配置独立的 Schema 和标题。
+ *
+ * 特性：
+ * - 步骤导航（Steps 组件）
+ * - 上一步/下一步切换
+ * - 支持步骤验证（validateOnNext）
+ * - 命令式步骤控制（prev / next / goTo）
+ * - 横向/垂直布局
+ *
+ * @example
+ * ```tsx
+ * <ProForm
+ *   schemas={[...]}
+ * >
+ *   <ProFormSteps
+ *     steps={[
+ *       { title: '基本信息', schemas: [basicSchemas] },
+ *       { title: '联系方式', schemas: [contactSchemas] },
+ *     ]}
+ *   />
+ * </ProForm>
+ * ```
+ */
 import React, { FC, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Steps, Button, Space } from '@arco-design/web-react';
 import { ProForm } from '../index';

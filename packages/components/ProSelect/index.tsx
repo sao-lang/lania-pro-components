@@ -1,3 +1,32 @@
+/**
+ * ProSelect 组件 — 增强版选择器组件
+ *
+ * 基于 Arco Design Select 封装的高级选择器组件，支持以下特性：
+ * - 远程数据请求（request + 分页加载）
+ * - 本地搜索（带防抖延迟）
+ * - 自定义字段映射（fieldNames）
+ * - 选项分组渲染
+ * - 全选/取消全选（多选模式）
+ * - 标签模式（tagMode）
+ * - 虚拟滚动（大数据量优化）
+ * - 动态创建选项（allowCreate + validateCreate）
+ * - 自定义选项渲染（optionRender）/ 空状态（emptyRender）
+ * - 下拉框头部/底部自定义（dropdownHeader / dropdownFooter）
+ * - ref 暴露 refresh / loadMore / selectAll / create 等方法
+ *
+ * @example
+ * ```tsx
+ * // 远程搜索分页
+ * <ProSelect
+ *   search
+ *   pagination
+ *   request={async ({ keyword, page, pageSize }) => {
+ *     const res = await fetchData({ keyword, page, pageSize });
+ *     return { data: res.list, total: res.total };
+ *   }}
+ * />
+ * ```
+ */
 import React, { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Select, Spin, Empty, Tag, Checkbox } from '@arco-design/web-react';
 import type { ProSelectProps, ProSelectInstance, ProSelectOption, ProSelectRequestResult, SelectProps } from './types';

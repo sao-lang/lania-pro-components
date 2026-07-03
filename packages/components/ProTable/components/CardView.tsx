@@ -1,3 +1,12 @@
+/**
+ * CardView — 卡片视图组件
+ *
+ * 将表格数据以卡片形式展示，适用于移动端或内容展示场景：
+ * - 支持多种卡片布局（Grid 网格 / List 列表）
+ * - 自定义卡片渲染
+ * - 支持选择模式
+ * - 与表格视图共享数据源和选中状态
+ */
 import React, { useMemo } from 'react';
 import { Card, Grid, Empty } from '@arco-design/web-react';
 import { IconList, IconApps } from '@arco-design/web-react/icon';

@@ -1,3 +1,14 @@
+/**
+ * 表单根上下文（RootContext）
+ *
+ * 表单最顶层的上下文，存储表单核心引用：
+ * - instance: ProFormInstance（对外暴露的实例 API）
+ * - arcoForm: Arco Design Form 实例
+ * - onValuesChange: 值变化回调
+ * - formState: 表单状态（draft / readonly 等）
+ *
+ * 所有表单子组件通过 useRootContext() 获取根上下文。
+ */
 import React, { createContext, useContext, ReactNode } from 'react';
 import type { FormStatus, ProFormInstance } from '../types';
 import type { ArcoFormInstance } from '../hooks/useArcoForm';

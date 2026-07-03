@@ -1,3 +1,12 @@
+/**
+ * 导出按钮组件
+ *
+ * 封装了"点击按钮 → 导出数据"的完整交互流程。
+ * 支持两种导出模式：
+ * 1. 通过 exportUrl 发起 GET 请求下载文件（默认实现，支持超时控制）
+ * 2. 通过 onExport 自定义导出逻辑（如前端生成 Excel）
+ * 可通过 ref.export() 进行命令式调用。
+ */
 import React, { useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@arco-design/web-react';
 import { IconDownload } from '@arco-design/web-react/icon';

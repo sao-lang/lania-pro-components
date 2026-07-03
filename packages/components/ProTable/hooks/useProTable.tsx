@@ -1,3 +1,23 @@
+/**
+ * useProTable — 编程式表格控制 Hook
+ *
+ * 提供 ref 替代方案的编程式表格控制方式：
+ * 1. 声明式：直接传入 schemas 和 onFinish 等配置
+ * 2. 命令式：通过返回的 dialog / form / table 实例控制
+ *
+ * @example
+ * ```tsx
+ * const MyComponent = () => {
+ *   const { open, bindingProps } = useProTable({ columns: [...] });
+ *   return (
+ *     <>
+ *       <Button onClick={() => open()}>打开弹窗</Button>
+ *       <ProTable {...bindingProps} />
+ *     </>
+ *   );
+ * };
+ * ```
+ */
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 import { useRef, useImperativeHandle, useCallback, useMemo, useState, createContext, useContext } from 'react';

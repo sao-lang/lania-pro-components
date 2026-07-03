@@ -1,3 +1,14 @@
+/**
+ * 布局上下文（LayoutContext）
+ *
+ * 向表单子组件传递布局配置，如列数（columns）、标签列宽度（labelCol）、
+ * 内容列宽度（wrapperCol）、间距（gutter）等。
+ *
+ * 布局配置可以：
+ * - 在表单级别全局设置
+ * - 在 Schema 级别按字段覆盖
+ * - 在 FormField 内合并使用
+ */
 import React, { createContext, useContext, ReactNode } from 'react';
 import type { ColProps } from '@arco-design/web-react/lib/Grid';
 

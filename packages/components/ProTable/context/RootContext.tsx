@@ -1,3 +1,9 @@
+/**
+ * RootContext — 表格根上下文（全局配置层）
+ *
+ * 存储 ProTable 的全局配置（props、rowKey、事件回调等）。
+ * 是所有子 Context 的数据来源，子组件通过 useRootContext() 获取。
+ */
 import React, { createContext, useContext, useCallback } from 'react';
 import type { ProTableProps } from '../types';
 

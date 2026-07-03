@@ -1,3 +1,12 @@
+/**
+ * 可编辑表格类型定义
+ *
+ * 定义可编辑表格的配置、行状态和实例接口。
+ * - EditableConfig: 编辑模式配置（单行/多行、编辑行、验证等）
+ * - EditableRowState: 当前行的编辑状态
+ * - EditableTableInstance: 可编辑表格的命令式控制实例
+ * - EditableCellConfig: 可编辑单元格的配置
+ */
 /* eslint-disable @typescript-eslint/no-invalid-void-type */
 import type { ReactNode } from 'react';
 

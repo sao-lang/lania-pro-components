@@ -1,3 +1,13 @@
+/**
+ * 虚拟滚动 Hook
+ *
+ * 为大数据量表单提供虚拟滚动性能优化：
+ * - useVirtualScroll: 固定高度列表的虚拟滚动
+ * - useDynamicVirtualScroll: 动态高度列表的虚拟滚动（通过测量机制）
+ *
+ * 原理：只渲染可视区域内的列表项，通过 translateY 模拟滚动效果，
+ * 显著减少 DOM 节点数量，提升渲染性能。
+ */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 /**
