@@ -17,7 +17,7 @@
  * - ⭐ 分页自动调整（删除最后一条数据时自动回退）
  * - DataStore 订阅自动触发请求
  * - 缓存集成（cache + cacheKey）
- * - window 'protable:reload' 事件监听
+ * - store.onReload 注册（架构债务 #1/#7：替代 window.dispatchEvent 全局广播）
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { createRequestEngine } from './RequestEngine';
@@ -28,8 +28,9 @@ import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState } from '../store/types';
 import type { UseCacheReturn } from '@lania-pro-components/shared';
 
-export interface UseRequestOptions<T extends Record<string, unknown> = Record<string, unknown>>
-  extends RequestEngineOptions<T> {
+export interface UseRequestOptions<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> extends RequestEngineOptions<T> {
   /** DataStore 实例 */
   store: DataStoreImpl<T>;
   /** 是否手动触发（默认 false，自动触发首次请求） */
@@ -266,12 +267,12 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     };
   }, [manual, engineOptions.request, store, fetchData, debouncedFetchData, cancelRequest, stopPolling]);
 
-  // ===== 监听 'protable:reload' CustomEvent =====
+  // ===== 注册 store.onReload（替代 window.dispatchEvent 全局广播，架构债务 #1/#7） =====
+  // 通过 DataStore 实例级回调注册，消除多实例冲突和全局耦合
   useEffect(() => {
-    const handleReload = () => void fetchData();
-    window.addEventListener('protable:reload', handleReload);
-    return () => window.removeEventListener('protable:reload', handleReload);
-  }, [fetchData]);
+    const unregister = store.onReload(fetchData);
+    return () => unregister();
+  }, [store, fetchData]);
 
   return {
     fetchData,

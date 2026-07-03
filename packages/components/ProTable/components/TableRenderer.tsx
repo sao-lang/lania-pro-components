@@ -25,7 +25,7 @@ import { Table, Spin, ConfigProvider, Empty } from '@arco-design/web-react';
 import type { TableProps, PaginationProps } from '@arco-design/web-react';
 import { useDataContext, useColumnContext, useRootContext } from '../context';
 import { convertColumns } from '../utils/columnRender';
-import { SkeletonTable } from '../components';
+import { SkeletonTable } from './SkeletonTable';
 import type { ProTableRowSelectionConfig, ProTableNEventHandlers, ProTableProps, ProColumnType } from '../types';
 import type { TableColumnProps } from '@arco-design/web-react';
 import { getCellMergeProps } from '../utils/cellMerge';

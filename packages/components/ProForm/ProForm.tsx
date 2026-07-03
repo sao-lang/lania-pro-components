@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, u
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
 import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions } from './types';
 import { useProForm } from './useProForm';
-import { FormField } from './FormField';
+import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
 import { useVirtualScroll } from '@lania-pro-components/shared';
 import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';

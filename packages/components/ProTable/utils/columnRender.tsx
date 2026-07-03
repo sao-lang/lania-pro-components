@@ -60,7 +60,7 @@ import type {
   ProTableNEventHandlers,
   ProTableActionType,
 } from '../types';
-import { OprActionButtons } from '../features/ActionButtonRenderer';
+import { OprActionButtons } from '../components/ActionButtonRenderer';
 import type { OprActionButtonConfig } from '../types-action-button';
 import {
   formatNumber,

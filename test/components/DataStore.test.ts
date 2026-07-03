@@ -213,13 +213,24 @@ describe('DataStore / reset', () => {
 });
 
 describe('DataStore / reload', () => {
-  it('reload 派发 protable:reload 事件', () => {
+  it('reload 触发已注册的回调', () => {
     const store = createDataStore();
     const handler = vi.fn();
-    window.addEventListener('protable:reload', handler);
+    const unregister = store.onReload(handler);
     store.reload();
     expect(handler).toHaveBeenCalledTimes(1);
-    window.removeEventListener('protable:reload', handler);
+    unregister();
+    store.reload();
+    expect(handler).toHaveBeenCalledTimes(1); // 取消后不再触发
+  });
+
+  it('offReload 取消注册回调', () => {
+    const store = createDataStore();
+    const handler = vi.fn();
+    store.onReload(handler);
+    store.offReload(handler);
+    store.reload();
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

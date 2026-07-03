@@ -18,10 +18,17 @@ type StateChangeListener<T> = (state: DataStoreState<T>, prevState: DataStoreSta
 /**
  * DataStore 类
  * 基于 createStore 实现状态管理
+ *
+ * === 架构债务修复 #1 / #7 ===
+ * reload() 不再使用 window.dispatchEvent('protable:reload') 全局广播，
+ * 改为通过 onReload/offReload 注册实例级回调，消除多实例冲突和全局耦合。
  */
 class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<T> {
   /** 底层 Store 实例 */
   private store: Store<DataStoreState<T>>;
+
+  /** reload 回调注册表（替代 window.dispatchEvent 全局广播） */
+  private reloadCallbacks = new Set<() => void>();
 
   /** 初始值（用于 reset） */
   private _initialData: T[];
@@ -49,6 +56,22 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
       isPolling: false,
       pollingInterval: undefined,
     });
+  }
+
+  /**
+   * 注册 reload 回调（替代 window.addEventListener('protable:reload')）
+   * 返回取消注册函数，便于 useEffect 清理
+   */
+  onReload(callback: () => void): () => void {
+    this.reloadCallbacks.add(callback);
+    return () => this.reloadCallbacks.delete(callback);
+  }
+
+  /**
+   * 取消注册 reload 回调
+   */
+  offReload(callback: () => void): void {
+    this.reloadCallbacks.delete(callback);
   }
 
   /**
@@ -147,8 +170,8 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
   // ==================== 批量操作 ====================
 
   reload(): void {
-    const event = new CustomEvent('protable:reload', { detail: this.store.getState() });
-    window.dispatchEvent(event);
+    // 遍历所有注册的 reload 回调（替代 window.dispatchEvent 全局广播）
+    this.reloadCallbacks.forEach((cb) => cb());
   }
 
   reset(): void {

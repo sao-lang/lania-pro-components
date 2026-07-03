@@ -31,7 +31,7 @@ import React, { FC, useCallback, useMemo } from 'react';
 import { Button, Card } from '@arco-design/web-react';
 import { IconPlus, IconDelete } from '@arco-design/web-react/icon';
 import { useRootContext } from '../context/RootContext';
-import { FormField } from '../FormField';
+import { FormField } from '../components/FormField';
 import { useProFormContext } from '../useProForm';
 
 import type { ProFormListProps } from './types';

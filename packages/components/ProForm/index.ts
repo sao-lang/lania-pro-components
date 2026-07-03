@@ -57,7 +57,7 @@ export type {
 
 // 核心组件
 export { ProForm } from './ProForm';
-export { FormField } from './FormField';
+export { FormField } from './components/FormField';
 
 // Hook
 export { useProForm, useProFormContext, ProFormContext } from './useProForm';
