@@ -15,12 +15,12 @@ const columns = [
   },
 ];
 
-export default () => (
+export const Demo1 = () => (
   <ProTable
     columns={columns}
     request={() =>
       Promise.resolve({
-        list: [
+        data: [
           { id: 1, name: '张三', age: 25, email: 'zhangsan@example.com' },
           { id: 2, name: '李四', age: 30, email: 'lisi@example.com' },
         ],
@@ -30,3 +30,4 @@ export default () => (
   />
 );
 
+export default Demo1;

@@ -6,11 +6,5 @@ const options = [
   { value: 'c', label: '选项 C' },
 ];
 
-export default () => (
-  <ProSelect
-    options={options}
-    multiple
-    placeholder="请选择多个选项"
-  />
-);
-
+export const Demo3 = () => <ProSelect options={options} mode='multiple' placeholder='请选择多个选项' />;
+export default Demo3;

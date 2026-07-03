@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ImportButton, type ImportButtonRef } from '@lania-pro-components/components';
 import { Button, Message, Space } from '@arco-design/web-react';
 
-export default function Demo10() {
+export const Demo10 = () => {
   const importRef = useRef<ImportButtonRef>(null);
   const [successCount, setSuccessCount] = useState(0);
 
@@ -33,4 +33,6 @@ export default function Demo10() {
       <div>成功导入次数：{successCount}</div>
     </Space>
   );
-}
+};
+
+export default Demo10;

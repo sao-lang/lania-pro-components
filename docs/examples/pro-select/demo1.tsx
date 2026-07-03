@@ -6,11 +6,8 @@ const options = [
   { value: 'option3', label: '选项三' },
 ];
 
-export default () => (
-  <ProSelect
-    options={options}
-    placeholder="请选择"
-    onChange={(value) => console.log('选中:', value)}
-  />
+const Demo = () => (
+  <ProSelect options={options} placeholder='请选择' onChange={(value) => console.log('选中:', value)} />
 );
 
+export default Demo;

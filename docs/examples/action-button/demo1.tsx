@@ -8,7 +8,7 @@ const userSchemas = [
   { name: 'email', label: '邮箱', component: 'Input', required: true },
 ];
 
-export default () => (
+export const Demo1 = () => (
   <div style={{ display: 'flex', gap: '8px' }}>
     <AddButton
       title='新增用户'
@@ -44,3 +44,5 @@ export default () => (
     />
   </div>
 );
+
+export default Demo1;

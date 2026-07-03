@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ExportButton, type ExportButtonRef } from '@lania-pro-components/components';
 import { Button, Message, Space } from '@arco-design/web-react';
 
-export default function Demo9() {
+export const Demo9 = () => {
   const exportRef = useRef<ExportButtonRef>(null);
   const [count, setCount] = useState(0);
 
@@ -36,4 +36,6 @@ export default function Demo9() {
       <div>loading 状态：{exportRef.current?.loading ? '加载中' : '空闲'}</div>
     </Space>
   );
-}
+};
+
+export default Demo9;

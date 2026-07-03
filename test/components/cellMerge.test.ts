@@ -5,8 +5,8 @@ import {
   combineMerge,
   calculateMergeState,
   getCellMergeProps,
-} from '../ProTable/utils/cellMerge';
-import type { ProColumnType } from '../ProTable/types';
+} from '../../packages/components/ProTable/utils/cellMerge';
+import type { ProColumnType } from '../../packages/components/ProTable/types';
 
 interface RecordT {
   category: string;

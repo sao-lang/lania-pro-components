@@ -3,21 +3,21 @@ import { ProForm } from '@lania-pro-components/components';
 const schema = [
   {
     type: 'input',
-    field: 'name',
+    name: 'name',
     label: '姓名',
     required: true,
     placeholder: '请输入姓名',
   },
   {
     type: 'input',
-    field: 'email',
+    name: 'email',
     label: '邮箱',
     required: true,
     placeholder: '请输入邮箱',
   },
   {
     type: 'select',
-    field: 'gender',
+    name: 'gender',
     label: '性别',
     required: true,
     options: [
@@ -27,12 +27,13 @@ const schema = [
   },
 ];
 
-export default () => (
+export const Demo1 = () => (
   <ProForm
-    schema={schema}
-    onSubmit={(values) => {
+    schemas={schema}
+    onFinish={(values) => {
       console.log('表单值:', values);
     }}
   />
 );
 
+export default Demo1;

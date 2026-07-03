@@ -72,18 +72,27 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
     defaultValue,
     onChange,
     onVisibleChange,
+    placeholder,
     ...restProps
   } = props;
+
+  // When allowCreate is enabled, search must be active so the user can type to create options
+  const effectiveSearch = search || allowCreate;
+
   const [optionsState, setOptionsState] = useState<ProSelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [pageNum, setPageNum] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [innerValue, setInnerValue] = useState<SelectProps['value']>(defaultValue || (mode === 'multiple' ? [] : ''));
+  const [innerValue, setInnerValue] = useState<SelectProps['value']>(
+    defaultValue !== undefined ? defaultValue : mode === 'multiple' ? [] : undefined,
+  );
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstLoadRef = useRef(true);
   const selectRef = useRef<React.ElementRef<typeof Select>>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const isControlled = value !== undefined;
   const currentValue = isControlled ? value : innerValue;
@@ -388,19 +397,42 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
     [request, optionsState.length, fetchData, onVisibleChange],
   );
 
-  const handlePopupScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (!pagination) {
-        return;
-      }
+  // Use IntersectionObserver on a sentinel element to detect when the user
+  // scrolls near the bottom and trigger loadMore. This works for both normal
+  // pagination scroll (on the wrapper div) and virtual scroll (where the
+  // virtual list has its own internal scroll container).
+  useEffect(() => {
+    if (!pagination || !dropdownOpen) {
+      return;
+    }
 
-      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-      if (scrollHeight - scrollTop - clientHeight < 50) {
-        void loadMore();
-      }
-    },
-    [pagination, loadMore],
-  );
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    const sentinel = sentinelRef.current;
+    if (!sentinel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          void loadMore();
+        }
+      },
+      {
+        rootMargin: '100px 0px 0px 0px',
+      },
+    );
+
+    observer.observe(sentinel);
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [pagination, dropdownOpen, hasMore, loading, loadMore]);
 
   useEffect(
     () => () => {
@@ -513,7 +545,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
 
   const dropdownRender = useCallback(
     (menu: React.ReactNode) => (
-      <div onScroll={handlePopupScroll}>
+      <div style={virtual ? undefined : { maxHeight: 300, overflowY: 'auto' }}>
         {dropdownHeader}
         {showSelectAll && mode === 'multiple' && optionsState.length > 0 && (
           <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
@@ -543,6 +575,8 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
           </div>
         )}
         {menu}
+        {/* Sentinel element for IntersectionObserver to detect when user scrolls near the bottom */}
+        {pagination && hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
         {pagination && loading && dropdownOpen && (
           <div style={{ padding: '8px 0', textAlign: 'center' }}>
             <Spin size={14} />
@@ -564,7 +598,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       </div>
     ),
     [
-      handlePopupScroll,
+      virtual,
       dropdownHeader,
       showSelectAll,
       mode,
@@ -603,13 +637,15 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       mode={mode}
       value={currentValue}
       onChange={handleChange}
-      showSearch={search}
-      onSearch={search ? handleSearch : undefined}
+      showSearch={effectiveSearch}
+      placeholder={placeholder}
+      onSearch={effectiveSearch ? handleSearch : undefined}
       onVisibleChange={handleDropdownVisibleChange}
       dropdownRender={dropdownRender}
       notFoundContent={renderNotFoundContent}
       renderTag={(tagMode && mode === 'multiple' ? renderTag : undefined) as SelectProps['renderTag']}
       maxTagCount={maxTagCount}
+      filterOption={request ? false : undefined}
       virtualListProps={
         virtual
           ? {

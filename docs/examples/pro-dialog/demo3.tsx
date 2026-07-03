@@ -1,11 +1,9 @@
-import { useProDialog } from '@lania-pro-components/components';
+import { Modal } from '@arco-design/web-react';
 import { Button } from '@arco-design/web-react';
 
-export default () => {
-  const { confirm } = useProDialog();
-
+export const Demo3 = () => {
   const handleConfirm = () => {
-    confirm({
+    Modal.confirm({
       title: '确认删除',
       content: '确定要删除这条记录吗？',
       onOk: () => {
@@ -14,6 +12,11 @@ export default () => {
     });
   };
 
-  return <Button type="danger" onClick={handleConfirm}>删除</Button>;
+  return (
+    <Button status='danger' onClick={handleConfirm}>
+      删除
+    </Button>
+  );
 };
 
+export default Demo3;

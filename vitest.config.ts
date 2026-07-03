@@ -19,7 +19,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['packages/components/__tests__/**/*.{test,spec}.{ts,tsx}'],
+    include: ['test/**/*.{test,spec}.{ts,tsx}', 'packages/components/test/**/*.{test,spec}.{ts,tsx}', 'packages/components/*/test/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', '**/dist/**', 'docs', '.vitepress'],
     css: {
       // Arco Design 会引入大量 CSS，测试时不需要真实样式

@@ -4,40 +4,32 @@ const columns = [
   {
     title: '姓名',
     dataIndex: 'name',
+    search: {},
   },
   {
     title: '状态',
     dataIndex: 'status',
+    valueType: 'select',
+    search: {
+      options: [
+        { value: 'active', label: '活跃' },
+        { value: 'inactive', label: '不活跃' },
+      ],
+    },
   },
 ];
 
-const searchSchema = [
-  {
-    type: 'input',
-    field: 'name',
-    label: '姓名',
-  },
-  {
-    type: 'select',
-    field: 'status',
-    label: '状态',
-    options: [
-      { value: 'active', label: '活跃' },
-      { value: 'inactive', label: '不活跃' },
-    ],
-  },
-];
-
-export default () => (
+export const Demo3 = () => (
   <ProTable
     columns={columns}
-    searchSchema={searchSchema}
-    request={(params) =>
+    search={{}}
+    request={(_params) =>
       Promise.resolve({
-        list: [],
+        data: [],
         total: 0,
       })
     }
   />
 );
 
+export default Demo3;

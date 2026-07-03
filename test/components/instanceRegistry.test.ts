@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { instanceRegistry, getProDialogInstance } from '../ProDialog/instanceRegistry';
-import type { ProDialogInstance } from '../ProDialog/types';
+import { instanceRegistry, getProDialogInstance } from '../../packages/components/ProDialog/instanceRegistry';
+import type { ProDialogInstance } from '../../packages/components/ProDialog/types';
 
 /** 创建一个最小化的 ProDialogInstance mock */
 function createMockInstance(name: string): ProDialogInstance {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSizeWidth, getFooterJustify } from '../ProDialog/utils';
+import { getSizeWidth, getFooterJustify } from '../../packages/components/ProDialog/utils';
 import { deepMerge } from '@lania-pro-components/utils';
 
 describe('ProDialog/utils / getSizeWidth', () => {

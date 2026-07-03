@@ -11,13 +11,13 @@ const columns = [
   },
 ];
 
-export default () => {
-  const { tableProps, Provider } = useProTable({
+export const Demo2 = () => {
+  const { bindingProps, Provider } = useProTable({
     columns,
-    request: async ({ page, search }) => {
-      console.log('请求参数:', { page, search });
+    request: async ({ current, pageSize, params }) => {
+      console.log('请求参数:', { current, pageSize, params });
       return {
-        list: [
+        data: [
           { id: 1, name: '王五', department: '研发部' },
           { id: 2, name: '赵六', department: '产品部' },
         ],
@@ -28,8 +28,9 @@ export default () => {
 
   return (
     <Provider>
-      <ProTable {...tableProps} />
+      <ProTable {...bindingProps} />
     </Provider>
   );
 };
 
+export default Demo2;

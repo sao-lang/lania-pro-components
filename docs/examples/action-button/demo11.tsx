@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { JumpButton, type JumpButtonRef } from '@lania-pro-components/components';
 import { Button, Message, Space } from '@arco-design/web-react';
 
-export default function Demo11() {
+export const Demo11 = () => {
   const jumpRef = useRef<JumpButtonRef>(null);
 
   return (
@@ -31,4 +31,6 @@ export default function Demo11() {
       <JumpButton ref={jumpRef} text='ref 绑定的跳转按钮' to='https://www.npmjs.com' target='_blank' />
     </Space>
   );
-}
+};
+
+export default Demo11;

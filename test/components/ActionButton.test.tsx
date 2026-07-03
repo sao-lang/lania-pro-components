@@ -41,18 +41,18 @@ const { ProDialog: MockedProDialog } = vi.hoisted(() => {
   return { ProDialog: Comp };
 });
 
-vi.mock('../ProDialog', () => ({
+vi.mock('../../packages/components/ProDialog', () => ({
   ProDialog: MockedProDialog,
 }));
 
-import { AddButton } from '../ActionButton/AddButton';
-import { DeleteButton } from '../ActionButton/DeleteButton';
-import { JumpButton } from '../ActionButton/JumpButton';
-import { BatchButton } from '../ActionButton/BatchButton';
-import { ExportButton } from '../ActionButton/ExportButton';
-import { ViewButton } from '../ActionButton/ViewButton';
-import { EditButton } from '../ActionButton/EditButton';
-import { ImportButton } from '../ActionButton/ImportButton';
+import { AddButton } from '../../packages/components/ActionButton/AddButton';
+import { DeleteButton } from '../../packages/components/ActionButton/DeleteButton';
+import { JumpButton } from '../../packages/components/ActionButton/JumpButton';
+import { BatchButton } from '../../packages/components/ActionButton/BatchButton';
+import { ExportButton } from '../../packages/components/ActionButton/ExportButton';
+import { ViewButton } from '../../packages/components/ActionButton/ViewButton';
+import { EditButton } from '../../packages/components/ActionButton/EditButton';
+import { ImportButton } from '../../packages/components/ActionButton/ImportButton';
 
 describe('ActionButton / 公共行为', () => {
   beforeEach(() => {

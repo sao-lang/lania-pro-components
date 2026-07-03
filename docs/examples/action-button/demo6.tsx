@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { DeleteButton, type DeleteButtonRef } from '@lania-pro-components/components';
 import { Button, Message, Space } from '@arco-design/web-react';
 
-export default () => {
+export const Demo6 = () => {
   const deleteRef = useRef<DeleteButtonRef>(null);
   const [deleted, setDeleted] = useState(false);
   const [item] = useState({ id: 1, name: '用户A' });
@@ -33,3 +33,5 @@ export default () => {
     </Space>
   );
 };
+
+export default Demo6;

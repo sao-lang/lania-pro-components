@@ -19,7 +19,7 @@ const userSchemas = [
   { name: 'age', label: '年龄', component: 'InputNumber' },
 ];
 
-export default function Demo4() {
+export const Demo4 = () => {
   const addButtonRef = useRef<AddButtonRef>(null);
   const [count, setCount] = useState(0);
 
@@ -51,4 +51,6 @@ export default function Demo4() {
       <div>新增次数：{count}</div>
     </Space>
   );
-}
+};
+
+export default Demo4;

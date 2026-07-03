@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  getNestedValue,
-  formatNumber,
-  formatMoney,
-  formatPercent,
-  formatDate,
-} from '@lania-pro-components/utils';
+import { getNestedValue, formatNumber, formatMoney, formatPercent, formatDate } from '@lania-pro-components/utils';
 import {
   registerCellRenderer,
   unregisterCellRenderer,
@@ -13,7 +7,7 @@ import {
   getCellRenderer,
   hasCellRenderer,
   customRendererRegistry,
-} from '../ProTable/utils/columnRender';
+} from '../../packages/components/ProTable/utils/columnRender';
 
 describe('columnRender / getNestedValue', () => {
   it('支持点号分隔的字符串路径', () => {

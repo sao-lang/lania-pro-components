@@ -14,7 +14,7 @@ const dataSource: Row[] = [
   { id: 3, name: '王五', email: 'wangwu@example.com' },
 ];
 
-export default () => {
+export const Demo8 = () => {
   const batchRef = useRef<BatchButtonRef>(null);
   const [selectedKeys, setSelectedKeys] = useState<(string | number)[]>([1, 2]);
   const [selectedRows, setSelectedRows] = useState<Row[]>(dataSource.filter((r) => selectedKeys.includes(r.id)));
@@ -91,3 +91,5 @@ export default () => {
     </Space>
   );
 };
+
+export default Demo8;

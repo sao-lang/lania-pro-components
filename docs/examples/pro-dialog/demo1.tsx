@@ -2,7 +2,7 @@ import { ProDialog } from '@lania-pro-components/components';
 import { Button } from '@arco-design/web-react';
 import { useState } from 'react';
 
-export default () => {
+export const Demo1 = () => {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -10,7 +10,7 @@ export default () => {
       <Button onClick={() => setVisible(true)}>打开弹窗</Button>
       <ProDialog
         visible={visible}
-        title="示例弹窗"
+        title='示例弹窗'
         onCancel={() => setVisible(false)}
         onOk={() => {
           setVisible(false);
@@ -22,4 +22,4 @@ export default () => {
     </div>
   );
 };
-
+export default Demo1;

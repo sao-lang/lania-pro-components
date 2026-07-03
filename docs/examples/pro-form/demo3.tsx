@@ -3,18 +3,12 @@ import { Input } from '@arco-design/web-react';
 
 const schema = [
   {
-    type: 'input',
-    field: 'custom',
+    name: 'custom',
     label: '自定义输入',
-    render: ({ field }) => (
-      <Input
-        {...field}
-        prefix="¥"
-        placeholder="请输入金额"
-      />
-    ),
+    render: ({ field }: { field: Record<string, unknown> }) => <Input {...field} prefix='¥' placeholder='请输入金额' />,
   },
 ];
 
-export default () => <ProForm schema={schema} />;
+export const Demo3 = () => <ProForm schemas={schema} />;
 
+export default Demo3;

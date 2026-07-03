@@ -1,7 +1,7 @@
 import { JumpButton } from '@lania-pro-components/components';
 import { Message } from '@arco-design/web-react';
 
-export default function Demo3() {
+export const Demo3 = () => {
   return (
     <div style={{ display: 'flex', gap: '8px' }}>
       <JumpButton
@@ -23,4 +23,6 @@ export default function Demo3() {
       />
     </div>
   );
-}
+};
+
+export default Demo3;

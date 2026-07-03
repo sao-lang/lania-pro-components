@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createDataStore, DataStoreImpl } from '../ProTable/store/DataStore';
+import { createDataStore, DataStoreImpl } from '../../packages/components/ProTable/store/DataStore';
 
 interface Row {
   id: number;

@@ -18,7 +18,7 @@ const userSchemas = [
   },
 ];
 
-export default function Demo5() {
+export const Demo5 = () => {
   const editRef = useRef<EditButtonRef>(null);
   const [record, setRecord] = useState({ id: 1, name: '张三', email: 'a@b.com', role: 'admin' });
 
@@ -52,4 +52,6 @@ export default function Demo5() {
       </div>
     </Space>
   );
-}
+};
+
+export default Demo5;
