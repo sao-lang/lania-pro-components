@@ -73,6 +73,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
     onChange,
     onVisibleChange,
     placeholder,
+    createdOptionPrefix,
     ...restProps
   } = props;
 
@@ -498,9 +499,13 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
     });
 
     if (allowCreate && keyword.trim() && !optionsState.some((opt) => opt.value === keyword.trim())) {
+      const prefix =
+        typeof createdOptionPrefix === 'function'
+          ? createdOptionPrefix({ label: keyword, value: keyword })
+          : createdOptionPrefix;
       result.push(
         <Select.Option key={'__create__'} value={keyword.trim()}>
-          <span style={{ color: '#165dff' }}>+ 创建 {'"'.concat(keyword.trim(), '"')}</span>
+          <span style={{ color: '#165dff' }}>{prefix + '"'.concat(keyword.trim(), '"')}</span>
         </Select.Option>,
       );
     }
@@ -548,7 +553,7 @@ const ProSelectComponent = forwardRef<ProSelectInstance, ProSelectProps>((props:
       <div style={virtual ? undefined : { maxHeight: 300, overflowY: 'auto' }}>
         {dropdownHeader}
         {showSelectAll && mode === 'multiple' && optionsState.length > 0 && (
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+          <div style={{ padding: '8px 7px', borderBottom: '1px solid #f0f0f0' }}>
             <Checkbox
               checked={
                 Array.isArray(currentValue) &&

@@ -246,6 +246,7 @@ export interface ProSelectProps extends Omit<SelectProps, 'options' | 'onSearch'
    * @returns 选项数据
    */
   formatCreateOption?: (inputValue: string) => ProSelectOption;
+  createdOptionPrefix: ((newOption: ProSelectOption) => ReactNode) | ReactNode;
   /**
    * 自定义下拉框头部
    */
