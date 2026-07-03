@@ -19,6 +19,10 @@ const components = [
   { name: 'ProTable', ext: 'tsx' },
   { name: 'ProSelect', ext: 'tsx' },
   { name: 'ProUpload', ext: 'tsx' },
+  { name: 'ProLayout', ext: 'tsx' },
+  { name: 'ProQueryForm', ext: 'tsx' },
+  { name: 'ProDescriptions', ext: 'tsx' },
+  { name: 'ProChart', ext: 'tsx' },
 ];
 
 const baseConfig = {
@@ -50,7 +54,7 @@ const baseConfig = {
   ],
 };
 
-const componentConfigs = components.flatMap(component => [
+const componentConfigs = components.flatMap((component) => [
   {
     ...baseConfig,
     input: path.resolve(__dirname, `packages/components/${component.name}/index.${component.ext}`),
@@ -99,8 +103,14 @@ const themeConfig = [
       ...baseConfig.plugins,
       copy({
         targets: [
-          { src: [path.resolve(__dirname, 'packages/theme/src/light.css')], dest: path.resolve(__dirname, 'packages/theme/dist') },
-          { src: [path.resolve(__dirname, 'packages/theme/src/dark.css')], dest: path.resolve(__dirname, 'packages/theme/dist') },
+          {
+            src: [path.resolve(__dirname, 'packages/theme/src/light.css')],
+            dest: path.resolve(__dirname, 'packages/theme/dist'),
+          },
+          {
+            src: [path.resolve(__dirname, 'packages/theme/src/dark.css')],
+            dest: path.resolve(__dirname, 'packages/theme/dist'),
+          },
         ],
         flatten: true,
         verbose: true,

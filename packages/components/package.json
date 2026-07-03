@@ -41,6 +41,26 @@
       "import": "./dist/ProUpload/index.mjs",
       "require": "./dist/ProUpload/index.cjs",
       "types": "./dist/ProUpload/index.d.ts"
+    },
+    "./ProLayout": {
+      "import": "./dist/ProLayout/index.mjs",
+      "require": "./dist/ProLayout/index.cjs",
+      "types": "./dist/ProLayout/index.d.ts"
+    },
+    "./ProQueryForm": {
+      "import": "./dist/ProQueryForm/index.mjs",
+      "require": "./dist/ProQueryForm/index.cjs",
+      "types": "./dist/ProQueryForm/index.d.ts"
+    },
+    "./ProDescriptions": {
+      "import": "./dist/ProDescriptions/index.mjs",
+      "require": "./dist/ProDescriptions/index.cjs",
+      "types": "./dist/ProDescriptions/index.d.ts"
+    },
+    "./ProChart": {
+      "import": "./dist/ProChart/index.mjs",
+      "require": "./dist/ProChart/index.cjs",
+      "types": "./dist/ProChart/index.d.ts"
     }
   },
   "scripts": {
@@ -67,7 +87,8 @@
   ],
   "dependencies": {
     "@lania-pro-components/utils": "workspace:*",
-    "@lania-pro-components/shared": "workspace:*"
+    "@lania-pro-components/shared": "workspace:*",
+    "@lania-pro-components/theme": "workspace:*"
   },
   "peerDependencies": {
     "@arco-design/web-react": "^2.66.0",

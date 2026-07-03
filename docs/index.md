@@ -34,9 +34,7 @@ const schema = [
   },
 ];
 
-const App = () => (
-  <ProForm schema={schema} onSubmit={(values) => console.log(values)} />
-);
+const App = () => <ProForm schema={schema} onSubmit={(values) => console.log(values)} />;
 ```
 
 ## 组件列表
@@ -47,4 +45,8 @@ const App = () => (
 - [ProSelect](./components/pro-select) - 高级选择组件
 - [ProUpload](./components/pro-upload) - 上传组件
 - [ActionButton](./components/action-button) - 操作按钮组件
-
+- [ProLayout](./components/pro-layout) - 页面布局组件
+- [ProQueryForm](./components/pro-query-form) - 查询表单组件
+- [ProDescriptions](./components/pro-descriptions) - 详情描述组件
+- [ProChart](./components/pro-chart) - 图表组件
+- [Theme](./components/theme) - 主题系统

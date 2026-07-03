@@ -91,3 +91,60 @@ export type { ProSelectProps } from './ProSelect/types';
 
 export { ProUpload } from './ProUpload';
 export type { ProUploadProps } from './ProUpload/types';
+
+export { ProLayout, PageHeader, Content, Footer, Sider } from './ProLayout';
+export type {
+  ProLayoutProps,
+  ProLayoutMode,
+  PageHeaderConfig,
+  SiderConfig,
+  ContentConfig,
+  FooterConfig,
+  BreadcrumbItem,
+  ContentLayoutMode,
+} from './ProLayout/types';
+export { useSiderCollapsed } from './ProLayout/hooks/useSiderCollapsed';
+export type { UseSiderCollapsedOptions, UseSiderCollapsedReturn } from './ProLayout/hooks/useSiderCollapsed';
+
+export { ProQueryForm, QueryFormRenderer, SearchSchemaBar } from './ProQueryForm';
+export type {
+  ProQueryFormProps,
+  ProQueryFormInstance,
+  UrlSyncConfig,
+  SearchSchemaConfig,
+  QueryFormRendererProps,
+  SearchSchemaBarProps,
+} from './ProQueryForm';
+export {
+  valueTypeToComponent,
+  getComponentPropsByValueType,
+  convertColumnsToSearchSchema,
+  transformSearchParams,
+} from './ProQueryForm/utils';
+
+export { ProDescriptions, DescriptionCell, CopyButton, EmptyValue } from './ProDescriptions';
+export type {
+  ProDescriptionsProps,
+  ProDescriptionColumn,
+  DescriptionCellProps,
+  CopyButtonProps,
+  EmptyValueProps,
+} from './ProDescriptions';
+export { adaptColumns } from './ProDescriptions/columnAdapter';
+
+export { ProChart, ChartStatus, EChartsAdapter, setEChartsInstance } from './ProChart';
+export type {
+  ProChartProps,
+  ProChartInstance,
+  ChartSchema,
+  ChartAdapter,
+  ChartInstance,
+  ChartStatusProps,
+} from './ProChart';
+export {
+  registerChartAdapter,
+  hasChartAdapter,
+  resolveChartAdapter,
+  unregisterChartAdapter,
+} from './ProChart/chartAdapterRegistry';
+export { registerChartTransformer, getChartTransformer } from './ProChart/transformers';

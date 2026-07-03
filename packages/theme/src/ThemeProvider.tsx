@@ -34,15 +34,13 @@
  * ```
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ThemeType, ResolvedThemeType, ThemeContextValue } from './types';
+import { ThemeContext } from './ThemeContext';
 import type { ReactNode } from 'react';
 
 /** localStorage 存储键名（默认值，可通过 storageKey prop 覆盖） */
 const THEME_KEY = 'lania-pro-theme';
-
-/** 主题上下文对象，初始值为 null（Provider 外访问会报错） */
-const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
  * 获取系统当前的主题偏好
@@ -249,30 +247,4 @@ export function ThemeProvider({
   );
 
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
-}
-
-// ======================== useTheme Hook ========================
-
-/**
- * 获取当前主题上下文的 Hook
- *
- * 必须在 ThemeProvider 内部使用，否则会抛出错误。
- *
- * @returns 主题上下文值，包含当前主题状态和操作方法
- * @throws 如果在 ThemeProvider 外部调用，会抛出 Error
- *
- * @example
- * ```tsx
- * function MyComponent() {
- *   const { resolvedTheme, toggleTheme } = useTheme();
- *   return <button onClick={toggleTheme}>{resolvedTheme}</button>;
- * }
- * ```
- */
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
 }

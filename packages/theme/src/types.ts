@@ -1,7 +1,7 @@
 /**
  * 主题系统类型定义
  *
- * 定义了主题系统所需的类型，包括主题类型、上下文值等。
+ * 定义了主题系统所需的类型，包括主题类型、上下文值、设计令牌结构等。
  */
 
 /**
@@ -22,10 +22,73 @@ export type ThemeType = 'light' | 'dark' | 'system';
 export type ResolvedThemeType = 'light' | 'dark';
 
 /**
- * 主题上下文值
+ * 设计令牌（Design Tokens）完整结构
  *
- * 通过 React Context 向下传递的主题状态和操作方法。
- * 子组件通过 useTheme() 获取此对象。
+ * 主题包的核心数据模型，lightTheme / darkTheme 均实现此接口。
+ */
+export interface ThemeTokens {
+  color: {
+    bg: { 1: string; 2: string; 3: string; 4: string };
+    text: { 1: string; 2: string; 3: string; 4: string };
+    border: { 1: string; 2: string; 3: string };
+    primary: string;
+    primaryHover: string;
+    primaryActive: string;
+    primaryLight: string;
+    success: string;
+    successHover: string;
+    successActive: string;
+    successLight: string;
+    successBorder: string;
+    warning: string;
+    warningHover: string;
+    warningActive: string;
+    warningLight: string;
+    warningBorder: string;
+    danger: string;
+    dangerHover: string;
+    dangerActive: string;
+    dangerLight: string;
+    dangerBorder: string;
+    info: string;
+    infoLight: string;
+    link: string;
+    linkHover: string;
+    linkActive: string;
+    mask: string;
+    disabledBg: string;
+    disabledText: string;
+    disabledBorder: string;
+    rowHover: string;
+    rowSelected: string;
+    rowStriped: string;
+    highlight: string;
+  };
+  fontSize: { xs: string; sm: string; base: string; lg: string; xl: string; xxl: string };
+  fontFamily: { base: string; code: string; numeric: string };
+  fontWeight: { regular: number; medium: number; semibold: number; bold: number };
+  lineHeight: { tight: number; base: number; loose: number };
+  spacing: { xs: string; sm: string; md: string; lg: string; xl: string; xxl: string };
+  radius: { sm: string; md: string; lg: string; xl: string; full: string };
+  shadow: {
+    sm: string;
+    md: string;
+    lg: string;
+    xl: string;
+    dropdown: string;
+    drawer: string;
+    modal: string;
+    card: string;
+    none: string;
+  };
+  opacity: { disabled: number; loading: number; mask: number; secondary: number; placeholder: number };
+  zIndex: { dropdown: number; sticky: number; drawer: number; modal: number; message: number; tooltip: number };
+  transition: { durationFast: string; durationNormal: string; durationSlow: string; timingFunction: string };
+  breakpoint: { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number };
+}
+
+/**
+ * 主题上下文值
  */
 export interface ThemeContextValue {
   /** 当前主题设置（可能为 'system'） */

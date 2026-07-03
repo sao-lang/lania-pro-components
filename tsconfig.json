@@ -22,7 +22,9 @@
       "@lania-pro-components/shared": ["packages/shared/src"],
       "@lania-pro-components/shared/*": ["packages/shared/src/*"],
       "@lania-pro/theme": ["packages/theme"],
-      "@lania-pro/theme/*": ["packages/theme/*"]
+      "@lania-pro/theme/*": ["packages/theme/*"],
+      "@lania-pro-components/theme": ["packages/theme/src"],
+      "@lania-pro-components/theme/*": ["packages/theme/src/*"]
     },
     "skipLibCheck": true,
     "isolatedModules": true,
