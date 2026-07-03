@@ -36,6 +36,33 @@ const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm', 'mkv', 'mpe
  * isVideo('');           // false（空字符串）
  * ```
  */
+/**
+ * 根据文件 MIME 类型判断文件是否属于指定分类
+ *
+ * 在前端上传场景中，用于在文件被添加到文件列表前进行类型校验。
+ * 支持判断图片、视频或其他文件类型。
+ *
+ * @param file - 文件对象（File）
+ * @param type - 目标类型：'image' | 'video' | 'file'
+ * @returns boolean - true 表示文件类型匹配
+ *
+ * @example
+ * ```ts
+ * const file = new File([''], 'photo.jpg', { type: 'image/jpeg' });
+ * checkFileType(file, 'image'); // true
+ * checkFileType(file, 'video'); // false
+ * ```
+ */
+export const checkFileType = (file: File, type: string): boolean => {
+  if (type === 'image') {
+    return file.type.startsWith('image/');
+  }
+  if (type === 'video') {
+    return file.type.startsWith('video/');
+  }
+  return true;
+};
+
 export const isVideo = (filename: string): boolean => {
   // 空文件名直接返回 false
   if (!filename) return false;

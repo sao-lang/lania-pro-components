@@ -40,7 +40,7 @@ import {
   IconArrowDown,
 } from '@arco-design/web-react/icon';
 import type { ProUploadProps, ProUploadInstance, ProUploadFileItem, BeforeUploadResult } from './types';
-import { isVideo } from '@lania-pro-components/utils';
+import { isVideo, compressImage, checkFileType, formatFileSize } from '@lania-pro-components/utils';
 
 /**
  * 默认文件类型配置
@@ -50,84 +50,6 @@ const DEFAULT_ACCEPT_MAP: Record<string, string> = {
   video: 'video/*',
   file: '*',
 };
-
-/**
- * 检查文件类型
- */
-const checkFileType = (file: File, type: string): boolean => {
-  if (type === 'image') {
-    return file.type.startsWith('image/');
-  }
-  if (type === 'video') {
-    return file.type.startsWith('video/');
-  }
-  return true;
-};
-
-/**
- * 格式化文件大小
- */
-const formatFileSize = (size: number): string => {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(2)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-};
-
-/**
- * 图片压缩
- */
-const compressImage = (
-  file: File,
-  config: {
-    maxWidth?: number;
-    maxHeight?: number;
-    quality?: number;
-    type?: string;
-  },
-): Promise<Blob> =>
-  new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    img.onload = () => {
-      let { width, height } = img;
-      const { maxWidth, maxHeight, quality = 0.8, type = 'image/jpeg' } = config;
-
-      if (maxWidth && width > maxWidth) {
-        height = (height * maxWidth) / width;
-        width = maxWidth;
-      }
-      if (maxHeight && height > maxHeight) {
-        width = (width * maxHeight) / height;
-        height = maxHeight;
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas not supported'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Compression failed'));
-          }
-        },
-        type,
-        quality,
-      );
-    };
-    img.onerror = () => reject(new Error('Image load error'));
-    img.src = URL.createObjectURL(file);
-  });
 
 /**
  * ProUpload 组件 - 增强版上传组件

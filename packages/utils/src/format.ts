@@ -158,6 +158,33 @@ export const formatPercent = (
  * formatDate('');                                     // '-'
  * ```
  */
+/**
+ * 格式化文件大小
+ *
+ * 将字节数转换为人类可读的文件大小字符串。
+ * 支持 B、KB、MB 单位，自动根据大小选择合适的单位。
+ * 适用于文件上传组件、表格文件大小列等场景。
+ *
+ * @param size - 文件大小（字节数）
+ * @returns 格式化后的文件大小字符串
+ *
+ * @example
+ * ```ts
+ * formatFileSize(1024);        // '1.00 KB'
+ * formatFileSize(1048576);     // '1.00 MB'
+ * formatFileSize(500);         // '500 B'
+ * ```
+ */
+export const formatFileSize = (size: number): string => {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(2)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+};
+
 export const formatDate = (value: string | number | Date, format: string = 'YYYY-MM-DD'): string => {
   // 空值（null/undefined/空字符串）返回占位符
   if (!value) {

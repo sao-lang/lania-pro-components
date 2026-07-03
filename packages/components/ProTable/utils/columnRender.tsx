@@ -69,6 +69,7 @@ import {
   formatDate,
   getNestedValue,
   copyToClipboard as copyToClipboardPure,
+  getTagColor,
 } from '@lania-pro-components/utils';
 
 const { Text } = Typography;
@@ -355,68 +356,6 @@ const renderSelect = (text: unknown, column: ProColumnType): ReactNode => {
   }
 
   return text !== null && text !== undefined ? (text as ReactNode) : emptyText;
-};
-
-/**
- * 标签颜色映射表
- */
-const tagColorMap: Record<string, string> = {
-  success: 'green',
-  error: 'red',
-  warning: 'orange',
-  info: 'blue',
-  default: 'gray',
-  red: 'red',
-  orange: 'orange',
-  yellow: 'yellow',
-  green: 'green',
-  cyan: 'cyan',
-  blue: 'blue',
-  purple: 'purple',
-  pink: 'pink',
-  gray: 'gray',
-  active: 'green',
-  inactive: 'red',
-  pending: 'orange',
-  enabled: 'green',
-  disabled: 'gray',
-  online: 'green',
-  offline: 'gray',
-  running: 'green',
-  stopped: 'red',
-  completed: 'green',
-  failed: 'red',
-  processing: 'blue',
-};
-
-/**
- * 获取标签颜色
- */
-const getTagColor = (colorOrStatus?: string): string | undefined => {
-  if (!colorOrStatus) {
-    return undefined;
-  }
-
-  const validColors = [
-    'red',
-    'orangered',
-    'orange',
-    'gold',
-    'lime',
-    'green',
-    'cyan',
-    'blue',
-    'arcoblue',
-    'purple',
-    'pinkpurple',
-    'magenta',
-    'gray',
-  ];
-  if (validColors.includes(colorOrStatus)) {
-    return colorOrStatus;
-  }
-
-  return tagColorMap[colorOrStatus.toLowerCase()];
 };
 
 /**
