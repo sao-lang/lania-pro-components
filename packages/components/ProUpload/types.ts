@@ -209,11 +209,6 @@ export interface PreviewConfig {
    */
   enable?: boolean;
   /**
-   * 预览类型
-   * @default 'modal'
-   */
-  type?: 'modal' | 'drawer' | 'inline';
-  /**
    * 图片预览配置
    */
   imageProps?: Omit<ImageProps, 'src'>;
