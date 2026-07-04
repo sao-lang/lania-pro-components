@@ -1,16 +1,17 @@
 # Pro-Components
 
-基于 [Arco Design](https://arco.design/) 的 Schema 驱动企业级 React 组件库，致力于通过声明式配置降低中后台页面开发复杂度，提供表单、表格、弹窗、选择器、上传等高频业务组件的开箱即用方案。
+基于 [Arco Design](https://arco.design/) 的 Schema 驱动企业级 React 组件库，致力于通过声明式配置降低中后台页面开发复杂度，提供表单、表格、弹窗、布局、查询、详情、图表等 10 个 Pro 组件及完整主题系统的开箱即用方案。
 
 ## 包结构
 
-本项目采用 **pnpm workspace monorepo** 架构，包含以下三个独立的 npm 包：
+本项目采用 **pnpm workspace monorepo** 架构，包含以下四个独立的 npm 包：
 
-| 包名                               | 说明                                                 | 位置                                        |
-| ---------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
-| `@lania-pro-components/components` | 组件库主包，包含所有业务组件                         | [packages/components/](packages/components) |
-| `@lania-pro-components/utils`      | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils)           |
-| `@lania-pro-components/theme`      | 主题包，提供 light / dark 两种主题及 ThemeProvider   | [packages/theme/](packages/theme)           |
+| 包名 | 说明 | 位置 |
+| --- | --- | --- |
+| `@lania-pro-components/components` | 组件库主包，10 个业务组件 | [packages/components/](packages/components) |
+| `@lania-pro-components/utils` | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils) |
+| `@lania-pro-components/theme` | 主题包，90+ 设计令牌、ThemeProvider、CSS 变量工具 | [packages/theme/](packages/theme) |
+| `@lania-pro-components/shared` | 通用抽象底座，跨组件复用的 Hooks 和类型 | [packages/shared/](packages/shared) |
 
 ## 核心理念
 
@@ -21,6 +22,8 @@
 - **ProForm**: 通过 `schemas` 数组描述表单字段布局与行为
 - **ProTable**: 通过 `columns` 数组描述表格列定义与渲染方式
 - **ProDialog**: 通过 `schemas` 或 `columns` 描述弹窗内容类型
+- **ProLayout**: 通过 `header` / `sider` / `content` / `footer` 配置描述页面骨架
+- **ProChart**: 通过 `type` + `xField`/`yField` 声明式描述图表
 
 ### 分层架构
 
@@ -48,6 +51,8 @@
 内置基于 **Proxy** 的响应式状态管理系统（参考 Vue 响应式原理），字段值变化自动触发联动、校验和 UI 更新，无需手动 setState。
 
 ## 组件概览
+
+当前共 **10 个 Pro 组件**，覆盖中后台操作按钮 → 表单 → 表格 → 弹窗 → 选择器 → 上传 → 布局 → 查询 → 详情 → 图表的完整场景。
 
 ### ProForm — Schema 驱动表单
 
@@ -220,6 +225,103 @@
 - `ProUpload` — 上传组件
 - `ProUploadInstance` — 组件实例类型（upload / clear / retry / getStats 等）
 
+---
+
+### ProLayout — 页面布局容器
+
+[packages/components/ProLayout/](packages/components/ProLayout)
+
+页面级骨架布局组件，封装 PageHeader + Content + Footer + Sider 四个区域，支持三种布局模式。
+
+**核心能力：**
+
+- **三种布局**：`top`（顶栏）/ `side`（侧栏）/ `mix`（混合），覆盖不同业务场景
+- **响应式适配**：mobile 自动转 top 布局 + Sider Drawer 模式
+- **主题联动**：全部使用 CSS 变量（`var(--color-*)`），自动跟随 light/dark
+- **Sider 折叠持久化**：localStorage 存储折叠状态，刷新保持
+- **子组件独立使用**：PageHeader / Content / Footer / Sider 可单独引入
+
+**导出 API：**
+
+- `ProLayout` — 主布局容器
+- `PageHeader` — 页头（title / subTitle / description / breadcrumb / extra）
+- `Content` — 内容区（支持 CardContainerConfig 卡片包裹）
+- `Footer` — 底部按钮区（支持 FooterPosition + getFooterJustify）
+- `Sider` — 侧边栏（折叠状态持久化）
+- `useSiderCollapsed` — 折叠状态管理 Hook
+
+---
+
+### ProQueryForm — 独立查询表单
+
+[packages/components/ProQueryForm/](packages/components/ProQueryForm)
+
+脱离 ProTable 的独立查询表单组件，支持双形态入参和双模式。
+
+**核心能力：**
+
+- **双形态入参**：`columns`（列驱动，与 ProTable 互通）/ `schemas`（Schema 驱动，独立使用）
+- **双模式**：轻量（`onSearch` 回调）/ 重量（`store` prop + DataStore 集成）
+- **复用 ProForm 引擎**：直接基于 ProForm 渲染，支持折叠、响应式
+- **URL 同步**：支持查询条件同步到 URL query
+- **查询方案管理**：支持保存/切换/删除查询预设方案
+- **工具函数**：4 个迁移自 ProTable 的纯函数（valueTypeToComponent / convertColumnsToSearchSchema 等）
+
+**导出 API：**
+
+- `ProQueryForm` — 主组件
+- `QueryFormRenderer` — 独立表单渲染器
+- `SearchSchemaBar` — 查询方案管理条
+
+---
+
+### ProDescriptions — 详情描述组件
+
+[packages/components/ProDescriptions/](packages/components/ProDescriptions)
+
+详情视图组件，Schema 驱动，与 ProTable 列定义互通。
+
+**核心能力：**
+
+- **列定义互通**：同一份 columns 同时驱动 ProTable 和 ProDescriptions
+- **三种布局**：`table`（描述列表）/ `grid`（网格卡片）/ `inline`（行内紧凑）
+- **渲染器零拷贝复用**：复用 ProTable 的 21+ valueType 渲染器
+- **脱敏渲染**：复用 ProForm readonlyRegistry（phone / email / idCard）
+- **复制按钮**：长文本一键复制
+- **响应式列数**：grid 布局自动适配 mobile / tablet / desktop
+
+**导出 API：**
+
+- `ProDescriptions` — 主组件
+- `DescriptionCell` — 单项渲染器
+- `CopyButton` / `EmptyValue` — 辅助组件
+- `adaptColumns` — ProColumnType[] → ProDescriptionColumn[] 适配函数
+
+---
+
+### ProChart — 图表组件
+
+[packages/components/ProChart/](packages/components/ProChart)
+
+图表库无关的数据可视化组件，基于 Adapter 模式。
+
+**核心能力：**
+
+- **图表库无关**：通过 ChartAdapter 抽象 echarts / highcharts / g2
+- **双形态**：Schema 模式（`type` + `xField`/`yField`）+ Option 模式（原生配置）
+- **6 种内置图表**：line / bar / pie / scatter / area / radar
+- **远程数据**：request + params + 轮询，自动加载
+- **三态渲染**：loading / error / empty 开箱即用
+- **StrictMode 安全**：正确处理 React 18 双重挂载
+- **按需加载**：ECharts adapter 独立子路径，不引入即不打包
+
+**导出 API：**
+
+- `ProChart` — 主组件
+- `EChartsAdapter` — 内置 ECharts 适配器
+- `ChartStatus` — 三态渲染组件
+- `registerChartAdapter` / `registerChartTransformer` — 注册表 API
+
 ## 组件间关系
 
 ```
@@ -227,13 +329,29 @@ ProTable ── 内嵌 ──→ ProForm（查询表单）
     │                      │
     ├── 集成 ──→ ProDialog（表格弹窗）
     │                      │
-    └── 使用 ──→ ActionButton（操作列 / 工具栏）
+    ├── 使用 ──→ ActionButton（操作列 / 工具栏）
+    │                      │
+    ├── 互通 ──→ ProDescriptions（列定义复用）
+    │
+    ├── 共享 ──→ ProQueryForm（查询逻辑复用）
+    │
+    └── 内嵌 ──→ ProLayout（页面骨架）
 
 ProDialog ── 内嵌 ──→ ProForm（表单弹窗）
     │
-    └── 内嵌 ──→ ProTable（表格选择弹窗）
+    ├── 内嵌 ──→ ProTable（表格选择弹窗）
+    │
+    └── 共享 ──→ ProLayout（FooterPosition + getFooterJustify）
+
+ProForm ── 共享 ──→ ProQueryForm（表单引擎复用）
+    │
+    └── 共享 ──→ ProDescriptions（readonlyRegistry 脱敏渲染器）
 
 ActionButton ── 调用 ──→ ProDialog（增/删/改/查弹窗）
+
+ProChart ── 共享 ──→ Theme（light/dark 主题联动）
+    │
+    └── 共享 ──→ Utils（format 格式化函数）
 ```
 
 ## Utils 工具包
@@ -254,21 +372,44 @@ ActionButton ── 调用 ──→ ProDialog（增/删/改/查弹窗）
 
 ## Theme 主题包
 
-`@lania-pro-components/theme` — 主题系统，提供亮/暗两种主题及 React Provider。
+`@lania-pro-components/theme` — 主题系统，提供 light / dark 两种主题、90+ 设计令牌、ThemeProvider 及 CSS 变量工具。
 
 [packages/theme/src/](packages/theme/src)
 
 **导出：**
 
-- `ThemeProvider` — 主题 Provider 组件，包裹应用后提供主题上下文
-- `useTheme` — Hook，获取当前主题类型和切换方法
-- `lightTheme` / `darkTheme` — 主题变量对象
-- `ThemeType` — 主题类型（`'light' | 'dark'`）
+| 导出 | 类型 | 说明 |
+| --- | --- | --- |
+| `ThemeProvider` | 组件 | 主题 Provider，管理全局主题状态 |
+| `useTheme` | Hook | 获取当前主题和切换方法 |
+| `lightTheme` / `darkTheme` | 对象 | 90+ 原子级设计令牌（color / spacing / shadow / font / opacity / zIndex 等 10 大类） |
+| `cssVar` | 函数 | 类型安全的 CSS 变量名生成器，`cssVar('color', 'bg', 1)` → `'--color-bg-1'` |
+| `cssVarRef` | 函数 | CSS `var()` 引用辅助，`cssVarRef('color', 'primary')` → `'var(--color-primary)'` |
+| `createLightTheme` / `createDarkTheme` | 函数 | 基于现有主题创建设置自定义主题 |
+| `ThemeType` | 类型 | `'light' \| 'dark' \| 'system'` |
+| `ThemeTokens` | 类型 | 设计令牌完整结构类型 |
 
 **CSS 文件：**
 
-- `@lania-pro-components/theme/light.css` — 亮色主题变量
-- `@lania-pro-components/theme/dark.css` — 暗色主题变量
+- `@lania-pro-components/theme/light.css` — 亮色主题 CSS 变量
+- `@lania-pro-components/theme/dark.css` — 暗色主题 CSS 变量
+
+**设计令牌分类：**
+
+| 分类 | 变量数 | 示例 |
+| --- | --- | --- |
+| 背景色 | 4 | `--color-bg-1` ~ `--color-bg-4` |
+| 文字色 | 4 | `--color-text-1` ~ `--color-text-4` |
+| 边框色 | 3 | `--color-border-1` ~ `--color-border-3` |
+| 功能色 | 26 | `--color-primary` / `--color-success-*` / `--color-danger-border` |
+| 扩展色 | 12 | `--color-link` / `--color-mask` / `--color-disabled-*` / `--color-row-*` |
+| 字体 | 11 | `--font-size-*` / `--font-family-*` / `--font-weight-*` / `--line-height-*` |
+| 间距 | 6 | `--spacing-xs` ~ `--spacing-xxl` |
+| 圆角 | 5 | `--radius-sm` ~ `--radius-full` |
+| 阴影 | 9 | `--shadow-sm` ~ `--shadow-card` / `--shadow-modal` |
+| 透明度 | 5 | `--opacity-disabled` / `--opacity-mask` |
+| 层级 | 6 | `--z-dropdown` / `--z-modal` / `--z-tooltip` |
+| 过渡 | 4 | `--transition-duration-*` / `--transition-timing-function` |
 
 ## 技术栈
 
@@ -419,8 +560,18 @@ lania-pro-components/
 │   │   │
 │   │   ├── ProSelect/                # 增强选择器
 │   │   ├── ProUpload/                # 增强上传
+│   │   ├── ProLayout/                # 页面布局容器
+│   │   ├── ProQueryForm/             # 独立查询表单
+│   │   ├── ProDescriptions/          # 详情描述组件
+│   │   ├── ProChart/                 # 图表组件
 │   │   ├── __tests__/                # 统一测试目录
 │   │   └── index.ts                  # 包入口
+│   │
+│   ├── shared/                       # 通用抽象底座
+│   │   └── src/
+│   │       ├── hooks/                # useResponsive / useCache / useAsyncRequest
+│   │       ├── types/                # layout / performance / request / status
+│   │       └── factories/            # createProProvider / createImperativeInstance
 │   │
 │   ├── utils/                        # 公共工具函数包
 │   │   └── src/
@@ -435,11 +586,14 @@ lania-pro-components/
 │   │
 │   └── theme/                        # 主题包
 │       └── src/
-│           ├── ThemeProvider.tsx
-│           ├── themes.ts
-│           ├── light.css
-│           ├── dark.css
-│           ├── types.ts
+│           ├── ThemeProvider.tsx      # 主题 Provider
+│           ├── ThemeContext.ts        # Context 创建
+│           ├── useTheme.ts           # Hook
+│           ├── themes.ts             # 90+ 设计令牌
+│           ├── cssVar.ts             # CSS 变量名生成器
+│           ├── createTheme.ts        # 自定义主题创建
+│           ├── light.css / dark.css
+│           ├── types.ts              # ThemeTokens / ThemeType
 │           └── index.ts
 │
 ├── docs/                             # VitePress 文档站
