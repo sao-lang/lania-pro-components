@@ -44,13 +44,13 @@
 
 ### 亮点 3：更完整的 ProTable 表格能力
 
-**关键词**：请求引擎、20+ valueType、可编辑表格、URL 同步、缓存
+**关键词**：统一请求引擎、20+ valueType、可编辑表格、URL 同步、缓存
 
-> "ProTable 包含一个请求引擎，自动管理 loading、分页、搜索状态。支持 20 多种 valueType（text/money/percent/date/select/tag/image 等），每个类型都有对应的渲染器和格式化逻辑。还有可编辑表格、拖拽排序、URL query 同步、数据缓存等实用功能。"
+> "ProTable 的请求引擎直接基于 shared 层的通用 `useAsyncRequest` Hook，统一了项目内的请求管理方案，自动处理 loading、分页、搜索、防抖、取消和轮询。支持 20 多种 valueType（text/money/percent/date/select/tag/image 等），每个类型都有对应的渲染器和格式化逻辑。还有可编辑表格、拖拽排序、URL query 同步、数据缓存等实用功能。"
 
 **追问应对**：
 
-> "ProTable 的可编辑表格支持行编辑和单元格编辑两种模式，内部复用了 ProForm 的表单引擎，因此校验和联动能力可以直接复用。表格的查询表单也是基于同一套 Schema 方案，实现了架构统一。"
+> "ProTable 的可编辑表格支持行编辑和单元格编辑两种模式，内部复用了 ProForm 的表单引擎，因此校验和联动能力可以直接复用。表格的查询表单也是基于同一套 Schema 方案，实现了架构统一。请求层也做了统一——之前 ProTable 单独维护了一个 RequestEngine 类，最近重构为直接使用 shared 层的 useAsyncRequest，减少了重复代码，也让整个项目的依赖关系更清晰。"
 
 ### 亮点 4：性能优化体系
 
