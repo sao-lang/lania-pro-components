@@ -18,7 +18,8 @@
  * ```
  */
 
-import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo, useCallback } from 'react';
+import { useAsyncRequest } from '@lania-pro-components/shared';
 import { resolveChartAdapter } from './chartAdapterRegistry';
 import { getChartTransformer } from './transformers';
 import { ChartStatus } from './ChartStatus';
@@ -43,8 +44,6 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
     loading: externalLoading,
     error: externalError,
     empty: externalEmpty,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    performance,
     onChartReady,
     request,
     params,
@@ -58,8 +57,8 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
   const instanceRef = useRef<ChartInstance | null>(null);
   const adapterRef = useRef<ChartAdapter | null>(null);
   const destroyedRef = useRef(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // dataSource 仍保留本地 state（兼容 request=undefined 时静态数据回退）
+  // loading / error 委托给 useAsyncRequest（见下方 useAsyncRequest 调用）
   const [dataSource, setDataSource] = useState<Record<string, unknown>[]>(schemaData ?? []);
 
   // 解析 adapter
@@ -83,48 +82,52 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
     };
   }, [adapterProp]);
 
-  // 加载远程数据
+  // ===== 远程数据请求：委托 useAsyncRequest =====
+  // request=undefined 时使用 no-op 函数（hooks 不能条件调用，需保持调用一致）
+  const requestFn = request ?? (async () => ({ data: [] as unknown[] }));
+
+  // onSuccess 必须用 useCallback 稳定引用，否则每次渲染生成新函数 → execute useCallback
+  // 依赖变化 → 下方 effect 重复触发 → 死循环
+  const handleSuccess = useCallback((response: { data: unknown[]; total?: number }) => {
+    setDataSource(response.data as Record<string, unknown>[]);
+  }, []);
+
+  const {
+    loading: requestLoading,
+    error: requestError,
+    execute,
+    refresh,
+    cancel,
+    startPolling,
+    stopPolling,
+  } = useAsyncRequest<Record<string, unknown>, { data: unknown[]; total?: number }>({
+    request: requestFn,
+    manual: true, // 由下方 effect 显式控制触发时机
+    pollingInterval: polling,
+    silentPolling: true, // 图表轮询静默刷新：不切 loading，但仍 setError（错误感知不丢失）
+    onSuccess: handleSuccess,
+  });
+
+  // params / request 变化时触发请求（首次挂载也会触发）
+  useEffect(() => {
+    if (!request) return;
+    execute(params ?? {});
+    return () => cancel();
+  }, [request, params, execute, cancel]);
+
+  // 静态数据模式：request=undefined 时同步 schemaData 到 dataSource
   useEffect(() => {
     if (!request) {
       setDataSource(schemaData ?? []);
-      return;
     }
+  }, [request, schemaData]);
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    request(params ?? {})
-      .then((res) => {
-        if (!cancelled) {
-          setDataSource(res.data as Record<string, unknown>[]);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err);
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [request, params, schemaData]);
-
-  // 轮询
+  // 自动启停轮询（用 useAsyncRequest 的 polling 能力，含 silentPolling + AbortController）
   useEffect(() => {
     if (!request || !polling) return;
-    const interval = setInterval(() => {
-      request(params ?? {})
-        .then((res) => {
-          setDataSource(res.data as Record<string, unknown>[]);
-        })
-        .catch(() => {});
-    }, polling);
-    return () => clearInterval(interval);
-  }, [request, params, polling]);
+    startPolling();
+    return () => stopPolling();
+  }, [request, polling, startPolling, stopPolling]);
 
   // 生成 option（Schema 模式）
   const option = useMemo(() => {
@@ -210,26 +213,15 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
         }
       },
       reload: () => {
-        if (request) {
-          setLoading(true);
-          setError(null);
-          request(params ?? {})
-            .then((res) => {
-              setDataSource(res.data as Record<string, unknown>[]);
-              setLoading(false);
-            })
-            .catch((err) => {
-              setError(err);
-              setLoading(false);
-            });
-        }
+        if (request) refresh();
       },
     }),
-    [request, params],
+    [request, refresh],
   );
 
-  const isError = externalError ?? error;
-  const isLoading = externalLoading ?? loading;
+  // requestError 类型为 Error | undefined，归一化为 Error | null 与原签名一致
+  const isError = externalError ?? requestError ?? null;
+  const isLoading = externalLoading ?? requestLoading;
   const isEmpty = externalEmpty ?? (!isLoading && !isError && dataSource.length === 0);
 
   return (
@@ -242,19 +234,7 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
         renderError={renderError}
         renderEmpty={renderEmpty}
         onRetry={() => {
-          if (request) {
-            setLoading(true);
-            setError(null);
-            request(params ?? {})
-              .then((res) => {
-                setDataSource(res.data as Record<string, unknown>[]);
-                setLoading(false);
-              })
-              .catch((err) => {
-                setError(err);
-                setLoading(false);
-              });
-          }
+          if (request) refresh();
         }}
       >
         <div ref={containerRef} style={{ width: '100%', height: typeof height === 'number' ? height : height }} />

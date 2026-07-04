@@ -52,6 +52,23 @@ export interface AsyncRequestOptions<TParams, TResponse> {
   onSuccess?: (data: TResponse, params: TParams) => void;
   /** 失败回调 */
   onError?: (error: Error, params: TParams) => void;
+  /**
+   * 轮询时是否静默切换 loading 状态（默认 false）。
+   * - true：轮询触发 execute 时跳过 setLoading(true) + setError(undefined)，
+   *   但成功仍 setData、失败仍 setError（错误感知不丢失）。适合图表静默刷新。
+   * - 仅作用于 startPolling 内部触发的 execute；用户主动 execute/refresh/debouncedExecute 不受影响。
+   * @default false
+   */
+  silentPolling?: boolean;
+  /**
+   * 依赖项数组：变化时自动用最近一次 params 重新 execute（跳过首次）。
+   * - 不传或 undefined：完全禁用此机制
+   * - 注意：使用 latestParamsRef.current（旧 params），适合"非 params 依赖变化"场景
+   *   （如 schemaData 变化用当前 params 重拉）。不适合"params 变化用新 params"场景。
+   * - inline 数组引用每次变化会重复触发，建议传 useMemo 后的稳定引用。
+   * 参考 ahooks useRequest refreshDeps。
+   */
+  refreshDeps?: unknown[];
 }
 
 /**
@@ -76,6 +93,12 @@ export interface AsyncRequestReturn<TParams, TResponse> {
   stopPolling: () => void;
   /** 重置状态 */
   reset: () => void;
+  /**
+   * 用最近一次 params 重新 execute。
+   * - latestParamsRef.current 为 undefined（从未 execute 且未传 defaultParams）时返回 undefined
+   * - 不受 silentPolling 影响（始终走非 silent 路径，会 setLoading）
+   */
+  refresh: () => Promise<TResponse | undefined>;
 }
 
 /**
@@ -94,6 +117,8 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     afterRequest,
     onSuccess,
     onError,
+    silentPolling = false,
+    refreshDeps,
   } = options;
 
   const [data, setData] = useState<TResponse | undefined>();
@@ -106,6 +131,7 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
   const isPollingEnabledRef = useRef(true);
   const mountedRef = useRef(true);
   const latestParamsRef = useRef<TParams | undefined>(defaultParams);
+  const isFirstRefreshRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -119,7 +145,11 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
    * 执行请求的核心函数
    */
   const execute = useCallback(
-    async (params: TParams): Promise<TResponse | undefined> => {
+    async (
+      params: TParams,
+      /** @internal 内部标记，外部不应使用 */
+      internalOptions?: { silent?: boolean },
+    ): Promise<TResponse | undefined> => {
       // 取消上一次请求
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -129,8 +159,11 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
       abortControllerRef.current = controller;
       latestParamsRef.current = params;
 
-      setLoading(true);
-      setError(undefined);
+      // 仅当 silentPolling 启用且本次调用被标记为 silent 时才跳过 loading/error 切换
+      if (!silentPolling || !internalOptions?.silent) {
+        setLoading(true);
+        setError(undefined);
+      }
 
       try {
         let finalParams = params;
@@ -169,7 +202,7 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
         return undefined;
       }
     },
-    [request, beforeRequest, afterRequest, onSuccess, onError],
+    [request, beforeRequest, afterRequest, onSuccess, onError, silentPolling],
   );
 
   /**
@@ -211,7 +244,7 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     const poll = () => {
       if (!isPollingEnabledRef.current || !latestParamsRef.current) return;
       pollingTimerRef.current = setTimeout(async () => {
-        await execute(latestParamsRef.current!);
+        await execute(latestParamsRef.current!, { silent: true });
         if (isPollingEnabledRef.current) {
           poll();
         }
@@ -243,6 +276,16 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     stopPolling();
   }, [cancel, stopPolling]);
 
+  /**
+   * 用最近一次 params 重新 execute
+   */
+  const refresh = useCallback(async (): Promise<TResponse | undefined> => {
+    if (latestParamsRef.current === undefined) {
+      return undefined;
+    }
+    return execute(latestParamsRef.current);
+  }, [execute]);
+
   // 自动发起首次请求
   useEffect(() => {
     if (!manual && defaultParams) {
@@ -254,6 +297,19 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     };
   }, []);
 
+  // refreshDeps 变化时用最近一次 params 重新 execute（跳过首次）
+  useEffect(() => {
+    if (!refreshDeps) return;
+    if (isFirstRefreshRef.current) {
+      isFirstRefreshRef.current = false;
+      return;
+    }
+    if (latestParamsRef.current !== undefined) {
+      execute(latestParamsRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, refreshDeps);
+
   return {
     data,
     loading,
@@ -264,5 +320,6 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     startPolling,
     stopPolling,
     reset,
+    refresh,
   };
 }
