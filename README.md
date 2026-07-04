@@ -6,12 +6,12 @@
 
 本项目采用 **pnpm workspace monorepo** 架构，包含以下四个独立的 npm 包：
 
-| 包名 | 说明 | 位置 |
-| --- | --- | --- |
-| `@lania-pro-components/components` | 组件库主包，10 个业务组件 | [packages/components/](packages/components) |
-| `@lania-pro-components/utils` | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils) |
-| `@lania-pro-components/theme` | 主题包，90+ 设计令牌、ThemeProvider、CSS 变量工具 | [packages/theme/](packages/theme) |
-| `@lania-pro-components/shared` | 通用抽象底座，跨组件复用的 Hooks 和类型 | [packages/shared/](packages/shared) |
+| 包名                               | 说明                                                 | 位置                                        |
+| ---------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
+| `@lania-pro-components/components` | 组件库主包，10 个业务组件                            | [packages/components/](packages/components) |
+| `@lania-pro-components/utils`      | 公共工具函数包，响应式系统、格式化、性能优化等纯函数 | [packages/utils/](packages/utils)           |
+| `@lania-pro-components/theme`      | 主题包，90+ 设计令牌、ThemeProvider、CSS 变量工具    | [packages/theme/](packages/theme)           |
+| `@lania-pro-components/shared`     | 通用抽象底座，跨组件复用的 Hooks 和类型              | [packages/shared/](packages/shared)         |
 
 ## 核心理念
 
@@ -378,16 +378,16 @@ ProChart ── 共享 ──→ Theme（light/dark 主题联动）
 
 **导出：**
 
-| 导出 | 类型 | 说明 |
-| --- | --- | --- |
-| `ThemeProvider` | 组件 | 主题 Provider，管理全局主题状态 |
-| `useTheme` | Hook | 获取当前主题和切换方法 |
-| `lightTheme` / `darkTheme` | 对象 | 90+ 原子级设计令牌（color / spacing / shadow / font / opacity / zIndex 等 10 大类） |
-| `cssVar` | 函数 | 类型安全的 CSS 变量名生成器，`cssVar('color', 'bg', 1)` → `'--color-bg-1'` |
-| `cssVarRef` | 函数 | CSS `var()` 引用辅助，`cssVarRef('color', 'primary')` → `'var(--color-primary)'` |
-| `createLightTheme` / `createDarkTheme` | 函数 | 基于现有主题创建设置自定义主题 |
-| `ThemeType` | 类型 | `'light' \| 'dark' \| 'system'` |
-| `ThemeTokens` | 类型 | 设计令牌完整结构类型 |
+| 导出                                   | 类型 | 说明                                                                                |
+| -------------------------------------- | ---- | ----------------------------------------------------------------------------------- |
+| `ThemeProvider`                        | 组件 | 主题 Provider，管理全局主题状态                                                     |
+| `useTheme`                             | Hook | 获取当前主题和切换方法                                                              |
+| `lightTheme` / `darkTheme`             | 对象 | 90+ 原子级设计令牌（color / spacing / shadow / font / opacity / zIndex 等 10 大类） |
+| `cssVar`                               | 函数 | 类型安全的 CSS 变量名生成器，`cssVar('color', 'bg', 1)` → `'--color-bg-1'`          |
+| `cssVarRef`                            | 函数 | CSS `var()` 引用辅助，`cssVarRef('color', 'primary')` → `'var(--color-primary)'`    |
+| `createLightTheme` / `createDarkTheme` | 函数 | 基于现有主题创建设置自定义主题                                                      |
+| `ThemeType`                            | 类型 | `'light' \| 'dark' \| 'system'`                                                     |
+| `ThemeTokens`                          | 类型 | 设计令牌完整结构类型                                                                |
 
 **CSS 文件：**
 
@@ -396,20 +396,20 @@ ProChart ── 共享 ──→ Theme（light/dark 主题联动）
 
 **设计令牌分类：**
 
-| 分类 | 变量数 | 示例 |
-| --- | --- | --- |
-| 背景色 | 4 | `--color-bg-1` ~ `--color-bg-4` |
-| 文字色 | 4 | `--color-text-1` ~ `--color-text-4` |
-| 边框色 | 3 | `--color-border-1` ~ `--color-border-3` |
-| 功能色 | 26 | `--color-primary` / `--color-success-*` / `--color-danger-border` |
-| 扩展色 | 12 | `--color-link` / `--color-mask` / `--color-disabled-*` / `--color-row-*` |
-| 字体 | 11 | `--font-size-*` / `--font-family-*` / `--font-weight-*` / `--line-height-*` |
-| 间距 | 6 | `--spacing-xs` ~ `--spacing-xxl` |
-| 圆角 | 5 | `--radius-sm` ~ `--radius-full` |
-| 阴影 | 9 | `--shadow-sm` ~ `--shadow-card` / `--shadow-modal` |
-| 透明度 | 5 | `--opacity-disabled` / `--opacity-mask` |
-| 层级 | 6 | `--z-dropdown` / `--z-modal` / `--z-tooltip` |
-| 过渡 | 4 | `--transition-duration-*` / `--transition-timing-function` |
+| 分类   | 变量数 | 示例                                                                        |
+| ------ | ------ | --------------------------------------------------------------------------- |
+| 背景色 | 4      | `--color-bg-1` ~ `--color-bg-4`                                             |
+| 文字色 | 4      | `--color-text-1` ~ `--color-text-4`                                         |
+| 边框色 | 3      | `--color-border-1` ~ `--color-border-3`                                     |
+| 功能色 | 26     | `--color-primary` / `--color-success-*` / `--color-danger-border`           |
+| 扩展色 | 12     | `--color-link` / `--color-mask` / `--color-disabled-*` / `--color-row-*`    |
+| 字体   | 11     | `--font-size-*` / `--font-family-*` / `--font-weight-*` / `--line-height-*` |
+| 间距   | 6      | `--spacing-xs` ~ `--spacing-xxl`                                            |
+| 圆角   | 5      | `--radius-sm` ~ `--radius-full`                                             |
+| 阴影   | 9      | `--shadow-sm` ~ `--shadow-card` / `--shadow-modal`                          |
+| 透明度 | 5      | `--opacity-disabled` / `--opacity-mask`                                     |
+| 层级   | 6      | `--z-dropdown` / `--z-modal` / `--z-tooltip`                                |
+| 过渡   | 4      | `--transition-duration-*` / `--transition-timing-function`                  |
 
 ## 技术栈
 
