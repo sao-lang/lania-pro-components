@@ -38,7 +38,7 @@ import type { ProTableProps, ProTableActionType, ProTableRequest, ProTableNEvent
 import type { ProFormInstance } from '../ProForm/types';
 import { RootProvider, DataProvider, ColumnProvider } from './context';
 import { createDataStore } from './store/DataStore';
-import { useRequest } from './request/useRequest';
+import { useRequest } from './hooks/useRequest';
 import { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation } from './components';
 import { openDialog, confirm } from './components/TableDialog';
 import { useUrlSync, useSearchSchema, useProTable, useDragSort } from './hooks';
@@ -682,12 +682,8 @@ export type { TableConfig, TableConfigProviderProps } from './context';
 export { createDataStore } from './store/DataStore';
 export type { DataStoreState, DataStoreActions, CreateDataStoreOptions } from './store/types';
 
-// 导出 Request
-export { createRequestEngine } from './request/RequestEngine';
-export type { RequestEngine, RequestEngineOptions } from './request/RequestEngine';
-
-// 导出 Features
-export { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation, openDialog, confirm } from './features';
+// 导出 Components（原 features/ 已合并到 components/）
+export { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation, openDialog, confirm } from './components';
 
 // 导出 Hooks
 export {

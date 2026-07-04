@@ -1,6 +1,6 @@
 # ProTable
 
-Schema 驱动的企业级表格组件，通过声明式列配置实现数据展示、查询、排序、筛选、编辑等全功能。
+Schema 驱动的企业级表格组件，基于 DataStore + TableRenderer + QueryForm 三层 Context 架构实现数据展示、查询、排序、筛选、编辑等全功能。
 
 ## 快速开始
 
@@ -37,489 +37,384 @@ import { ProTable, useProTable } from '@lania-pro-components/components';
   ]}
   request={async (params) => {
     const res = await fetchList(params);
-    return { data: res.list, total: res.total, success: true };
+    return { data: res.list, total: res.total };
   }}
 />;
 
-// 编程式控制
-const action = useProTable();
-<ProTable action={action} columns={columns} request={request} />;
-action.current?.reload();
-action.current?.clearSelected();
+// useProTable 编程式控制
+const { instance, bindingProps } = useProTable({ columns, request });
+<ProTable {...bindingProps} />;
+instance.reload();
+instance.clearSelection();
 ```
-
-> ProTable 与 [ProQueryForm](./ProQueryForm) 共享查询表单逻辑，与 [ProDescriptions](./ProDescriptions) 共享列定义。
 
 ---
 
-## 一、项目概述
+## 一、架构分层
 
-ProTable 是一个基于 **Schema-Driven** 模式设计的企业级表格组件库，旨在提供：
-
-- **高性能**：基于发布-订阅模式的状态管理，配合虚拟滚动、请求防抖与取消机制
-- **高扩展性**：三层 Context 架构、可插拔的 Hook 插件系统、自定义渲染器注册
-- **高灵活性**：支持多种视图模式（表格/卡片）、可编辑表格、拖拽排序、URL 同步等
-- **良好兼容性**：与 Arco Design Table 深度集成，提供兼容 API
-
-### 核心思想
+### 1.1 整体架构
 
 ```
-ProTable = DataStore + ColumnSchema + QueryForm + TableRenderer
+┌────────────────────────────────────────────────────────────────────┐
+│                    ProTable 整体架构                               │
+├────────────────────────────────────────────────────────────────────┤
+│  Component 层（渲染组件，原 features/ + components/ 已合并）       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐  │
+│  │TableRendr│ │QueryForm │ │ Toolbar  │ │Pagination│ │BatchOp │  │
+│  │表格渲染器 │ │ 查询表单 │ │ 工具栏   │ │  分页    │ │批量操作│  │
+│  ├──────────┤ ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤  │
+│  │CardView  │ │Skeleton  │ │DragSort  │ │SearchSch │ │TableDlg│  │
+│  │卡片视图  │ │  骨架屏  │ │拖拽排序  │ │查询方案  │ │弹窗    │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘  │
+├────────────────────────────────────────────────────────────────────┤
+│  Context 层（三层上下文）                                          │
+│  ┌──────────────┐ ┌────────────────┐ ┌────────────────────┐       │
+│  │  RootContext  │ │  DataContext    │ │  ColumnContext     │       │
+│  │ （全局配置）   │ │ （数据状态+操作）│ │ （列配置+显隐+密度）│       │
+│  ├──────────────┤ ├────────────────┤ ├────────────────────┤       │
+│  │ TableConfigContext — 合并后的完整配置                          │       │
+│  └──────────────┘ └────────────────┘ └────────────────────┘       │
+├────────────────────────────────────────────────────────────────────┤
+│  Hooks 层（逻辑复用）                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │useProTabl│ │useRequest│ │useUrlSync│ │useSearch │ │useDrag │ │
+│  │ 实例管理  │ │ 数据请求  │ │ URL同步  │ │  方案    │ │ 拖拽   │ │
+│  ├──────────┤ ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤ │
+│  │useVirtualScroll│ │useCache  │ (均来自 @lania-pro-components/shared)│
+│  └──────────┘ └──────────┘ └────────────────────────────────────── ┘│
+├────────────────────────────────────────────────────────────────────┤
+│  Editable 层（可编辑表格）                                         │
+│  ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐          │
+│  │useEditableTabl│ │ EditableCell │ │ EditableActions  │          │
+│  └───────────────┘ └──────────────┘ └──────────────────┘          │
+├────────────────────────────────────────────────────────────────────┤
+│  Core 层（核心引擎）                                               │
+│  ┌────────────┐ ┌──────────────────┐ ┌──────────────────────┐     │
+│  │ DataStore  │ │ RequestEngine    │ │   columnRender       │     │
+│  │ (createStor│ │ (@deprecated,    │ │   + cellMerge        │     │
+│  │  e 实现)    │ │  内部用asyncReq)│ │   + defineEnumMap    │     │
+│  └────────────┘ └──────────────────┘ └──────────────────────┘     │
+├────────────────────────────────────────────────────────────────────┤
+│  Schema 层 — ProColumnType / ProTableProps / ProTableActionType    │
+│  Utils 层 — columnRender / cellMerge / defineEnumMap              │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-### 设计原则
+### 1.2 层级职责
 
-1. **配置化优先**：所有功能通过配置开启，降低心智负担
-2. **分层架构**：核心层 + 功能层 + 插件层 + 组件层
-3. **按需加载**：支持 Tree Shaking，未使用的功能不打包
-4. **类型安全**：完整的 TypeScript 类型支持
+| 层级             | 文件路径                             | 核心职责                                        | 关键组件/类                                                                                                                                                  |
+| ---------------- | ------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Schema 层**    | `types.ts`, `types-action-button.ts` | 列配置和组件属性类型                            | `ProColumnType`, `ProTableProps`, `ProTableActionType`                                                                                                       |
+| **Core 层**      | `store/`, `request/`, `utils/`       | 状态管理和请求引擎                              | `DataStore`, `RequestEngine`, `columnRender`, `cellMerge`                                                                                                    |
+| **Context 层**   | `context/`                           | 三层上下文传递                                  | `RootContext`, `DataContext`, `ColumnContext`, `TableConfigContext`                                                                                          |
+| **Hooks 层**     | `hooks/`                             | 逻辑复用                                        | `useProTable`, `useRequest`, `useUrlSync`, `useSearchSchema`, `useDragSort`                                                                                  |
+| **Editable 层**  | `editable/`                          | 可编辑表格                                      | `useEditableTable`, `EditableCell`, `EditableActions`                                                                                                        |
+| **Component 层** | `components/`                        | 所有渲染组件（原 features/ + components/ 合并） | `TableRenderer`, `QueryForm`, `Toolbar`, `Pagination`, `BatchOperation`, `CardView`, `SkeletonTable`, `DragSortTable`, `SearchSchemaSelector`, `TableDialog` |
+| **Utils 层**     | `utils/`                             | 列渲染/合并/枚举工具                            | `columnRender`, `cellMerge`, `defineEnumMap`                                                                                                                 |
+
+### 1.3 核心设计原则
+
+- **单向数据流**：Schema → DataStore → RequestEngine → UI
+- **三层 Context**：Root（全局配置）+ Data（数据状态+操作）+ Column（列配置）
+- **事件驱动**：通过 `createStore` 的 subscribe 实现状态变更通知
+- **可插拔扩展**：Hooks 层实现功能动态扩展
 
 ---
 
-## 二、架构分层详解
+## 二、使用方式
 
-### 2.1 整体架构图
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            ProTable 整体架构                                     │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                       Component 层（辅助组件）                             │   │
-│  │  ┌──────────┐ ┌────────────┐ ┌──────────────────┐ ┌───────────────────┐   │   │
-│  │  │ CardView │ │SkeletonTable││SearchSchemaSelector││   DragSortTable   │   │   │
-│  │  │ 卡片视图 │ │   骨架屏    ││   查询方案选择器   ││   拖拽排序表格    │   │   │
-│  │  └──────────┘ └────────────┘ └──────────────────┘ └───────────────────┘   │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-│                                          │                                      │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                        Features 层（功能模块）                             │   │
-│  │  ┌──────────┐ ┌──────────────┐ ┌──────────┐ ┌────────────┐ ┌───────────┐ │   │
-│  │  │QueryForm │ │TableRenderer │ │ Toolbar  │ │ Pagination │ │BatchOp... │ │   │
-│  │  │ 查询表单 │ │  表格渲染器  │ │ 工具栏   │ │   分页     │ │ 批量操作  │ │   │
-│  │  └────┬─────┘ └──────┬───────┘ └────┬─────┘ └─────┬──────┘ └─────┬─────┘ │   │
-│  └───────┼──────────────┼──────────────┼─────────────┼───────────────┼───────┘   │
-│          │              │              │             │               │           │
-│  ┌───────▼──────────────▼──────────────▼─────────────▼───────────────▼───────┐   │
-│  │                        Context 层（上下文传递）                            │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌───────────────────┐       │   │
-│  │  │RootContext │ │DataContext │ │ColumnCtx   │ │TableConfigContext │       │   │
-│  │  │全局配置    │ │数据状态    │ │列配置      │ │ 表格配置上下文    │       │   │
-│  │  └────────────┘ └──────┬─────┘ └────────────┘ └───────────────────┘       │   │
-│  │                        │                                                  │   │
-│  └────────────────────────┼──────────────────────────────────────────────────┘   │
-│                           │                                                     │
-│  ┌────────────────────────▼──────────────────────────────────────────────────┐   │
-│  │                         Hooks 层（插件能力）                               │   │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌──────────────────┐     │   │
-│  │  │useProTable  │ │ useRequest  │ │ useUrlSync  │ │useSearchSchema   │     │   │
-│  │  │实例管理     │ │ 数据请求    │ │ URL同步     │ │ 查询方案         │     │   │
-│  │  ├─────────────┤ ├─────────────┤ ├─────────────┤ ├──────────────────┤     │   │
-│  │  │useVirtualScr│ │ useDragSort │ │ useResponsive││    useCache      │     │   │
-│  │  │虚拟滚动     │ │ 拖拽排序    │ │ 响应式适配   │ │ 数据缓存         │     │   │
-│  │  └─────────────┘ └─────────────┘ └─────────────┘ └──────────────────┘     │   │
-│  └──────────────────────────────────────────────────────────────────────────┘   │
-│                           │                                                     │
-│  ┌────────────────────────▼──────────────────────────────────────────────────┐   │
-│  │                        Core 层（核心引擎）                                │   │
-│  │  ┌────────────┐ ┌─────────────────┐ ┌──────────────────────┐              │   │
-│  │  │ DataStore  │ │ RequestEngine   │ │   ColumnRender       │              │   │
-│  │  │ 状态管理   │ │ 请求执行引擎    │ │   列渲染系统         │              │   │
-│  │  └────────────┘ └─────────────────┘ └──────────────────────┘              │   │
-│  └──────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                        Schema 层（配置定义）                              │   │
-│  │           ProColumnType - 列配置描述（类型定义）                          │   │
-│  │           ProTableProps - 组件属性（类型定义）                           │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                        Utils 层（工具支撑）                               │   │
-│  │  ┌──────────────┐ ┌──────────┐ ┌──────────────────┐                       │   │
-│  │  │columnRender  │ │cellMerge │ │defineEnumMap     │                       │   │
-│  │  │ 列渲染工具   │ │单元格合并│ │ 枚举映射定义     │                       │   │
-│  │  └──────────────┘ └──────────┘ └──────────────────┘                       │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 层级职责总览
-
-| 层级             | 文件路径                                       | 核心职责                     | 关键组件/类                                                             |
-| ---------------- | ---------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
-| **Schema 层**    | `types.ts`, `types-action-button.ts`           | 定义列配置结构和组件属性类型 | `ProColumnType`, `ProTableProps`, `ProTableActionType`                  |
-| **Core 层**      | `store/`, `request/`, `utils/columnRender.tsx` | 表格状态管理和请求引擎核心   | `DataStore`, `RequestEngine`, `columnRender`                            |
-| **Context 层**   | `context/`                                     | React 上下文传递机制         | `RootContext`, `DataContext`, `ColumnContext`, `TableConfigContext`     |
-| **Hooks 层**     | `hooks/`                                       | 可复用逻辑封装（插件能力）   | `useProTable`, `useRequest`, `useUrlSync`, `useVirtualScroll`           |
-| **Features 层**  | `features/`                                    | 表格核心功能模块             | `QueryForm`, `TableRenderer`, `Toolbar`, `Pagination`, `BatchOperation` |
-| **Editable 层**  | `editable/`                                    | 可编辑表格功能               | `useEditableTable`, `EditableCell`, `EditableActions`                   |
-| **Component 层** | `components/`                                  | 辅助组件                     | `CardView`, `SkeletonTable`, `DragSortTable`, `SearchSchemaSelector`    |
-| **Utils 层**     | `utils/`                                       | 工具函数支撑                 | `columnRender`, `cellMerge`, `defineEnumMap`                            |
-
-### 2.3 层级依赖关系
-
-```
-Schema 层（types.ts）
-    ▲
-    │ 被引用（类型约束）
-    │
-所有层都依赖 Schema 层的类型定义
-
-Core 层 ────驱动───→ Context 层 ────传递───→ Features 层
-(DataStore)         (三层上下文)         (QueryForm/TableRenderer/Toolbar)
-(RequestEngine)                                │
-(columnRender)                                 ▼
-                                          Component 层
-                                          (CardView/SkeletonTable)
-                                              │
-Hooks 层 ────扩展───┘
-(useUrlSync/useCache/useVirtualScroll)
-
-Utils 层 ────支撑───→ 所有层
-(columnRender/cellMerge/defineEnumMap)
-```
-
-**核心设计原则**：
-
-- **单向数据流**：Schema → DataStore → RequestEngine → 更新 DataStore → UI 重新渲染
-- **关注点分离**：状态管理（Core）与视图渲染（Features）完全解耦
-- **事件驱动**：通过发布-订阅模式实现状态变更通知
-- **可插拔扩展**：通过 Hooks 层实现功能的动态扩展
-
----
-
-## 三、使用方式总览
-
-ProTable 提供多种使用方式，从简单到复杂，满足不同场景需求：
-
-| 使用方式                 | 适用场景                                 | 复杂度 | 核心特点                                                      |
-| ------------------------ | ---------------------------------------- | ------ | ------------------------------------------------------------- |
-| **纯 ProTable 组件**     | 快速构建表格，自动处理数据请求和状态     | 低     | 一行代码完成表格，自带搜索、分页、工具栏                      |
-| **ref 操作表格**         | 需要在外部触发表格操作（刷新、重置等）   | 中     | 通过 ref 调用 reload/reset/getSelectedRows 等方法             |
-| **useProTable 简化模式** | 需要访问表格状态和实例，无需自定义 store | 中     | 无需 createDataStore，直接获取 instance、dataSource、loading  |
-| **useProTable 完整模式** | 需要自定义 store、初始数据等高级配置     | 高     | 手动创建 DataStore，精细控制表格行为                          |
-| **Provider 跨组件访问**  | 父组件创建实例，子组件深度访问表格状态   | 中     | 通过 Context 下发实例，子组件用 useProTableContext 访问       |
-| **DataContext 表格内部** | 在表格列渲染器中访问表格状态             | 中     | ProTable 内部自动包裹 Provider，列渲染器直接用 useDataContext |
-
-**快速上手示例**：
+| 方式                 | 说明                                                                     |
+| -------------------- | ------------------------------------------------------------------------ |
+| **纯 ProTable 组件** | 直接传入 props，自动处理数据请求                                         |
+| **`actionRef`**      | `const ref = useRef<ProTableActionType>(); <ProTable actionRef={ref} />` |
+| **`useProTable`**    | 返回 `{ instance, bindingProps, dataSource, loading, Provider }`         |
+| **Provider 模式**    | `useProTable()` 返回 `Provider`，子组件用 `useProTableContext()` 访问    |
 
 ```tsx
-// 方式一：纯 ProTable 组件（最简单）
-<ProTable columns={columns} request={fetchData} />
+// 方式一：纯组件
+<ProTable columns={columns} request={fetchData} />;
 
-// 方式二：ref 操作表格
-const tableRef = useRef<ProTableActionType>(null);
-<ProTable ref={tableRef} columns={columns} request={fetchData} />
-tableRef.current?.reload();
+// 方式二：actionRef
+const ref = useRef<ProTableActionType>(null);
+<ProTable actionRef={ref} columns={columns} request={fetchData} />;
+ref.current?.reload();
 
-// 方式三：useProTable 简化模式（推荐）
-const { instance, bindingProps, dataSource, loading } = useProTable({
-  columns,
-  request: fetchData,
-});
-<ProTable {...bindingProps} />
+// 方式三：useProTable（推荐）
+const { instance, bindingProps } = useProTable({ columns, request: fetchData });
+<ProTable {...bindingProps} />;
+instance.reload();
 
-// 方式四：useProTable 完整模式（自定义 store）
-const store = createDataStore({ initialQuery: {...} });
-const { instance, bindingProps } = useProTable({ store, columns, request: fetchData });
-<ProTable {...bindingProps} />
-
-// 方式五：Provider 跨组件访问
+// 方式四：Provider 跨组件
 const { Provider, bindingProps } = useProTable({ columns, request: fetchData });
 <Provider>
   <ProTable {...bindingProps} />
-  <ChildComponent />  {/* 子组件可通过 useProTableContext() 访问实例 */}
-</Provider>
-
-// 方式六：DataContext 在表格内部使用
-const { action, store } = useDataContext();
-action.reload();
+  <ChildComponent />
+</Provider>;
 ```
 
 ---
 
-## 四、Schema 层
+## 三、类型定义
 
-### 3.1 ProColumnType（列配置）
-
-列配置是 ProTable 的核心，定义于 `types.ts`：
+### 3.1 ProColumnType
 
 ```typescript
 interface ProColumnType<T = Record<string, unknown>> {
-  dataIndex?: string | string[]; // 数据字段路径，支持嵌套
-  title?: ReactNode; // 列标题
-  valueType?: ProColumnValueType; // 值类型，决定渲染方式
+  dataIndex?: string | string[];      // 数据字段路径
+  title?: ReactNode;                   // 列标题
+  valueType?: ProColumnValueType;      // 值类型
   valueEnum?: Record<string, { text: string; color?: string; status?: string }>;
-  emptyText?: ReactNode; // 空值显示文本（默认 '--'）
-  hideInSearch?: boolean; // 是否在查询表单中隐藏
-  hideInTable?: boolean; // 是否在表格中隐藏
-  disableInSetting?: boolean; // 是否在列设置中禁用
-  search?: false | ProFormSchema; // 查询表单配置，设为 false 隐藏
-  ellipsis?: boolean; // 是否省略显示
-  copyable?: boolean; // 是否可拷贝
-  copyText?: (text: unknown, record: T) => string; // 自定义复制内容
-  width?: number | string; // 列宽
-  fixed?: 'left' | 'right'; // 固定列
-  align?: 'left' | 'center' | 'right'; // 对齐方式
-  tooltip?: string; // 列标题提示
-  cellTooltip?: boolean | string | ((text: unknown, record: T) => string);
-  dateFormat?: DateFormatType; // 日期格式化（默认 'YYYY-MM-DD'）
-  moneySymbol?: string; // 货币符号（默认 '¥'）
-  precision?: number; // 小数位数（默认 2）
-  thousandsSeparator?: boolean; // 是否千分位（默认 true）
-  render?: (
-    dom: ReactNode,
-    record: T,
-    index: number,
-    action: ProTableActionType,
-    schema: ProColumnType<T>,
-  ) => ReactNode;
-  renderText?: (text: unknown, record: T, index: number) => unknown;
-  oprTools?: OprToolConfig<T>[]; // 操作按钮组配置（用于 opr 类型）
-  proTableConfig?: ProTableConfig; // 子表格配置（用于 proTable 类型）
-  editable?: boolean | ((record: T, index: number) => boolean) | EditableConfig;
-  children?: ProColumnType<T>[]; // 分组表头子列
-  summary?: boolean | { type: string; render: (data: T[]) => ReactNode };
-  filters?: { text: string; value: string }[]; // 筛选配置
-  sorter?: boolean | ((a: T, b: T) => number); // 排序配置
-  defaultSortOrder?: 'ascend' | 'descend'; // 默认排序顺序
+  emptyText?: ReactNode;               // 空值显示文本
+  hideInSearch?: boolean;              // 查询表单中隐藏
+  hideInTable?: boolean;               // 表格中隐藏
+  disableInSetting?: boolean;          // 列设置中禁用
+  search?: false | (Omit<ProFormSchema, 'name'> & { order?; transform? });
+  ellipsis?: boolean;
+  copyable?: boolean;
+  copyText?: (text, record) => string;
+  width?: number | string;
+  fixed?: 'left' | 'right';
+  align?: 'left' | 'center' | 'right';
+  tooltip?: string;
+  cellTooltip?: boolean | string | ((text, record?, index?) => ReactNode);
+  dateFormat?: DateFormatType;
+  moneySymbol?: string;                // 默认 '¥'
+  precision?: number;                  // 默认 2
+  thousandsSeparator?: boolean;        // 默认 true
+  render?: (dom, entity, index, action, schema) => ReactNode;
+  renderText?: (text, record, index) => unknown;
+  oprTools?: OprToolConfig<T>[];       // 操作按钮（opr 类型）
+  proTableConfig?: { columns; dataSource?; tableProps?; dataPath?; title?; bordered?; size?; pagination? };
+  editable?: boolean | ((record) => boolean) | { component?; componentProps?; rules?; required?; formSchema? };
+  children?: ProColumnType<T>[];        // 分组表头
+  summary?: boolean | { type: 'sum'|'avg'|'min'|'max'|'count'; render? };
+  actions?: OprActionButtonConfig<T>[]; // 操作按钮（新方式，替代 oprTools）
+  // 筛选/排序
+  filters?: { text: ReactNode; value: unknown }[];
+  filterDropdown?: boolean;
+  onFilter?: (value, record) => boolean;
+  sorter?: boolean | ((a, b) => number) | 'ascend' | 'descend';
+  defaultSortOrder?: 'ascend' | 'descend';
+  sortPriority?: number;
+  // 渲染属性
+  componentProps?: { size?; width?; height?; preview?; objectFit?; borderRadius?; ... };
+  drag?: boolean;
+  cellClassName?: string | ((record, index) => string);
+  minWidth?: number;
+  maxWidth?: number;
 }
 ```
 
-### 3.2 ProColumnValueType（值类型）
+### 3.2 ProColumnValueType
 
-| 类型            | 说明         | 渲染结果                   |
-| --------------- | ------------ | -------------------------- |
-| `text`          | 文本         | 纯文本显示，支持省略和拷贝 |
-| `number`        | 数字         | 千分位格式化               |
-| `money`         | 金额         | 货币符号 + 千分位 + 小数   |
-| `percent`       | 百分比       | 百分比格式化               |
-| `date`          | 日期         | YYYY-MM-DD                 |
-| `dateTime`      | 日期时间     | YYYY-MM-DD HH:mm:ss        |
-| `time`          | 时间         | HH:mm:ss                   |
-| `dateRange`     | 日期范围     | 开始 \~ 结束               |
-| `dateTimeRange` | 日期时间范围 | 开始 \~ 结束               |
-| `select`        | 下拉选择     | 根据 valueEnum 显示文本    |
-| `radio`         | 单选         | 根据 valueEnum 显示文本    |
-| `checkbox`      | 多选         | 根据 valueEnum 显示标签    |
-| `switch`        | 开关         | 开关状态显示               |
-| `tag`           | 标签         | 彩色标签                   |
-| `avatar`        | 头像         | 圆形头像                   |
-| `image`         | 图片         | 缩略图 + 预览              |
-| `link`          | 链接         | 可点击链接                 |
-| `progress`      | 进度条       | 进度条组件                 |
-| `code`          | 代码         | 等宽字体显示               |
-| `json`          | JSON         | 格式化 JSON                |
-| `textarea`      | 文本域       | 多行文本                   |
-| `enum`          | 枚举         | 根据 valueEnum 显示标签    |
-| `index`         | 序号         | 自动序号                   |
-| `indexBorder`   | 带边框序号   | 带边框的序号               |
-| `opr`           | 操作列       | 操作按钮组                 |
-| `proTable`      | 子表格       | 嵌套表格                   |
+| 类型                            | 说明             | 渲染结果        |
+| ------------------------------- | ---------------- | --------------- |
+| `text`                          | 文本             | 纯文本          |
+| `number`                        | 数字             | 千分位格式化    |
+| `money`                         | 金额             | 货币符号+千分位 |
+| `percent`                       | 百分比           | 百分比格式化    |
+| `date` / `dateTime` / `time`    | 日期/时间        | 格式化日期      |
+| `dateRange` / `dateTimeRange`   | 日期范围         | 开始~结束       |
+| `select` / `radio` / `checkbox` | 选择             | valueEnum 映射  |
+| `switch` / `tag`                | 开关/标签        | 状态显示        |
+| `avatar` / `image`              | 图片             | 缩略图+预览     |
+| `link`                          | 链接             | 可点击链接      |
+| `progress`                      | 进度条           | 进度条组件      |
+| `code` / `json` / `textarea`    | 代码/JSON/文本域 | 格式化显示      |
+| `enum`                          | 枚举             | valueEnum 标签  |
+| `index` / `indexBorder`         | 序号             | 自动/带边框序号 |
+| `opr`                           | 操作列           | 操作按钮组      |
+| `proTable`                      | 子表格           | 嵌套表格        |
 
-### 3.3 ProTableProps（组件属性）
+### 3.3 ProTableProps
 
-```typescript
-interface ProTableProps<T = Record<string, unknown>> {
-  columns: ProColumnType<T>[]; // 列配置（必填）
-  request?: ProTableRequest<T>; // 数据请求函数
-  dataSource?: T[]; // 静态数据源（与 request 二选一）
-  params?: Record<string, unknown>; // 额外查询参数
-  defaultPageSize?: number; // 默认每页条数（默认 20）
-  pageSizeOptions?: number[]; // 分页大小选项（默认 [10,20,50,100]）
-  rowKey?: string | ((record: T) => string); // 行标识（默认 'id'）
+| 分类          | 属性                                                                                                    | 说明              |
+| ------------- | ------------------------------------------------------------------------------------------------------- | ----------------- |
+| **核心**      | `columns`, `request`, `dataSource`, `params`, `rowKey`                                                  | 列配置和数据      |
+| **分页**      | `pagination`, `defaultPageSize`, `pageSizeOptions`                                                      | 分页设置          |
+| **搜索**      | `search`, `beforeRequest`, `afterRequest`, `postData`                                                   | 查询表单          |
+| **工具栏**    | `toolbar`, `headerTitle`, `onDensityChange`, `onColumnsStateChange`                                     | 工具栏            |
+| **行选择**    | `rowSelection`, `batchOperation`                                                                        | 选择和批量操作    |
+| **请求**      | `manual`, `debounceTime`, `polling`, `onRequestError`                                                   | 请求控制          |
+| **高级**      | `urlSync`, `searchSchema`, `virtualScroll`, `dragSort`, `cardMode`, `viewMode`, `cache`, `cacheKey`     | 高级功能          |
+| **编辑**      | `editable`                                                                                              | 可编辑表格        |
+| **样式**      | `className`, `style`, `containerClassName`, `containerStyle`, `cardContainer`, `bordered`               | 外观              |
+| **展开**      | `defaultExpandAllRows`, `defaultExpandedRowKeys`, `expandedRowKeys`, `expandedRowRender`, `expandProps` | 展开行            |
+| **汇总/粘性** | `tableSummary`, `stickyHeader`, `cellMerge`, `groupColumns`                                             | 表格功能          |
+| **事件**      | `onCreate`, `onEdit`, `onView`, `onDelete`, `onExport`, `onImport`                                      | ActionButton 事件 |
+| **弹窗**      | `dialogConfig`, `columnsStatePersistenceKey`                                                            | 弹窗/持久化       |
 
-  // 查询表单
-  search?: boolean | SearchConfig;
+### 3.4 ProTableActionType
 
-  // 工具栏
-  toolbar?: ToolbarConfig | false;
+| 方法                                                                                                            | 说明             |
+| --------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `reload(resetPageIndex?)`                                                                                       | 重新加载数据     |
+| `reloadAndRest()`                                                                                               | 刷新并清空选中   |
+| `reset()`                                                                                                       | 重置查询条件     |
+| `clearSelected()` / `setSelectedRows()` / `setSelectedRowKeys()` / `getSelectedRows()` / `getSelectedRowKeys()` | 行选择           |
+| `startEditable()` / `cancelEditable()` / `saveEditable()` / `deleteEditable()`                                  | 可编辑行         |
+| `getPagination()` / `setPagination()`                                                                           | 分页控制         |
+| `getParams()` / `setParams()`                                                                                   | 查询参数         |
+| `getFormInstance()`                                                                                             | 获取查询表单实例 |
+| `startPolling()` / `stopPolling()` / `getPollingStatus()`                                                       | 轮询             |
+| `debouncedFetchData(params?)`                                                                                   | 防抖请求         |
+| `openDialog(config)` / `confirm(config)`                                                                        | 弹窗             |
+| `scrollToIndex()` / `scrollToTop()` / `scrollToBottom()`                                                        | 虚拟滚动         |
+| `resetDragSort()`                                                                                               | 拖拽排序         |
+| `clearCache()`                                                                                                  | 清空缓存         |
 
-  // 行选择
-  rowSelection?: RowSelectionConfig | boolean;
-
-  // 批量操作
-  batchOperation?: BatchOperationConfig;
-
-  // 分页
-  pagination?: PaginationConfig | false;
-
-  // 可编辑表格
-  editable?: EditableConfig<T>;
-
-  // 请求控制
-  manual?: boolean; // 是否手动触发请求
-  debounceTime?: number; // 请求防抖时间（毫秒，默认 300）
-  polling?: number | PollingConfig; // 轮询间隔（毫秒）
-  beforeRequest?: (params: Record<string, unknown>) => Record<string, unknown>;
-  afterRequest?: (data: T[], total: number) => { data: T[]; total: number };
-  onRequestError?: (error: Error) => void;
-  postData?: (data: T[]) => T[];
-
-  // 高级功能
-  urlSync?: boolean | UrlSyncConfig; // URL 同步配置
-  searchSchema?: SearchSchemaConfig; // 查询方案配置
-  virtualScroll?: boolean; // 是否启用虚拟滚动
-  dragSort?: boolean | DragSortConfig; // 是否启用拖拽排序
-  cardMode?: boolean; // 是否支持卡片视图切换
-  viewMode?: 'table' | 'card'; // 视图模式（默认 'table'）
-  cache?: boolean | CacheConfig; // 是否启用数据缓存
-  cacheKey?: string; // 缓存 key
-
-  // 事件处理器
-  onCreate?: (config: ActionButtonConfig<T>) => void;
-  onEdit?: (config: ActionButtonConfig<T>) => void;
-  onView?: (config: ActionButtonConfig<T>) => void;
-  onDelete?: (config: ActionButtonConfig<T>) => void;
-  onExport?: (config: ActionButtonConfig<T>) => void;
-  onImport?: (config: ActionButtonConfig<T>) => void;
-}
-```
-
-### 3.4 ProTableActionType（表格实例方法）
-
-| 方法                                   | 说明                             |
-| -------------------------------------- | -------------------------------- |
-| `reload(resetPageIndex?)`              | 重新加载数据，可选择是否重置页码 |
-| `reloadAndRest()`                      | 重置并重新加载                   |
-| `reset()`                              | 重置查询条件和分页               |
-| `clearSelected()`                      | 清空选中行                       |
-| `setSelectedRows(rows)`                | 设置选中行                       |
-| `setSelectedRowKeys(keys)`             | 设置选中行 keys                  |
-| `getSelectedRows()`                    | 获取选中行数据                   |
-| `getSelectedRowKeys()`                 | 获取选中行 keys                  |
-| `startEditable(rowKey)`                | 开始编辑指定行                   |
-| `cancelEditable(rowKey)`               | 取消编辑                         |
-| `saveEditable(rowKey)`                 | 保存编辑                         |
-| `deleteEditable(rowKey)`               | 删除行                           |
-| `getPagination()`                      | 获取分页信息                     |
-| `setPagination({ current, pageSize })` | 设置分页                         |
-| `getParams()`                          | 获取查询参数                     |
-| `setParams(params)`                    | 设置查询参数                     |
-| `getFormInstance()`                    | 获取查询表单实例                 |
-| `startPolling()`                       | 开始轮询                         |
-| `stopPolling()`                        | 停止轮询                         |
-| `openDialog(config)`                   | 打开弹窗                         |
-| `confirm(config)`                      | 确认对话框                       |
-| `scrollToIndex(index)`                 | 滚动到指定行（虚拟滚动）         |
-| `scrollToTop()`                        | 滚动到顶部（虚拟滚动）           |
-| `scrollToBottom()`                     | 滚动到底部（虚拟滚动）           |
-| `resetDragSort()`                      | 重置拖拽排序                     |
-| `clearCache()`                         | 清除缓存                         |
-
-### 3.5 ToolbarConfig（工具栏配置）
+### 3.5 ProTableToolbarConfig
 
 ```typescript
-interface ToolbarConfig {
-  title?: ReactNode; // 工具栏标题
-  subTitle?: ReactNode; // 副标题
-  description?: ReactNode; // 描述
-  showRefresh?: boolean; // 显示刷新按钮（默认 false）
-  showDensity?: boolean; // 显示密度切换（默认 false）
-  showColumnSetting?: boolean; // 显示列设置（默认 false）
-  showFullscreen?: boolean; // 显示全屏按钮（默认 false）
-  leftRender?: ReactNode; // 左侧自定义渲染
-  rightRender?: ReactNode; // 右侧自定义渲染
-  toolbarRender?: ReactNode | ((toolbar: ReactNode) => ReactNode);
-  actions?: ActionButtonConfig[]; // 操作按钮配置
+interface ProTableToolbarConfig {
+  title?: ReactNode;
+  subTitle?: ReactNode;
+  description?: ReactNode;
+  showRefresh?: boolean;
+  showDensity?: boolean;
+  showColumnSetting?: boolean;
+  showFullscreen?: boolean;
+  leftRender?: ReactNode;
+  rightRender?: ReactNode;
+  toolbarRender?: (actions: ProTableActionType, rows: { selectedRows; selectedRowKeys }) => ReactNode;
+  actions?: ToolbarActionConfig;
 }
 ```
 
 ---
 
-## 五、Core 层
+## 四、Core 层
 
-Core 层是整个表格的状态管理引擎，位于 `store/` 和 `request/` 目录，不依赖 React，可独立运行。
+### 4.1 DataStore
 
-### 11.1 DataStore — 数据状态管理中心
+基于 `@lania-pro-components/utils` 的 `createStore` 实现。
 
-**文件**：`store/DataStore.ts`
+**状态**：`dataSource`, `loading`, `error`, `total`, `query`, `pagination`, `sorter`, `filters`, `selectedRowKeys`, `selectedRows`, `isPolling`, `pollingInterval`
 
-**职责**：管理所有表格数据状态，采用发布-订阅模式实现状态变更通知
+**副作用链**：
 
-**核心数据结构**：
+| 操作                      | 连锁变更               |
+| ------------------------- | ---------------------- |
+| `setQuery(query)`         | 页码→第1页 + 清空选中  |
+| `setPageSize(size)`       | 页码→第1页 + 清空选中  |
+| `setPage(page)`           | 仅更新页码（保留选中） |
+| `setSorter(field, order)` | 页码→第1页             |
+| `setFilters(filters)`     | 页码→第1页             |
+
+**架构债务修复**：`reload()` 使用实例级回调注册表替代 `window.dispatchEvent` 全局广播。
+
+### 4.2 RequestEngine
+
+`@deprecated` — 通用请求管理已迁移到 `@lania-pro-components/shared` 的 `useAsyncRequest`。
+
+ProTable 专用请求逻辑（DataStore 集成、分页自动调整、缓存）在 `hooks/useRequest.ts`。
+
+### 4.3 columnRender / cellMerge / defineEnumMap
+
+位于 `utils/` 目录，提供列渲染、单元格合并、枚举映射等工具函数。
+
+---
+
+## 五、useProTable Hook
 
 ```typescript
-interface DataStoreState<T = Record<string, unknown>> {
-  dataSource: T[]; // 数据源
-  loading: boolean; // 加载状态
-  error: Error | null; // 错误信息
-  total: number; // 总条数
-  query: Record<string, unknown>; // 查询条件
-  pagination: { current: number; pageSize: number };
-  sorter: { field?: string; order?: 'ascend' | 'descend' };
-  filters: Record<string, unknown>; // 筛选状态
-  selectedRowKeys: (string | number)[]; // 选中行 keys
-  selectedRows: T[]; // 选中行数据
-  isPolling: boolean; // 轮询状态
-  pollingInterval: number; // 轮询间隔
-}
+const {
+  tableRef, // 表格实例 ref
+  instance, // ProTableInstance（完整 API）
+  bindingProps, // 可直接绑定到 <ProTable>
+  dataSource, // 数据源
+  loading, // 加载状态
+  pagination, // 分页信息
+  selectedRowKeys, // 选中行 keys
+  selectedRows, // 选中行数据
+  query, // 查询参数
+  Provider, // Context Provider（跨组件）
+} = useProTable(options);
+```
 
-class DataStore<T = Record<string, unknown>> {
-  private _state: DataStoreState<T>;
-  private _listeners: Set<StateChangeListener<T>>;
+### ProTableInstance
+
+```typescript
+interface ProTableInstance {
+  reload: () => Promise<void>;
+  refresh: () => Promise<void>;
+  reset: () => Promise<void>;
+  getPagination: () => { current; pageSize; total };
+  setPagination: (p) => void;
+  getQueryParams: () => Record<string, unknown>;
+  setQueryParams: (params) => void;
+  getSorter: () => { field?; direction? } | null;
+  clearSorter: () => void;
+  getSelectedRows: () => Record<string, unknown>[];
+  getSelectedRowKeys: () => (string | number)[];
+  setSelectedRows: (keys, rows) => void;
+  clearSelection: () => void;
+  getDataSource: () => Record<string, unknown>[];
+  setDataSource: (data) => void;
+  getLoading: () => boolean;
+  expandAll: () => void;
+  collapseAll: () => void;
+  expandRow: (rowKey) => void;
+  collapseRow: (rowKey) => void;
 }
 ```
 
-**关键方法**：
+---
 
-| 方法                        | 说明                                         |
-| --------------------------- | -------------------------------------------- |
-| `getState()`                | 获取当前完整状态                             |
-| `setDataSource(dataSource)` | 设置数据源                                   |
-| `setLoading(loading)`       | 设置加载状态                                 |
-| `setTotal(total)`           | 设置总条数                                   |
-| `setQuery(query)`           | 设置查询条件（连锁变更：重置页码、清空选中） |
-| `setPage(current)`          | 设置页码（保留选中状态，支持跨页选择）       |
-| `setPageSize(pageSize)`     | 设置每页条数（连锁变更：重置页码、清空选中） |
-| `setSorter(field, order)`   | 设置排序（连锁变更：重置页码）               |
-| `setFilters(filters)`       | 设置筛选（连锁变更：重置页码）               |
-| `reset()`                   | 重置所有状态到初始值                         |
-| `subscribe(listener)`       | 订阅状态变化（返回取消订阅函数）             |
-| `_notify(key, prevValue)`   | 通知所有订阅者                               |
+## 六、功能模块
 
-**状态变更的"副作用链"**：
+| 模块           | 组件/Hook                                                      | 说明                                  |
+| -------------- | -------------------------------------------------------------- | ------------------------------------- |
+| **查询表单**   | `QueryForm`                                                    | 与 ProForm 联动，支持折叠、多列布局   |
+| **表格渲染**   | `TableRenderer`                                                | 基于 Arco Table，支持列显隐/密度/排序 |
+| **工具栏**     | `Toolbar`                                                      | 标题、刷新、密度、列设置、全屏        |
+| **分页**       | `Pagination`                                                   | 支持页大小切换、总数显示              |
+| **批量操作**   | `BatchOperation`                                               | 选中后出现操作栏                      |
+| **行操作**     | `OprColumn` + `ActionButtonRenderer`                           | 操作列按钮组                          |
+| **可编辑表格** | `useEditableTable` + `EditableCell`                            | 行内编辑                              |
+| **虚拟滚动**   | `useVirtualScroll`（from shared）                              | 大数据量优化                          |
+| **拖拽排序**   | `useDragSort` + `DragSortTable`                                | 行拖拽排序                            |
+| **URL 同步**   | `useUrlSync`                                                   | 查询参数同步到 URL                    |
+| **查询方案**   | `useSearchSchema` + `SearchSchemaSelector`                     | 保存/切换查询方案                     |
+| **卡片视图**   | `CardView` + `ViewModeSwitch`                                  | 表格/卡片切换                         |
+| **骨架屏**     | `SkeletonTable`                                                | 加载中占位                            |
+| **弹窗**       | `TableDialog`（openDialog/confirm/info/success/warning/error） | 命令式弹窗                            |
 
-| 操作方法                  | 主变更       | 连锁变更                                                                          |
-| ------------------------- | ------------ | --------------------------------------------------------------------------------- |
-| `setQuery(query)`         | 更新查询条件 | ① pagination 回到第 1 页 ② 清空 selectedRowKeys ③ 清空 selectedRows               |
-| `setPageSize(size)`       | 更新每页条数 | ① pagination 回到第 1 页 ② 清空 selectedRowKeys ③ 清空 selectedRows               |
-| `setPage(page)`           | 更新页码     | 仅更新页码（保留选中状态，支持跨页选择）                                          |
-| `setSorter(field, order)` | 更新排序     | ① pagination 回到第 1 页                                                          |
-| `setFilters(filters)`     | 更新筛选     | ① pagination 回到第 1 页                                                          |
-| `reset()`                 | 恢复初始状态 | 同时更新 query、pagination、sorter、filters、selectedRowKeys、selectedRows、error |
+---
 
-### 11.2 RequestEngine — 请求执行引擎
+## 七、Context 层
 
-**文件**：`request/RequestEngine.ts`
+| Context              | 说明                               |
+| -------------------- | ---------------------------------- |
+| `RootContext`        | 全局配置（props、rowKey、回调）    |
+| `DataContext`        | 数据状态（DataStore）+ action 方法 |
+| `ColumnContext`      | 列配置、列显隐、密度               |
+| `TableConfigContext` | 合并后的完整配置                   |
 
-**职责**：封装请求执行、取消、防抖，管理请求生命周期
+---
 
-**核心实现**：
+## 八、可编辑表格
 
-```typescript
-class RequestEngineImpl {
-  private abortController: AbortController | null = null;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+通过 `editable` prop 启用，支持 `single`/`multiple` 编辑模式：
 
-  async execute(params) {
-    this.cancel(); // ① 取消上一次请求
-    this.abortController = new AbortController();
-    const response = await request(finalParams);
-    // ... 处理响应
-  }
+```tsx
+<ProTable
+  editable={{
+    type: 'single',
+    onSave: async (rowKey, data, row) => {
+      /* 保存 */
+    },
+    onDelete: async (rowKey, row) => {
+      /* 删除 */
+    },
+  }}
+  columns={[
+    { title: '姓名', dataIndex: 'name', editable: true },
+    { title: '年龄', dataIndex: 'age', editable: { component: 'InputNumber' } },
+  ]}
+/>
+```
 
-  cancel() {
-    if (this.abortController) {
-      this.abortController.abort(); // ② 使用 AbortController 取消请求
-      this.abortController = null;
-    }
-  }
-
-  debouncedExecute(params, wait) {
     return new Promise((resolve, reject) => {
       if (this.debounceTimer) clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(async () => {
@@ -531,8 +426,10 @@ class RequestEngineImpl {
         }
       }, wait);
     });
-  }
+
 }
+}
+
 ```
 
 **请求取消 vs 请求防抖**：
@@ -551,17 +448,19 @@ class RequestEngineImpl {
 **渲染流程**：
 
 ```
+
 valueType → 查找渲染器 → 执行渲染 → 返回 ReactNode
-    │
-    ├── text → textRenderer
-    ├── number → numberRenderer（千分位）
-    ├── money → moneyRenderer（货币符号 + 千分位）
-    ├── date → dateRenderer（日期格式化）
-    ├── tag → tagRenderer（根据 valueEnum）
-    ├── opr → oprRenderer（操作按钮组）
-    ├── proTable → proTableRenderer（嵌套表格）
-    └── ... 其他类型
-```
+│
+├── text → textRenderer
+├── number → numberRenderer（千分位）
+├── money → moneyRenderer（货币符号 + 千分位）
+├── date → dateRenderer（日期格式化）
+├── tag → tagRenderer（根据 valueEnum）
+├── opr → oprRenderer（操作按钮组）
+├── proTable → proTableRenderer（嵌套表格）
+└── ... 其他类型
+
+````
 
 **通用处理**：
 
@@ -595,7 +494,7 @@ interface RootContextValue<T = Record<string, unknown>> {
   rowKey: string | ((record: T) => string); // 行标识配置
   getRowKey: (record: T) => string; // 获取行 key 的函数
 }
-```
+````
 
 ### 11.3 DataContext — 数据状态层
 

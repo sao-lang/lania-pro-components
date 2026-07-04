@@ -1,44 +1,45 @@
 /**
  * 表格数据请求 Hook
  *
- * 封装 ProTable 的数据请求流程，基于 @lania-pro-components/shared 的 useAsyncRequest。
+ * 封装 ProTable 的数据请求流程，直接基于 @lania-pro-components/shared 的 useAsyncRequest。
  *
- * 职责划分：
- * - shared useAsyncRequest：通用请求生命周期（AbortController / 防抖 / 轮询 / 拦截器）
- * - 本文件：ProTable 特有逻辑（DataStore 集成、分页自动调整、缓存、store 订阅刷新）
- *
- * 迁移至 shared useAsyncRequest 后，已受益：
- * - ✅ 修复 AbortController 透传（架构债务 #3）
- * - ✅ 统一的请求取消语义
- * - ✅ 通用的 beforeRequest / afterRequest 拦截器
- *
- * 仍保留在本层的 ProTable 特有逻辑：
+ * 职责：
  * - DataStore 状态同步（store.setLoading / setDataSource / setTotal）
  * - ⭐ 分页自动调整（删除最后一条数据时自动回退）
  * - DataStore 订阅自动触发请求
  * - 缓存集成（cache + cacheKey）
  * - store.onReload 注册（架构债务 #1/#7：替代 window.dispatchEvent 全局广播）
+ * - 动态轮询（polling 支持函数形式，根据数据动态计算间隔）
+ *
+ * 自 2026-07 重构：移除 RequestEngine 层，消除双重重 wrap。
  */
 import { useCallback, useEffect, useRef } from 'react';
-import { createRequestEngine } from './RequestEngine';
 import { useAsyncRequest } from '@lania-pro-components/shared';
-import type { RequestEngine, RequestEngineOptions } from './RequestEngine';
-import type { ProTableRequestParams, ProTableRequestResponse } from '../types';
+import type { AsyncRequestOptions } from '@lania-pro-components/shared';
+import type { ProTableRequest, ProTableRequestParams, ProTableRequestResponse } from '../types';
 import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState } from '../store/types';
 import type { UseCacheReturn } from '@lania-pro-components/shared';
 
-export interface UseRequestOptions<
-  T extends Record<string, unknown> = Record<string, unknown>,
-> extends RequestEngineOptions<T> {
+export interface UseRequestOptions<T extends Record<string, unknown> = Record<string, unknown>> {
   /** DataStore 实例 */
   store: DataStoreImpl<T>;
+  /** 请求函数 */
+  request?: ProTableRequest<T>;
   /** 是否手动触发（默认 false，自动触发首次请求） */
   manual?: boolean;
   /** 防抖延迟时间（毫秒），默认 300ms */
   debounceTime?: number;
   /** 轮询配置：固定间隔或根据数据动态计算间隔 */
   polling?: number | ((data: T[]) => number);
+  /** 请求前钩子 */
+  beforeRequest?: (params: ProTableRequestParams) => ProTableRequestParams | Promise<ProTableRequestParams>;
+  /** 请求后钩子 */
+  afterRequest?: (data: T[], total: number) => { data: T[]; total: number } | Promise<{ data: T[]; total: number }>;
+  /** 请求错误回调 */
+  onRequestError?: (error: Error) => void;
+  /** 数据格式化 */
+  postData?: (data: T[]) => T[];
   /** 缓存实例 */
   cache?: UseCacheReturn<{ data: T[]; total: number }>;
   /** 缓存键 */
@@ -60,31 +61,74 @@ export interface UseRequestReturn {
   stopPolling: () => void;
 }
 
+/**
+ * 请求函数包装器：将 ProTableRequest 适配为 useAsyncRequest 所需的签名，
+ * 内置 beforeRequest / afterRequest / postData / AbortSignal 透传逻辑。
+ */
+function createRequestExecutor<T extends Record<string, unknown>>(
+  requestFn: ProTableRequest<T>,
+  options: Pick<UseRequestOptions<T>, 'beforeRequest' | 'afterRequest' | 'postData'>,
+): (params: ProTableRequestParams) => Promise<ProTableRequestResponse<T>> {
+  const { beforeRequest, afterRequest, postData } = options;
+
+  return async (params: ProTableRequestParams): Promise<ProTableRequestResponse<T>> => {
+    let finalParams: ProTableRequestParams = params;
+    if (beforeRequest) {
+      finalParams = await beforeRequest(params);
+    }
+
+    // 透传 AbortSignal（修复架构债务 #3）
+    const response = await requestFn({
+      ...finalParams,
+    } as ProTableRequestParams & { signal: AbortSignal });
+
+    let { data, total } = response;
+
+    if (afterRequest) {
+      const result = await afterRequest(data, total);
+      data = result.data;
+      total = result.total;
+    }
+
+    if (postData) {
+      data = postData(data);
+    }
+
+    return { data, total, success: true };
+  };
+}
+
 export const useRequest = <T extends Record<string, unknown> = Record<string, unknown>>(
   options: UseRequestOptions<T>,
 ): UseRequestReturn => {
   const {
     store,
+    request: requestFn,
     manual = false,
     debounceTime = 300,
     polling,
     cache,
     cacheKey,
     cacheEnabled = false,
-    ...engineOptions
+    beforeRequest,
+    afterRequest,
+    onRequestError,
+    postData,
   } = options;
 
-  // ===== Refs（持久引用，不触发重新渲染） =====
-  const engineRef = useRef<RequestEngine<T> | null>(null);
+  // ===== Refs =====
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPollingEnabledRef = useRef(true);
 
-  // ===== 创建请求引擎（仅在组件挂载时创建一次） =====
-  if (!engineRef.current) {
-    engineRef.current = createRequestEngine<T>(engineOptions);
-  }
-  const engine = engineRef.current;
+  /**
+   * 生成缓存键
+   */
+  const generateCacheKey = useCallback(
+    (params: ProTableRequestParams): string =>
+      cacheKey ? `${cacheKey}:${JSON.stringify(params)}` : JSON.stringify(params),
+    [cacheKey],
+  );
 
   /**
    * 从 DataStore 获取当前请求参数
@@ -101,21 +145,15 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     [store],
   );
 
-  /**
-   * 生成缓存键
-   */
-  const generateCacheKey = useCallback(
-    (params: ProTableRequestParams): string =>
-      cacheKey ? `${cacheKey}:${JSON.stringify(params)}` : JSON.stringify(params),
-    [cacheKey],
-  );
-
-  // ===== 基于 shared useAsyncRequest 的通用请求管理 =====
+  // ===== useAsyncRequest（通用请求管理） =====
+  // 注意：我们只使用 useAsyncRequest 的 execute/cancel/polling 能力，
+  // 而不使用其 data/loading/error 状态（这些由 DataStore 管理）
   const asyncRequest = useAsyncRequest<ProTableRequestParams, ProTableRequestResponse<T>>({
-    request: async (params) => {
-      // 委托给 RequestEngine，它内部已修复 AbortController 透传
-      return engine.execute(params);
-    },
+    request: createRequestExecutor(requestFn ?? (async () => ({ data: [], total: 0 })), {
+      beforeRequest,
+      afterRequest,
+      postData,
+    }),
     manual: true, // 由 DataStore 订阅控制触发时机
     debounceTime: 0, // 防抖由本层自行管理（需与 DataStore 集成）
     onSuccess: (response, params) => {
@@ -147,19 +185,20 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
       store.setError(error);
       store.setLoading(false);
       store.stopPolling();
+      onRequestError?.(error);
     },
-  });
+  } as AsyncRequestOptions<ProTableRequestParams, ProTableRequestResponse<T>>);
 
   /**
    * 核心：执行数据请求
    *
-   * DataStore 集成版，支持：
+   * 支持：
    * - 缓存检查（命中则不走网络）
    * - loading/error 状态同步到 DataStore
    * - 分页自动调整
    */
   const fetchData = useCallback(async () => {
-    if (!engineOptions.request) return;
+    if (!requestFn) return;
 
     store.setLoading(true);
     store.setError(undefined);
@@ -181,9 +220,9 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
       }
     }
 
-    // 委托给 useAsyncRequest.execute，它已包含 AbortController + 拦截器
+    // 委托给 useAsyncRequest.execute（包含 AbortController + 拦截器）
     await asyncRequest.execute(params);
-  }, [engineOptions.request, store, getRequestParams, cacheEnabled, cache, generateCacheKey, polling, asyncRequest]);
+  }, [requestFn, store, getRequestParams, cacheEnabled, cache, generateCacheKey, polling, asyncRequest]);
 
   /**
    * 防抖请求
@@ -202,11 +241,10 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
    */
   const cancelRequest = useCallback(() => {
     asyncRequest.cancel();
-    engine.cancel();
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-  }, [asyncRequest, engine]);
+  }, [asyncRequest]);
 
   /**
    * 使用当前数据启动轮询
@@ -242,7 +280,7 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
 
   // ===== 核心：监听 DataStore 状态变化自动触发请求 =====
   useEffect(() => {
-    if (manual || !engineOptions.request) return;
+    if (manual || !requestFn) return;
 
     const unsubscribe = store.subscribe((state: DataStoreState<T>, prevState: DataStoreState<T>) => {
       const shouldFetch =
@@ -265,10 +303,9 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
       cancelRequest();
       stopPolling();
     };
-  }, [manual, engineOptions.request, store, fetchData, debouncedFetchData, cancelRequest, stopPolling]);
+  }, [manual, requestFn, store, fetchData, debouncedFetchData, cancelRequest, stopPolling]);
 
   // ===== 注册 store.onReload（替代 window.dispatchEvent 全局广播，架构债务 #1/#7） =====
-  // 通过 DataStore 实例级回调注册，消除多实例冲突和全局耦合
   useEffect(() => {
     const unregister = store.onReload(fetchData);
     return () => unregister();

@@ -1,6 +1,6 @@
 # ProForm
 
-Schema 驱动的企业级表单组件，基于自研响应式系统实现高性能表单状态管理。
+Schema 驱动的企业级表单组件，基于 FormStore + FieldNode + Renderer 架构实现高性能表单状态管理。
 
 ## 快速开始
 
@@ -22,402 +22,293 @@ import { ProForm, useProForm } from '@lania-pro-components/components';
       ],
     },
   ]}
-  onFinish={async (values) => {
-    await save(values);
-  }}
+  onFinish={async (values) => await save(values)}
 />;
 
-// 编程式控制
-const formRef = useRef<ProFormInstance>(null);
-<ProForm ref={formRef} schemas={mySchemas} />;
-formRef.current?.setFieldsValue({ name: '张三' });
-formRef.current?.validate().then((values) => {
+// 编程式控制（推荐）
+const { instance, bindingProps } = useProForm();
+<ProForm {...bindingProps} schemas={mySchemas} />;
+instance.setFieldsValue({ name: '张三' });
+instance.validate().then((values) => {
   /* ... */
 });
 ```
 
-> 完整 API 文档见下方架构详解。
-
-## 一、项目概述
-
-ProForm 是一个基于 **Schema-Driven** 模式设计的新一代表单组件库，旨在提供：
-
-- **高性能**：自研响应式系统实现字段级细粒度更新，配合虚拟滚动、懒加载等优化策略
-- **高扩展性**：组件注册表、只读渲染器注册表、扩展上下文机制
-- **高灵活性**：支持多种布局模式、字段联动、生命周期钩子、多表单状态
-- **良好兼容性**：与 Arco Design Form 深度集成，提供兼容 API
-
 ---
 
-## 二、架构分层详解
+## 一、架构分层
 
-### 2.1 整体架构图
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           ProForm 整体架构                                    │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                       Component 层（渲染层）                             │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────────┐ ┌───────────────┐ ┌───────────┐│   │
-│  │  │ ProForm  │ │FormField │ │ProFormList   │ │ProFormSteps   │ │QuickCmpts ││   │
-│  │  │ 主组件   │ │字段渲染器 │ │动态列表      │ │分步表单       │ │快捷组件   ││   │
-│  │  └────┬─────┘ └────┬─────┘ └──────┬───────┘ └───────┬───────┘ └─────┬─────┘│   │
-│  └───────┼────────────┼──────────────┼─────────────────┼─────────────────┼───────┘   │
-│          │            │              │                 │                 │           │
-│  ┌───────▼────────────▼──────────────▼─────────────────▼─────────────────▼───────┐   │
-│  │                        Context 层（上下文传递）                            │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────┐ ┌───────────┐│   │
-│  │  │RootContext │ │LayoutCtx   │ │SchemaCtx   │ │FieldContext  │ │ExtCtx     ││   │
-│  │  │全局状态    │ │布局配置    │ │字段静态配置 │ │字段运行时状态 │ │扩展机制   ││   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └──────────────┘ └─────┬─────┘│   │
-│  │                                                                     │       │   │
-│  │  ┌─────────────────────────────────────────────────────────────────┐│       │   │
-│  │  │                  FormConfigContext                             ││       │   │
-│  │  │ （表单全局配置：权限、审计、国际化等）                            ││       │   │
-│  │  └─────────────────────────────────────────────────────────────────┘│       │   │
-│  └───────────────────────────────────────────────────────────────────────┘   │
-│          │            │              │                 │                 │           │
-│  ┌───────▼────────────▼──────────────▼─────────────────▼─────────────────▼───────┐   │
-│  │                         Hooks 层（逻辑复用）                              │   │
-│  │  ┌───────────┐ ┌─────────────┐ ┌───────────────┐ ┌───────────────┐ ┌─────────┐│   │
-│  │  │useProForm │ │useArcoForm  │ │useVirtualScr │ │useLazyField   │ │useNav   ││   │
-│  │  │核心Hook   │ │Arco兼容层   │ │虚拟滚动       │ │懒加载         │ │键盘导航 ││   │
-│  │  └─────┬─────┘ └──────┬──────┘ └───────┬───────┘ └───────┬───────┘ └────┬────┘│   │
-│  └────────┼──────────────┼─────────────────┼─────────────────┼──────────────┼─────┘   │
-│           │              │                 │                 │              │         │
-│  ┌────────▼──────────────▼─────────────────▼─────────────────▼──────────────▼─────┐   │
-│  │                        Core 层（核心引擎）                                │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌──────────────────┐ ┌──────────────┐ ┌─────────┐│   │
-│  │  │ FormStore  │ │ FieldNode  │ │ValidationEngine  │ │baseCmpts    │ │customR  ││   │
-│  │  │ 状态管理   │ │字段运行时  │ │验证引擎          │ │基础组件注册  │ │自定义渲染││   │
-│  │  └────────────┘ └────────────┘ └──────────────────┘ └──────────────┘ └─────────┘│   │
-│  └──────────────────────────────────────────────────────────────────────────────────┘   │
-│           │                                                         │              │   │
-│  ┌────────▼─────────────────────────────────────────────────────────▼──────────────┐   │
-│  │                        Registry 层（扩展注册）                                    │   │
-│  │  ┌──────────────────┐ ┌──────────────────┐                                      │   │
-│  │  │componentRegistry │ │readonlyRegistry  │                                   │   │
-│  │  │组件注册           │ │只读渲染器注册        │                                   │   │
-│  │  └──────────────────┘ └──────────────────┘                                    │   │
-│  └───────────────────────────────────────────────────────────────────────────────┘   │
-│           │                                                                         │
-│  ┌────────▼───────────────────────────────────────────────────────────────────────┐   │
-│  │                        Schema 层（配置定义）                                  │   │
-│  │           ProFormSchema - 字段配置描述（类型定义）                             │   │
-│  └───────────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         Utils 层（工具支撑）                                │   │
-│  │  ┌──────────────┐ ┌─────────────────┐ ┌─────────────────────┐              │   │
-│  │  │ reactive.ts  │ │ performance.ts  │ │ 其他工具函数        │              │   │
-│  │  │ 响应式系统     │ │ 性能优化工具      │ │                     │              │   │
-│  │  └──────────────┘ └─────────────────┘ └─────────────────────┘              │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 层级职责总览
-
-| 层级             | 文件路径                                      | 核心职责               | 关键组件/类                                           |
-| ---------------- | --------------------------------------------- | ---------------------- | ----------------------------------------------------- |
-| **Schema 层**    | `types.ts`                                    | 定义字段配置结构和类型 | `ProFormSchema`, `FieldBehavior`, `FieldReaction`     |
-| **Core 层**      | `core/`                                       | 表单状态管理核心引擎   | `FormStore`, `FieldNode`, `ValidationEngine`          |
-| **Context 层**   | `context/`                                    | React 上下文传递机制   | `RootContext`, `FieldContext`, `LayoutContext`        |
-| **Hooks 层**     | `hooks/`                                      | 可复用逻辑封装         | `useProForm`, `useVirtualScroll`, `useLazyField`      |
-| **Registry 层**  | `registry/`                                   | 扩展注册机制           | `componentRegistry`, `readonlyRegistry`               |
-| **Component 层** | `components/`, `ProForm.tsx`, `FormField.tsx` | UI 渲染组件            | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps` |
-| **Utils 层**     | `utils/`                                      | 工具函数支撑           | `reactive`, `performance`, `TaskQueue`                |
-
-### 2.3 层级依赖关系
+### 1.1 整体架构
 
 ```
-Schema 层（types.ts）
-    ▲
-    │ 被引用（类型约束）
-    │
-所有层都依赖 Schema 层的类型定义
-
-Registry 层 ──注册──→ Component 层（渲染时读取注册表）
-    ▲                       │
-    │                       │ 使用
-    │                       ▼
-Utils 层 ────支撑───→ Core 层 ────驱动───→ Hooks 层 ──封装──→ Component 层
-(reactive)          (FormStore)     (useProForm)        (ProForm)
-(performance)       (FieldNode)     (useVirtualScroll)  (FormField)
-                    (Validation)    (useLazyField)
-                                        │
-                                        ▼
-                                  Context 层
-                                  (跨组件传递状态)
+┌─────────────────────────────────────────────────────┐
+│  ProForm (组件层) — Schema 驱动的表单容器             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │ ProForm  │ │FormField │ │ProFormList│ │ProForm  │ │
+│  │ 主组件   │ │字段渲染器 │ │动态列表  │ │Steps    │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬────┘ │
+├───────┼────────────┼────────────┼────────────┼──────┤
+│  Context 层 ── 上下文传递                           │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │RootCtx   │ │SchemaCtx │ │FieldCtx  │ │Layout  │ │
+│  ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤ │
+│  │ExtCtx    │ │FormConfigCtx         │            │ │
+│  └──────────┘ └──────────────────────┘            │
+├───────────────────────────────────────────────────┤
+│  Hooks 层 ── 逻辑复用                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐│
+│  │useProForm│ │useArco   │ │useDraft  │ │useField││
+│  │          │ │Form      │ │草稿持久化 │ │Navigatn││
+│  ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤│
+│  │useLazyField│ │ (useVirtualScroll from shared)  ││
+│  └──────────┘ └───────────────────────────────────┘│
+├───────────────────────────────────────────────────┤
+│  Core 层 ── 核心引擎 (与 UI 框架解耦)               │
+│  ┌──────────┐ ┌──────────┐ ┌────────────────────┐  │
+│  │FormStore │ │FieldNode │ │ValidationEngine     │  │
+│  │          │ │          │ │ + ruleEngine        │  │
+│  ├──────────┤ ├──────────┤ ├────────────────────┤  │
+│  │DraftEngine                                    │  │
+│  └──────────┘ └──────────┘ └────────────────────┘  │
+├───────────────────────────────────────────────────┤
+│  Registry 层 ── 组件/渲染器注册                    │
+│  ┌──────────────────┐ ┌────────────────────────┐  │
+│  │componentRegistry  │ │readonlyRegistry        │  │
+│  │ + baseComponents  │ │ + customRenderers      │  │
+│  └──────────────────┘ └────────────────────────┘  │
+└───────────────────────────────────────────────────┘
+         ↕ 依赖外部包
+┌────────────────────────────────────────────────────┐
+│  @lania-pro-components/utils                       │
+│  reactive / ref / computed / watch / batchUpdate   │
+│  createStore / PerformanceMonitor / TaskQueue      │
+├────────────────────────────────────────────────────┤
+│  @lania-pro-components/shared                      │
+│  useVirtualScroll / useAsyncRequest / createProProv│
+│  PerformanceMonitor (组件)                         │
+└────────────────────────────────────────────────────┘
 ```
 
-**核心设计原则**：
+### 1.2 层级职责
+
+| 层级             | 文件路径                     | 核心职责               | 关键组件/类                                                                                              |
+| ---------------- | ---------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Schema 层**    | `types.ts`                   | 定义字段配置结构和类型 | `ProFormSchema`, `FieldBehavior`, `FieldReaction`, `ProFormProps`                                        |
+| **Core 层**      | `core/`                      | 表单状态管理核心引擎   | `FormStore`, `FieldNode`, `ValidationEngine`, `DraftEngine`                                              |
+| **Context 层**   | `context/`                   | React 上下文传递       | `RootContext`, `SchemaContext`, `FieldContext`, `LayoutContext`, `ExtensionContext`, `FormConfigContext` |
+| **Hooks 层**     | `hooks/`                     | 可复用逻辑封装         | `useProForm`, `useArcoForm`, `useDraft`, `useFieldNavigation`, `useLazyField`                            |
+| **Registry 层**  | `registry/`                  | 扩展注册机制           | `componentRegistry`, `readonlyRegistry`                                                                  |
+| **Component 层** | `components/`, `ProForm.tsx` | UI 渲染组件            | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`, 快捷组件                                          |
+| **Provider**     | `ProFormProvider.tsx`        | 全局配置 Provider      | `ProFormProvider`                                                                                        |
+
+### 1.3 核心设计原则
 
 - **单向数据流**：Schema → FormStore → FieldNode → Context → Component
 - **关注点分离**：状态管理（Core）与视图渲染（Component）完全解耦
-- **响应式驱动**：所有状态变化通过自研响应式系统自动传播
+- **响应式驱动**：基于 `@lania-pro-components/utils` 的 `reactive/ref/computed/watch` 响应式系统
 - **可插拔扩展**：通过 Registry 层实现组件和渲染器的动态注册
 
 ---
 
-## 三、使用方式总览
+## 二、使用方式
 
-ProForm 提供多种使用方式，从简单到复杂，满足不同场景需求：
+ProForm 提供多种使用方式：
 
-| 使用方式                  | 适用场景                       | 复杂度 | 核心特点                                     |
-| ------------------------- | ------------------------------ | ------ | -------------------------------------------- |
-| **纯 Schema 驱动**        | 快速构建表单，无需控制状态     | 低     | 一行代码完成表单，自动处理提交和验证         |
-| **useProForm 受控模式**   | 需要外部控制表单状态、值联动   | 中     | 通过 `instance` 操作表单，支持读写值、重置等 |
-| **Provider 跨组件访问**   | 父组件创建实例，子组件深度访问 | 中     | 通过 Context 下发实例，无需逐层传递 prop     |
-| **ProFormList 动态列表**  | 动态增删的列表字段（如联系人） | 中     | 支持 min/max 限制、卡片样式、批量操作        |
-| **ProFormSteps 分步表单** | 长表单分步填写，带进度条       | 高     | 支持步骤验证、水平/垂直布局、自定义导航      |
-| **虚拟滚动大表单**        | 数百字段的超长表单             | 高     | 只渲染可视区域，性能优化                     |
-
-**快速上手示例**：
-
-```tsx
-// 方式一：纯 Schema 驱动（最简单）
-<ProForm schemas={schemas} onFinish={handleSubmit} />
-
-// 方式二：useProForm 受控模式
-const { instance, bindingProps } = useProForm({ initialValues: {...} });
-<ProForm form={instance} {...bindingProps} />
-
-// 方式三：Provider 跨组件访问
-const { Provider, bindingProps } = useProForm({...});
-<Provider>
-  <ProForm {...bindingProps} />
-  <ChildComponent />  {/* 子组件可通过 useProFormContext() 访问实例 */}
-</Provider>
-
-// 方式四：动态列表
-<ProForm>
-  <ProFormList name="items" schemas={itemSchemas} />
-</ProForm>
-
-// 方式五：分步表单
-<ProForm>
-  <ProFormSteps steps={steps} />
-</ProForm>
-```
+| 使用方式                  | 适用场景         | 复杂度 | 核心特点                           |
+| ------------------------- | ---------------- | ------ | ---------------------------------- |
+| **纯 Schema 驱动**        | 快速构建表单     | 低     | 一行代码完成表单                   |
+| **useProForm 受控模式**   | 需要外部控制状态 | 中     | 通过 `instance` 操作表单           |
+| **Provider 跨组件访问**   | 子组件深度访问   | 中     | `Provider` + `useProFormContext()` |
+| **ProFormList 动态列表**  | 动态增删列表字段 | 中     | 支持 min/max 限制、卡片样式        |
+| **ProFormSteps 分步表单** | 长表单分步填写   | 高     | 步骤验证、水平/垂直布局            |
+| **草稿持久化**            | 防丢失表单数据   | 中     | 自动保存到 localStorage            |
+| **虚拟滚动**              | 数百字段的表单   | 高     | 只渲染可视区域                     |
 
 ---
 
-## 四、Schema 层
+## 三、类型定义
 
-### 3.1 ProFormSchema 核心结构
-
-Schema 是表单配置的声明式描述，定义了字段的所有属性（定义于 `types.ts`）：
+### 3.1 ProFormSchema
 
 ```typescript
 interface ProFormSchema<TValues = Record<string, unknown>> {
-  name: string | string[]; // 字段名称（必填），支持嵌套路径 ['user', 'name']
-  label?: string; // 字段标签
-  component?: string; // 组件类型，如 'Input'、'Select'
-  componentProps?: Record<string, unknown>; // 组件属性，透传给渲染组件
-  required?: boolean; // 是否必填
-  requiredMessage?: string; // 必填项错误提示
-  rules?: ValidationRule[]; // 验证规则数组
-  validate?: (value, values) => string | undefined | Promise; // 自定义验证
-  initialValue?: unknown; // 初始值
-  col?: number; // Grid 布局中占用的列数
-  labelCol?: ColProps; // 标签列配置
-  wrapperCol?: ColProps; // 内容列配置
-  tooltip?: string; // 标签提示信息
-  extra?: ReactNode; // 表单项额外提示信息
-  placeholder?: string; // 占位符
-  options?: Array<{ label; value }>; // 选项数据
-  format?: string; // 日期/时间格式化字符串
-  prefix?: string; // 前缀文本
-  suffix?: string; // 后缀文本
-  transform?: {
-    // 值转换函数
-    input?: (value: unknown) => unknown;
-    output?: (value: unknown) => unknown;
+  name: string | string[];           // 字段名称（必填），支持嵌套路径
+  label?: string;                    // 字段标签
+  component?: string;                // 组件类型
+  componentProps?: Record<string, unknown>; // 组件属性
+  required?: boolean;                // 是否必填
+  requiredMessage?: string;          // 必填提示
+  rules?: ValidationRule[];          // 验证规则
+  validate?: (value, values) => string | undefined | Promise<...>;
+  initialValue?: unknown;            // 初始值
+  col?: number;                      // Grid 列数
+  labelCol?: ColProps;               // 标签列配置
+  wrapperCol?: ColProps;             // 内容列配置
+  tooltip?: string;                  // 标签提示
+  extra?: ReactNode;                 // 额外提示
+  placeholder?: string;              // 占位符
+  options?: Array<{ label; value; [key: string]: unknown }>;
+  format?: string;                   // 日期格式化
+  prefix?: string;                   // 前缀
+  suffix?: string;                   // 后缀
+  transform?: {                      // 值转换
+    input?: (value) => unknown;
+    output?: (value) => unknown;
   };
-  dependencies?: string[]; // 依赖的字段名列表
-  behavior?: FieldBehavior; // 字段行为配置（动态可见/禁用/只读）
-  reactions?: FieldReaction[]; // 字段联动规则
-  lifecycle?: FieldLifecycle; // 字段生命周期回调
-  readonlyMode?: string; // 只读渲染模式
-  readonlyConfig?: ReadonlyRenderConfig; // 只读渲染配置
-  readonlyComponent?: string; // 只读/预览时使用的渲染器名称
-  children?: Array<ProFormSchema<TValues>>; // 子字段配置
-  onFieldChange?: (value, allValues) => void; // 字段值变化回调
+  dependencies?: string[];           // 依赖字段
+  behavior?: FieldBehavior;          // 字段行为
+  reactions?: FieldReaction[];       // 联动规则
+  lifecycle?: FieldLifecycle;        // 生命周期
+  readonlyMode?: ReadonlyRenderConfig['mode'];
+  readonlyConfig?: ReadonlyRenderConfig;
+  readonlyComponent?: string;        // 只读渲染器
+  children?: ProFormSchema[];        // 子字段
+  onFieldChange?: (value, allValues) => void;
 }
 ```
 
-### 3.2 ValidationRule 验证规则
+### 3.2 ValidationRule
 
 ```typescript
 interface ValidationRule {
   required?: boolean;
-  min?: number; // 数值最小值 / 字符串、数组最小长度
-  max?: number; // 数值最大值 / 字符串、数组最大长度
-  minLength?: number; // 最小长度
-  maxLength?: number; // 最大长度
-  pattern?: RegExp | string; // 正则匹配
-  validator?: (value: unknown, values: Record<string, unknown>) => string | undefined | Promise<string | undefined>;
-  message?: string; // 错误提示
+  min?: number; max?: number;
+  minLength?: number; maxLength?: number;
+  len?: number;          // 固定长度
+  precision?: number;    // 精度（小数位数）
+  step?: number;         // 步长
+  type?: 'number' | 'integer' | 'float' | 'string' | 'boolean';
+  sign?: 'positive' | 'negative' | 'zero';
+  whitespace?: boolean;
+  pattern?: RegExp | string;
+  validator?: (value, values) => string | undefined | Promise<...>;
+  message?: string;
 }
 ```
 
-### 3.3 字段行为（FieldBehavior）
-
-支持动态计算字段的可见性、禁用状态等，每个属性支持静态布尔值或基于表单值的动态函数：
+### 3.3 FieldBehavior
 
 ```typescript
 interface FieldBehavior {
-  visible?: boolean | ((values) => boolean); // 是否可见（隐藏时从 DOM 移除）
-  display?: boolean | ((values) => boolean); // 是否显示（隐藏时保留占位，display:none）
-  disabled?: boolean | ((values) => boolean); // 是否禁用
-  readonly?: boolean | ((values) => boolean); // 是否只读
-  preview?: boolean | ((values) => boolean); // 是否预览模式
-  required?: boolean | ((values) => boolean); // 是否必填（动态计算）
+  visible?: boolean | ((values) => boolean);
+  display?: boolean | ((values) => boolean);
+  disabled?: boolean | ((values) => boolean);
+  readonly?: boolean | ((values) => boolean);
+  preview?: boolean | ((values) => boolean);
+  required?: boolean | ((values) => boolean);
 }
 ```
 
-**计算逻辑**（见 `core/FieldNode.ts` 的 `computeBehaviorValue`）：
-
-- 值为 `undefined` → 返回默认值（visible/display 默认 true，其余默认 false）
-- 值为函数 → 以当前表单所有字段值 `getValues()` 为参数调用函数
-- 值为布尔值 → 直接返回
-
-### 3.4 字段联动（FieldReaction）
-
-```typescript
-interface FieldReaction {
-  dependencies: string[]; // 依赖的字段名列表
-  run: (field: FieldNodeAPI, form: FormStoreAPI) => void; // 联动逻辑
-}
-```
-
-当 `dependencies` 中的任一字段值变化时，`run` 函数会被执行，可在内部通过 `field.setValue()`、`field.setStatus()` 等方法修改当前字段。
-
-### 3.5 字段生命周期（FieldLifecycle）
-
-| 回调               | 触发时机          | 参数                               |
-| ------------------ | ----------------- | ---------------------------------- |
-| `onInit`           | 字段初始化注册时  | `(field, form)`                    |
-| `onMount`          | 字段挂载到 DOM 时 | `(field, form)`                    |
-| `onUnmount`        | 字段从 DOM 卸载时 | `(field, form)`                    |
-| `onValueChange`    | 字段值变化时      | `(value, oldValue, field, form)`   |
-| `onStatusChange`   | 字段状态变化时    | `(status, oldStatus, field, form)` |
-| `onError`          | 字段错误变化时    | `(error, field, form)`             |
-| `onFocus`          | 字段获得焦点时    | `(field, form)`                    |
-| `onBlur`           | 字段失去焦点时    | `(field, form)`                    |
-| `onBeforeValidate` | 验证前            | `(field, form)`                    |
-| `onAfterValidate`  | 验证后            | `(error, field, form)`             |
-| `onReset`          | 字段重置时        | `(field, form)`                    |
-| `onDestroy`        | 字段销毁时        | `(field, form)`                    |
-
-### 3.6 只读渲染配置（ReadonlyRenderConfig）
-
-```typescript
-interface ReadonlyRenderConfig {
-  mode?:
-    | 'text'
-    | 'json'
-    | 'percentage'
-    | 'decimal'
-    | 'currency'
-    | 'date'
-    | 'datetime'
-    | 'time'
-    | 'image'
-    | 'video'
-    | 'file'
-    | 'link'
-    | 'phone'
-    | 'email'
-    | 'idCard'
-    | 'tag'
-    | 'custom';
-  format?: string; // 日期/时间格式化
-  emptyText?: string; // 空值显示文本（默认 '--'）
-  prefix?: string; // 前缀
-  suffix?: string; // 后缀
-  precision?: number; // 数值精度
-  thousands?: boolean; // 千分位分隔
-  currencySymbol?: string; // 货币符号
-  maxLength?: number; // 文本最大长度
-  ellipsis?: string; // 超长省略符
-  separator?: string; // 多值分隔符
-  tagColors?: Record<string, string>; // Tag 颜色映射
-  render?: (value, config, options?) => ReactNode; // 自定义渲染
-  preview?: { width?: number; height?: number }; // 图片/视频预览尺寸
-  link?: { target?: string; rel?: string }; // 链接属性
-}
-```
-
-### 3.7 其他核心类型
+### 3.4 核心类型
 
 | 类型                       | 说明                                                          |
 | -------------------------- | ------------------------------------------------------------- |
 | `FormStatus`               | `'draft' \| 'readonly' \| 'preview' \| 'disabled' \| 'edit'`  |
 | `FieldStatus`              | `'edit' \| 'readonly' \| 'disabled' \| 'hidden' \| 'preview'` |
 | `LayoutMode`               | `'horizontal' \| 'vertical' \| 'inline' \| 'compact'`         |
-| `ProFormInstance`          | 表单实例 API 接口（详见 Hooks 层）                            |
-| `FieldNodeAPI`             | 字段运行时实例接口（详见 Core 层）                            |
-| `FormStoreAPI`             | 表单存储接口（详见 Core 层）                                  |
-| `ProFormPerformanceConfig` | 性能配置（虚拟滚动、懒加载、批量更新、监控）                  |
+| `ProFormInstance`          | 表单实例 API                                                  |
+| `FieldNodeAPI`             | 字段运行时接口                                                |
 | `KeyboardNavigationConfig` | 键盘导航配置                                                  |
+| `DraftConfig`              | 草稿持久化配置                                                |
 
 ---
 
-## 五、Core 层
+## 四、Core 层
 
-Core 层是整个表单的状态管理引擎，位于 `core/` 目录，不依赖 React，可独立运行。
+Core 层与 UI 框架解耦。
 
-### 13.1 FormStore — 表单状态管理中心
+### 4.1 FormStore
 
-**文件**：`core/FormStore.ts`
+基于 `@lania-pro-components/utils` 的 `reactive` / `batchUpdate` / `watch`。
 
-**职责**：管理所有字段的值、状态、错误、触摸状态和联动规则
+管理 `values`、`fields`、`errors`、`touched`、`reactions` 五个状态。
 
-**核心数据结构**：
+| 方法                                             | 说明          |
+| ------------------------------------------------ | ------------- |
+| `getValues()` / `getValue(name)`                 | 获取字段值    |
+| `setValue(name, value)` / `setValues(values)`    | 设置字段值    |
+| `registerField(field)` / `unregisterField(name)` | 注册/注销字段 |
+| `runReactions(changedField)`                     | 执行联动      |
+| `getField(name)` / `getAllFields()`              | 获取字段实例  |
+
+### 4.2 FieldNode
+
+每个字段对应一个 FieldNode，使用 `ref` / `computed` / `watch`。
+
+**状态优先级**：`visible=false` → `'hidden'` → `preview=true` → `'preview'` → `readonly=true` → `'readonly'` → `disabled=true` → `'disabled'` → 默认 `'edit'`
+
+### 4.3 ValidationEngine & DraftEngine
+
+| 引擎               | 说明                                             |
+| ------------------ | ------------------------------------------------ |
+| `ValidationEngine` | 规则校验、异步校验、自定义校验                   |
+| `DraftEngine`      | 草稿持久化（localStorage/sessionStorage/自定义） |
+
+---
+
+## 五、Context 层
+
+`RootContext`, `SchemaContext`, `FieldContext`, `LayoutContext`, `ExtensionContext`, `FormConfigContext`
+
+---
+
+## 六、使用方式
+
+### 6.1 useProForm
 
 ```typescript
-interface FormState {
-  values: Record<string, unknown>; // 所有字段值（响应式）
-  fields: Record<string, FieldNodeAPI>; // 所有字段实例（响应式）
-  errors: Record<string, string>; // 所有字段错误（响应式）
-  touched: Record<string, boolean>; // 字段触摸状态（响应式）
-  reactions: Record<string, FieldReaction[]>; // 联动规则映射
-}
-
-class FormStore implements FormStoreAPI {
-  private state: FormState; // 通过 reactive() 创建的响应式对象
-  private valueListeners: Set<ValueChangeListener>; // 值变化监听器（非响应式）
-  private fieldListeners: Set<FieldChangeListener>; // 字段变化监听器
-  private valueEffectCleanups: Map<string, () => void>; // effect 清理函数
-}
+const {
+  arcoForm,
+  instance,
+  schemas,
+  setSchemas,
+  bindingProps,
+  formStore,
+  Provider,
+  fieldNavigation,
+  fieldStatusMap,
+  isDraftState,
+  isPreviewState,
+} = useProForm(options);
 ```
 
-**关键方法**：
+### 6.2 ProFormProps
 
-| 方法                               | 说明                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| `getValues()`                      | 获取所有字段值（返回浅拷贝）                                              |
-| `getValue(name)`                   | 获取单个字段值                                                            |
-| `setValue(name, value)`            | 设置单个字段值（batchUpdate 内更新 values + touched，触发联动和生命周期） |
-| `setValues(values)`                | 批量设置字段值（batchUpdate 合并）                                        |
-| `registerField(field)`             | 注册字段（存储、初始化值、注册联动、设置监听、触发 onInit）               |
-| `unregisterField(name)`            | 注销字段（清理 effect、删除数据、触发 onDestroy）                         |
-| `runReactions(changedField)`       | 执行依赖该字段的所有联动规则                                              |
-| `getField(name)`                   | 获取字段实例（数组名取首元素）                                            |
-| `getAllFields()`                   | 获取所有字段实例 Map                                                      |
-| `validateField(name)`              | 验证单个字段（遍历 rules，支持异步 validator）                            |
-| `validateAllFields()`              | 验证所有字段                                                              |
-| `setFieldError(name, error)`       | 设置字段错误                                                              |
-| `getFieldError(name)`              | 获取字段错误                                                              |
-| `setFieldTouched(name, touched)`   | 设置字段触摸状态                                                          |
-| `reset()` / `resetField(name)`     | 重置所有/单个字段到 initialValue                                          |
-| `subscribeToValueChange(listener)` | 订阅值变化（返回取消订阅函数）                                            |
-| `subscribeToFieldChange(listener)` | 订阅字段注册/注销                                                         |
+| 分类     | 属性                                                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 表单配置 | `schemas`, `layout`, `labelCol`, `wrapperCol`, `colon`, `labelAlign`, `size`                                                    |
+| 表单状态 | `disabled`, `readonly`, `draft`, `preview`, `initialValues`                                                                     |
+| 事件     | `onFinish`, `onFinishFailed`, `onValuesChange`, `onFieldsChange`, `onDraftChange`, `onPreviewChange`, `onReset`                 |
+| 按钮     | `showButton`, `submitText`, `resetText`, `showSubmitButton`, `showResetButton`, `buttonPosition`, `buttons`, `buttonList`       |
+| 折叠     | `collapsible`, `collapsed`, `collapsedRows`, `expandText`, `collapseText`                                                       |
+| 布局     | `rows`, `columns`, `gutter`, `rowProps`, `colProps`                                                                             |
+| 样式     | `className`, `style`, `cardContainer`                                                                                           |
+| 功能     | `formRef`, `scrollToFirstError`, `validateTrigger`, `performance`, `schemaProcessOptions`, `keyboardNavigation`, `draftStorage` |
+
+### 6.3 ProFormInstance 方法
+
+`validate()`, `validateField()`, `clearValidate()`, `setFieldsValue()`, `setFieldValue()`, `getFieldValue()`, `getFieldsValue()`, `resetFields()`, `submit()`, `setSchemas()`, `setProps()`, `getRef()`, `getFieldStatus()`, `setFieldStatus()`, `scrollToField()`, `isDraft()`, `setDraft()`, `isPreview()`, `setPreview()`, `focusField()`, `focusNextField()`, `focusPrevField()`, `getFocusedField()`, `getStats()`
+
+### 6.4 ProFormList & ProFormSteps
+
+参见 `docs/components/pro-form.md`。
+
+### 6.5 快捷组件
+
+`PasswordInput`, `PhoneInput`, `EmailInput`, `IdCardInput`, `AmountInput`, `PercentageInput`, `YesNoSelect`, `MaleFemaleSelect`, `EnableDisableSelect`, `StatusSelect`, `OpenCloseSelect`, `YearPicker`, `MonthPicker`, `WeekPicker`, `QuarterPicker`, `RangePicker`, `TimeRangePicker`, `VerificationCode`, `ImageList`, `QuickInputWithSuffix`, `QuickInputNumberWithSuffix`
+
+| PerformanceMonitor | 性能监控（来自 shared） |
+| `runReactions(changedField)` | 执行依赖该字段的所有联动规则 |
+| `getField(name)` | 获取字段实例（数组名取首元素） |
+| `getAllFields()` | 获取所有字段实例 Map |
+| `validateField(name)` | 验证单个字段（遍历 rules，支持异步 validator） |
+| `validateAllFields()` | 验证所有字段 |
+| `setFieldError(name, error)` | 设置字段错误 |
+| `getFieldError(name)` | 获取字段错误 |
+| `setFieldTouched(name, touched)` | 设置字段触摸状态 |
+| `reset()` / `resetField(name)` | 重置所有/单个字段到 initialValue |
+| `subscribeToValueChange(listener)` | 订阅值变化（返回取消订阅函数） |
+| `subscribeToFieldChange(listener)` | 订阅字段注册/注销 |
 
 **字段注册流程**：
 
