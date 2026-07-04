@@ -33,18 +33,157 @@
  * - statusRenderer: 状态标签
  */
 import React, { ReactNode, useState } from 'react';
-import { Image, Tag, Space } from '@arco-design/web-react';
+import { Image, Tag, Space, Typography } from '@arco-design/web-react';
 import { IconEye, IconFile, IconLink, IconPlayCircle } from '@arco-design/web-react/icon';
-import {
-  renderText,
-  renderNumber as sharedRenderNumber,
-  renderMoney as sharedRenderMoney,
-  renderPercent as sharedRenderPercent,
-  renderDate as sharedRenderDate,
-  renderOption as sharedRenderOption,
-  renderSwitch as sharedRenderSwitch,
-} from '@lania-pro-components/shared';
+import { formatNumber, formatMoney, formatPercent, formatDate } from '@lania-pro-components/utils';
 import type { ReadonlyRenderer, ReadonlyRendererRegistry, ReadonlyRenderConfig } from '../types';
+
+const { Text } = Typography;
+
+// ==================== 内联格式器（原 shared formatters） ====================
+
+/** 默认空值文本 */
+const INLINE_EMPTY = '--';
+
+/**
+ * 内联文本渲染
+ */
+function inlineRenderText(
+  value: unknown,
+  options: {
+    emptyText?: string;
+    maxLength?: number;
+    ellipsis?: string;
+    preserveNewlines?: boolean;
+    prefix?: ReactNode;
+    suffix?: ReactNode;
+  } = {},
+): ReactNode {
+  const { emptyText = INLINE_EMPTY, maxLength, ellipsis = '...', preserveNewlines = false, prefix, suffix } = options;
+  if (value === null || value === undefined || value === '') {
+    return wrapAffixInline(emptyText, prefix, suffix);
+  }
+  let text = String(value);
+  if (maxLength && text.length > maxLength) {
+    text = text.slice(0, maxLength) + ellipsis;
+  }
+  if (preserveNewlines) {
+    const lines = text.split('\n');
+    return wrapAffixInline(
+      lines.map((line, i) => (
+        <React.Fragment key={i}>
+          {line}
+          {i < lines.length - 1 && <br />}
+        </React.Fragment>
+      )),
+      prefix,
+      suffix,
+    );
+  }
+  return wrapAffixInline(text, prefix, suffix);
+}
+
+function wrapAffixInline(content: ReactNode, prefix?: ReactNode, suffix?: ReactNode): ReactNode {
+  if (!prefix && !suffix) return content;
+  return (
+    <span>
+      {prefix && <span style={{ marginRight: 4 }}>{prefix}</span>}
+      {content}
+      {suffix && <span style={{ marginLeft: 4 }}>{suffix}</span>}
+    </span>
+  );
+}
+
+/**
+ * 内联数字渲染
+ */
+function inlineRenderNumber(
+  value: unknown,
+  options: { precision?: number; thousandsSeparator?: boolean; emptyText?: string } = {},
+): ReactNode {
+  const { precision = 0, thousandsSeparator = true, emptyText = INLINE_EMPTY } = options;
+  if (value === null || value === undefined || value === '') return <>{emptyText}</>;
+  return <>{formatNumber(value as string | number, { precision, thousandsSeparator })}</>;
+}
+
+/**
+ * 内联货币渲染
+ */
+function inlineRenderMoney(
+  value: unknown,
+  options: { symbol?: string; precision?: number; thousandsSeparator?: boolean; emptyText?: string } = {},
+): ReactNode {
+  const { symbol = '¥', precision = 2, thousandsSeparator = true, emptyText = INLINE_EMPTY } = options;
+  if (value === null || value === undefined || value === '') return <>{emptyText}</>;
+  return (
+    <span style={{ fontFamily: 'monospace' }}>
+      {formatMoney(value as string | number, symbol, { precision, thousandsSeparator })}
+    </span>
+  );
+}
+
+/**
+ * 内联百分比渲染
+ */
+function inlineRenderPercent(value: unknown, options: { precision?: number; emptyText?: string } = {}): ReactNode {
+  const { precision = 2, emptyText = INLINE_EMPTY } = options;
+  if (value === null || value === undefined || value === '') return <>{emptyText}</>;
+  return <>{formatPercent(value as string | number, { precision })}</>;
+}
+
+/**
+ * 内联日期渲染
+ */
+function inlineRenderDate(value: unknown, options: { format?: string; emptyText?: string } = {}): ReactNode {
+  const { format = 'YYYY-MM-DD', emptyText = INLINE_EMPTY } = options;
+  if (!value) return <>{emptyText}</>;
+  return <>{formatDate(value as string | number | Date, format)}</>;
+}
+
+/**
+ * 内联选项渲染
+ */
+function inlineRenderOption(
+  value: unknown,
+  options: Array<{ value: string | number; label: ReactNode }> = [],
+  renderOptions: { emptyText?: string; separator?: string; tagMode?: boolean; tagColors?: Record<string, string> } = {},
+): ReactNode {
+  const { emptyText = INLINE_EMPTY, separator = ', ', tagMode, tagColors } = renderOptions;
+  if (value === null || value === undefined || value === '') return <>{emptyText}</>;
+  const getLabel = (v: unknown): ReactNode => {
+    const opt = options.find((o) => o.value === v);
+    return opt?.label ?? String(v);
+  };
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <>{emptyText}</>;
+    const labels = value.map((v) => getLabel(v));
+    if (tagMode) {
+      return (
+        <Space wrap>
+          {labels.map((label, i) => (
+            <Tag key={i} color={tagColors?.[String(value[i])]}>
+              {label}
+            </Tag>
+          ))}
+        </Space>
+      );
+    }
+    return <>{labels.join(separator)}</>;
+  }
+  const label = getLabel(value);
+  if (tagMode) return <Tag color={tagColors?.[String(value)]}>{label}</Tag>;
+  return <>{String(label)}</>;
+}
+
+/**
+ * 内联 Switch 渲染
+ */
+function inlineRenderSwitch(value: unknown, options: { trueText?: string; falseText?: string } = {}): ReactNode {
+  const { trueText = '是', falseText = '否' } = options;
+  if (value === null || value === undefined || value === '') return <>{INLINE_EMPTY}</>;
+  const isChecked = value === true || value === 'true' || value === 1 || value === '1';
+  return <Tag color={isChecked ? 'green' : 'gray'}>{isChecked ? trueText : falseText}</Tag>;
+}
 
 /**
  * 默认空值文本
@@ -82,7 +221,7 @@ function withAffix(content: ReactNode, config: ReadonlyRenderConfig): ReactNode 
  * 文本渲染器
  */
 export const textRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const rendered = renderText(value, {
+  const rendered = inlineRenderText(value, {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     maxLength: config.maxLength,
     ellipsis: config.ellipsis,
@@ -96,7 +235,7 @@ export const textRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
  * 多行文本渲染器
  */
 export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const rendered = renderText(value, {
+  const rendered = inlineRenderText(value, {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     preserveNewlines: true,
     prefix: config.prefix,
@@ -109,7 +248,7 @@ export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {})
  * 选项渲染器
  */
 export const optionRenderer: ReadonlyRenderer = (value, options = [], config = {}) => {
-  const rendered = sharedRenderOption(value, options as { value: string | number; label: ReactNode }[], {
+  const rendered = inlineRenderOption(value, options as { value: string | number; label: ReactNode }[], {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     separator: config.separator,
     tagMode: config.mode === 'tag',
@@ -130,7 +269,7 @@ export const checkboxRenderer: ReadonlyRenderer = (value, options = [], config =
  */
 export const switchRenderer: ReadonlyRenderer = (value, _options, _config = {}, componentProps = {}) => {
   const { checkedText, uncheckedText, trueText, falseText } = componentProps as Record<string, string>;
-  const rendered = sharedRenderSwitch(value, {
+  const rendered = inlineRenderSwitch(value, {
     trueText: checkedText || trueText || '是',
     falseText: uncheckedText || falseText || '否',
   });
@@ -141,7 +280,7 @@ export const switchRenderer: ReadonlyRenderer = (value, _options, _config = {}, 
  * 日期渲染器
  */
 export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const rendered = sharedRenderDate(value, {
+  const rendered = inlineRenderDate(value, {
     format: config.format || 'YYYY-MM-DD',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
   });
@@ -152,7 +291,7 @@ export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
  * 时间渲染器
  */
 export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const formatted = sharedRenderDate(value, {
+  const formatted = inlineRenderDate(value, {
     format: config.format || 'HH:mm:ss',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
   });
@@ -163,7 +302,7 @@ export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
  * 日期时间渲染器
  */
 export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const formatted = sharedRenderDate(value, {
+  const formatted = inlineRenderDate(value, {
     format: config.format || 'YYYY-MM-DD HH:mm:ss',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
   });
@@ -174,7 +313,7 @@ export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {})
  * 数字渲染器
  */
 export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
-  const rendered = sharedRenderNumber(value, {
+  const rendered = inlineRenderNumber(value, {
     precision: config.precision ?? 2,
     thousandsSeparator: config.thousands !== false,
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
@@ -188,7 +327,7 @@ export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}) =
 export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
   const num = Number(value);
   if (isNaN(num)) return <span>{String(value)}</span>;
-  const rendered = sharedRenderPercent(value, {
+  const rendered = inlineRenderPercent(value, {
     precision: config.precision ?? 2,
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
   });
@@ -201,7 +340,7 @@ export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {
 export const currencyRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
   const num = Number(value);
   if (isNaN(num)) return <span>{String(value)}</span>;
-  const rendered = sharedRenderMoney(value, {
+  const rendered = inlineRenderMoney(value, {
     symbol: config.currencySymbol || '¥',
     precision: config.precision ?? 2,
     thousandsSeparator: config.thousands ?? true,

@@ -61,32 +61,6 @@ export type { InstanceAdapter, UseChartInstanceReturn } from './hooks/useChartIn
 export { useResizeObserver } from './hooks/useResizeObserver';
 export type { Size, UseResizeObserverOptions, UseResizeObserverReturn } from './hooks/useResizeObserver';
 
-// ======================== 格式器 ========================
-export {
-  renderText,
-  renderNumber,
-  renderMoney,
-  renderPercent,
-  renderDate,
-  renderDateTime,
-  renderTime,
-  renderOption,
-  renderSwitch,
-  renderImage,
-  renderLink,
-} from './formatters';
-export type {
-  RenderTextOptions,
-  RenderNumberOptions,
-  RenderMoneyOptions,
-  RenderPercentOptions,
-  RenderDateOptions,
-  OptionItem,
-  RenderOptionOptions,
-  RenderImageOptions,
-  RenderLinkOptions,
-} from './formatters';
-
 // ======================== 组件 ========================
 export { PerformanceMonitor } from './PerformanceMonitor';
 export type { PerformanceMonitorProps } from './PerformanceMonitor/types';
