@@ -5,6 +5,7 @@
  */
 
 import { registerChartTransformer } from './types';
+import { buildAxis, buildLegend, buildTooltip, buildColorPalette } from './utils';
 
 function toNumber(val: unknown): number {
   if (typeof val === 'number') return val;
@@ -24,7 +25,6 @@ registerChartTransformer({
     }
 
     const yFields = Array.isArray(yField) ? yField[0] : yField;
-
     const buildData = (rows: Record<string, unknown>[]): unknown[][] =>
       rows.map((d) => {
         const point: unknown[] = [d[xField], d[yFields]];
@@ -40,11 +40,17 @@ registerChartTransformer({
         }
       : (): number => 10;
 
+    const option = {
+      xAxis: buildAxis(schema.xAxis, 'value'),
+      yAxis: buildAxis(schema.yAxis, 'value'),
+      tooltip: buildTooltip(schema.tooltip, 'item'),
+      legend: buildLegend(schema.legend, Boolean(seriesField)),
+      color: buildColorPalette(schema.color),
+    } as Record<string, unknown>;
+
     if (!seriesField) {
       return {
-        xAxis: { type: 'value' },
-        yAxis: { type: 'value' },
-        tooltip: { trigger: 'item' },
+        ...option,
         series: [
           {
             type: 'scatter',
@@ -63,10 +69,7 @@ registerChartTransformer({
     });
 
     return {
-      xAxis: { type: 'value' },
-      yAxis: { type: 'value' },
-      tooltip: { trigger: 'item' },
-      legend: { type: 'plain', top: 0 },
+      ...option,
       series: Array.from(groups.entries()).map(([name, rows]) => ({
         type: 'scatter',
         name,

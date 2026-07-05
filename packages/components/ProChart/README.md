@@ -95,41 +95,100 @@ setEChartsInstance(echarts);
   xField="date"
   yField="count"
 />
+
+// 5. Schema + 样式配置（自定义图例、tooltip、颜色）
+<ProChart
+  adapter="echarts"
+  type="bar"
+  dataSource={salesData}
+  xField="month"
+  yField="revenue"
+  seriesField="region"
+  legend={{ position: 'bottom' }}
+  tooltip={{ formatter: (p) => `${p.seriesName}: ¥${p.value}` }}
+  color={['#5470C6', '#91CC75', '#EE6666']}
+/>
+
+// 6. Schema + 轴配置 + 系列配置（平滑曲线/面积）
+<ProChart
+  adapter="echarts"
+  type="line"
+  dataSource={trendData}
+  xField="date"
+  yField="count"
+  series={{ smooth: true, area: true }}
+  xAxis={{ label: '日期', type: 'time' }}
+  yAxis={{ label: '数量' }}
+/>
+
+// 7. 横向柱状图
+<ProChart
+  adapter="echarts"
+  type="bar"
+  dataSource={rankData}
+  xField="name"
+  yField="score"
+  series={{ horizontal: true }}
+/>
 ```
 
 ## API
 
 ### ProChartProps
 
-| 参数          | 说明                        | 类型                                                         | 默认值   |
-| ------------- | --------------------------- | ------------------------------------------------------------ | -------- |
-| adapter       | 图表库适配器                | `string \| ChartAdapter`                                     | -        |
-| option        | 原生图表配置（Option 模式） | `TOption`                                                    | -        |
-| type          | 图表类型（Schema 模式）     | `string`                                                     | -        |
-| dataSource    | 数据源                      | `Record<string, unknown>[]`                                  | -        |
-| xField        | x 轴字段                    | `string`                                                     | -        |
-| yField        | y 轴字段                    | `string \| string[]`                                         | -        |
-| seriesField   | 系列分组字段                | `string`                                                     | -        |
-| request       | 远程数据请求函数            | `(params) => Promise<{ data }>`                              | -        |
-| params        | 请求参数                    | `Record<string, unknown>`                                    | -        |
-| polling       | 轮询间隔（ms）              | `number`                                                     | -        |
-| type          | 图表类型（Schema 模式）     | `'line' \| 'bar' \| 'pie' \| 'scatter' \| 'area' \| 'radar'` | -        |
-| dataSource    | 数据源（Schema 模式）       | `Record<string, unknown>[]`                                  | -        |
-| xField        | x 轴字段                    | `string`                                                     | -        |
-| yField        | y 轴字段                    | `string \| string[]`                                         | -        |
-| seriesField   | 系列分组字段                | `string`                                                     | -        |
-| sizeField     | 气泡大小字段（散点图）      | `string`                                                     | -        |
-| height        | 高度                        | `number \| string`                                           | `320`    |
-| width         | 宽度                        | `number \| string`                                           | `100%`   |
-| theme         | 主题                        | `'light' \| 'dark' \| 'auto'`                                | `'auto'` |
-| loading       | 外部强制 loading            | `boolean`                                                    | -        |
-| error         | 外部强制 error              | `Error \| null`                                              | -        |
-| empty         | 外部强制 empty              | `boolean`                                                    | -        |
-| onChartReady  | 图表就绪回调                | `(instance) => void`                                         | -        |
-| onChartEvent  | 图表事件回调                | `(event, payload) => void`                                   | -        |
-| renderLoading | 自定义加载渲染              | `() => ReactNode`                                            | -        |
-| renderError   | 自定义错误渲染              | `(error, retry) => ReactNode`                                | -        |
-| renderEmpty   | 自定义空数据渲染            | `() => ReactNode`                                            | -        |
+| 参数          | 说明                                 | 类型                                                 | 默认值   |
+| ------------- | ------------------------------------ | ---------------------------------------------------- | -------- |
+| adapter       | 图表库适配器                         | `string \| ChartAdapter`                             | -        |
+| option        | 原生图表配置（Option 模式）          | `TOption`                                            | -        |
+| type          | 图表类型（Schema 模式）              | `string`                                             | -        |
+| dataSource    | 数据源                               | `Record<string, unknown>[]`                          | -        |
+| xField        | x 轴字段（所有图表类型必需）         | `string`                                             | -        |
+| yField        | y 轴字段（单值/多值数组）            | `string \| string[]`                                 | -        |
+| seriesField   | 系列分组字段（多系列时显示图例）     | `string`                                             | -        |
+| sizeField     | 气泡大小字段（仅 scatter）           | `string`                                             | -        |
+| request       | 远程数据请求函数                     | `(params) => Promise<{ data }>`                      | -        |
+| params        | 请求参数                             | `Record<string, unknown>`                            | -        |
+| polling       | 轮询间隔（ms）                       | `number`                                             | -        |
+| height        | 高度                                 | `number \| string`                                   | `320`    |
+| width         | 宽度                                 | `number \| string`                                   | `100%`   |
+| theme         | 主题                                 | `'light' \| 'dark' \| 'auto'`                        | `'auto'` |
+| loading       | 外部强制 loading                     | `boolean`                                            | -        |
+| error         | 外部强制 error                       | `Error \| null`                                      | -        |
+| empty         | 外部强制 empty                       | `boolean`                                            | -        |
+| xAxis         | x 轴配置（label/formatter/type）     | `{ label?, formatter?, type? }`                      | -        |
+| yAxis         | y 轴配置（label/formatter/type）     | `{ label?, formatter?, type? }`                      | -        |
+| legend        | 图例配置（show/position）            | `{ show?, position? }`                               | -        |
+| tooltip       | tooltip 配置（show/formatter）       | `{ show?, formatter? }`                              | -        |
+| series        | 通用系列行为（smooth/stack/area 等） | `{ smooth?, stack?, area?, horizontal?, roseType? }` | -        |
+| color         | 颜色映射                             | `string[] \| Record<string, string>`                 | -        |
+| onChartReady  | 图表就绪回调                         | `(instance) => void`                                 | -        |
+| onChartEvent  | 图表事件回调                         | `(event, payload) => void`                           | -        |
+| renderLoading | 自定义加载渲染                       | `() => ReactNode`                                    | -        |
+| renderError   | 自定义错误渲染                       | `(error, retry) => ReactNode`                        | -        |
+| renderEmpty   | 自定义空数据渲染                     | `() => ReactNode`                                    | -        |
+
+### Schema 样式配置
+
+Schema 模式下额外支持的样式配置 prop，同 `ChartSchema` 同名字段。
+
+| 参数    | 说明             | 类型                                                 | 生效图表                    |
+| ------- | ---------------- | ---------------------------------------------------- | --------------------------- |
+| xAxis   | x 轴配置         | `{ label?, formatter?, type? }`                      | line / bar / area / scatter |
+| yAxis   | y 轴配置         | `{ label?, formatter?, type? }`                      | line / bar / area / scatter |
+| legend  | 图例配置         | `{ show?, position? }`                               | 全部                        |
+| tooltip | tooltip 配置     | `{ show?, formatter? }`                              | 全部                        |
+| series  | 通用系列行为配置 | `{ smooth?, stack?, area?, horizontal?, roseType? }` | 见下方                      |
+| color   | 颜色映射         | `string[] \| Record<string, string>`                 | 全部                        |
+
+**series 配置项对各图表类型的效果：**
+
+| 字段       | 效果            | 图表类型    |
+| ---------- | --------------- | ----------- |
+| smooth     | 平滑曲线        | line / area |
+| stack      | 堆叠系列        | bar / area  |
+| area       | 面积模式 / 环图 | line / pie  |
+| horizontal | 横向柱状图      | bar         |
+| roseType   | 玫瑰图          | pie         |
 
 ### ProChartInstance（ref）
 

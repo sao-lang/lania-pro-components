@@ -5,6 +5,7 @@
  */
 
 import { registerChartTransformer } from './types';
+import { buildAxis, buildLegend, buildTooltip, buildColorPalette } from './utils';
 
 registerChartTransformer({
   type: 'bar',
@@ -15,21 +16,35 @@ registerChartTransformer({
     }
 
     const yFields = Array.isArray(yField) ? yField : [yField];
+    const horizontal = Boolean(series?.horizontal);
+    const option = {
+      xAxis: buildAxis(schema.xAxis, horizontal ? 'value' : 'category'),
+      yAxis: buildAxis(schema.yAxis, horizontal ? 'category' : 'value'),
+      tooltip: buildTooltip(schema.tooltip, 'axis'),
+      legend: buildLegend(schema.legend, Boolean(seriesField)),
+      color: buildColorPalette(schema.color),
+    } as Record<string, unknown>;
 
     if (!seriesField) {
       return {
-        xAxis: { type: 'category', data: dataSource.map((d) => d[xField]) },
-        yAxis: { type: 'value' },
-        tooltip: { trigger: 'axis' },
+        ...option,
+        xAxis: {
+          ...(option.xAxis as Record<string, unknown>),
+          data: horizontal ? undefined : dataSource.map((d) => d[xField]),
+        },
+        yAxis: {
+          ...(option.yAxis as Record<string, unknown>),
+          data: horizontal ? dataSource.map((d) => d[xField]) : undefined,
+        },
         series: yFields.map((yf) => ({
           type: 'bar',
           name: yf,
+          stack: series?.stack ? (typeof series.stack === 'string' ? series.stack : 'total') : undefined,
           data: dataSource.map((d) => d[yf]),
         })),
       };
     }
 
-    // 多系列分组
     const groups = new Map<string, Record<string, unknown>[]>();
     dataSource.forEach((d) => {
       const key = String(d[seriesField!]);
@@ -40,10 +55,15 @@ registerChartTransformer({
     const xData = Array.from(new Set(dataSource.map((d) => String(d[xField!]))));
 
     return {
-      xAxis: { type: 'category', data: xData },
-      yAxis: { type: 'value' },
-      tooltip: { trigger: 'axis' },
-      legend: { type: 'plain', top: 0 },
+      ...option,
+      xAxis: {
+        ...(option.xAxis as Record<string, unknown>),
+        data: horizontal ? undefined : xData,
+      },
+      yAxis: {
+        ...(option.yAxis as Record<string, unknown>),
+        data: horizontal ? xData : undefined,
+      },
       series: Array.from(groups.entries()).map(([name, rows]) => ({
         type: 'bar',
         name,

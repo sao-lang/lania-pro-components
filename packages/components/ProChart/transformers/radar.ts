@@ -6,6 +6,7 @@
  */
 
 import { registerChartTransformer } from './types';
+import { buildLegend, buildTooltip, buildColorPalette } from './utils';
 
 registerChartTransformer({
   type: 'radar',
@@ -16,17 +17,20 @@ registerChartTransformer({
     }
 
     const yFields = Array.isArray(yField) ? yField[0] : yField;
-
-    // 所有唯一指示器名称（雷达图的轴）
     const indicators = Array.from(new Set(dataSource.map((d) => String(d[xField!])))).map((name) => ({
       name,
     }));
 
-    // 单系列无分组
+    const base = {
+      tooltip: buildTooltip(schema.tooltip, 'item'),
+      legend: buildLegend(schema.legend, Boolean(seriesField)),
+      radar: { indicator: indicators },
+      color: buildColorPalette(schema.color),
+    } as Record<string, unknown>;
+
     if (!seriesField) {
       return {
-        tooltip: { trigger: 'item' },
-        radar: { indicator: indicators },
+        ...base,
         series: [
           {
             type: 'radar',
@@ -43,7 +47,6 @@ registerChartTransformer({
       };
     }
 
-    // 多系列
     const groups = new Map<string, Record<string, unknown>[]>();
     dataSource.forEach((d) => {
       const key = String(d[seriesField!]);
@@ -52,9 +55,7 @@ registerChartTransformer({
     });
 
     return {
-      tooltip: { trigger: 'item' },
-      legend: { type: 'plain', top: 0 },
-      radar: { indicator: indicators },
+      ...base,
       series: [
         {
           type: 'radar',

@@ -5,6 +5,7 @@
  */
 
 import { registerChartTransformer } from './types';
+import { buildLegend, buildTooltip, buildColorPalette } from './utils';
 
 registerChartTransformer({
   type: 'pie',
@@ -17,13 +18,14 @@ registerChartTransformer({
     const yFields = Array.isArray(yField) ? yField[0] : yField;
 
     return {
-      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { type: 'plain', top: 0 },
+      tooltip: buildTooltip(schema.tooltip, 'item'),
+      legend: buildLegend(schema.legend, true),
+      color: buildColorPalette(schema.color),
       series: [
         {
           type: 'pie',
           radius: schema.series?.area ? ['40%', '70%'] : '60%',
-          roseType: (schema.series as Record<string, unknown>)?.roseType as boolean | undefined,
+          roseType: schema.series?.roseType,
           data: dataSource.map((d) => ({
             name: d[xField!],
             value: d[yFields],

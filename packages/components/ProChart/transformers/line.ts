@@ -5,6 +5,7 @@
  */
 
 import { registerChartTransformer } from './types';
+import { buildAxis, buildLegend, buildTooltip, buildColorPalette } from './utils';
 
 registerChartTransformer({
   type: 'line',
@@ -15,13 +16,19 @@ registerChartTransformer({
     }
 
     const yFields = Array.isArray(yField) ? yField : [yField];
+    const option = {
+      xAxis: buildAxis(schema.xAxis, 'category'),
+      yAxis: buildAxis(schema.yAxis, 'value'),
+      tooltip: buildTooltip(schema.tooltip, 'axis'),
+      legend: buildLegend(schema.legend, Boolean(seriesField)),
+      color: buildColorPalette(schema.color),
+    } as Record<string, unknown>;
 
     // 单系列无分组
     if (!seriesField) {
       return {
-        xAxis: { type: 'category', data: dataSource.map((d) => d[xField]) },
-        yAxis: { type: 'value' },
-        tooltip: { trigger: 'axis' },
+        ...option,
+        xAxis: { ...(option.xAxis as Record<string, unknown>), data: dataSource.map((d) => d[xField]) },
         series: yFields.map((yf) => ({
           type: 'line',
           name: yf,
@@ -32,7 +39,6 @@ registerChartTransformer({
       };
     }
 
-    // 多系列（按 seriesField 分组）
     const groups = new Map<string, Record<string, unknown>[]>();
     dataSource.forEach((d) => {
       const key = String(d[seriesField!]);
@@ -43,10 +49,8 @@ registerChartTransformer({
     const xData = Array.from(new Set(dataSource.map((d) => String(d[xField!]))));
 
     return {
-      xAxis: { type: 'category', data: xData },
-      yAxis: { type: 'value' },
-      tooltip: { trigger: 'axis' },
-      legend: { type: 'plain', top: 0 },
+      ...option,
+      xAxis: { ...(option.xAxis as Record<string, unknown>), data: xData },
       series: Array.from(groups.entries()).map(([name, rows]) => ({
         type: 'line',
         name,
