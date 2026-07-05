@@ -6,6 +6,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import type { ChartAdapter, ChartInstance } from './adapters/types';
+import type { ChartSchema } from './ChartSchema';
 
 /**
  * ProChart 主组件 Props
@@ -17,14 +18,8 @@ export interface ProChartProps<TOption = unknown> {
   /** === Option 模式 === */
   option?: TOption;
 
-  /** === Schema 模式 === */
-  type?: string;
-  dataSource?: Record<string, unknown>[];
-  xField?: string;
-  yField?: string | string[];
-  seriesField?: string;
-  colorField?: string;
-  sizeField?: string;
+  /** === Schema 模式：通过 schema 对象声明图表，替代扁平化的 type/dataSource/xField 等字段 === */
+  schema?: ChartSchema;
 
   /** === 远程数据 === */
   request?: (params: Record<string, unknown>) => Promise<{ data: unknown[]; total?: number }>;

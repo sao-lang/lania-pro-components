@@ -25,17 +25,12 @@ import { getChartTransformer } from './transformers';
 import { ChartStatus } from './ChartStatus';
 import type { ChartAdapter, ChartInstance } from './adapters/types';
 import type { ProChartProps, ProChartInstance } from './types';
-import type { ChartSchema } from './ChartSchema';
 
 export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref) => {
   const {
     adapter: adapterProp,
     option: optionProp,
-    type,
-    dataSource: schemaData,
-    xField,
-    yField,
-    seriesField,
+    schema,
     style,
     className,
     height = 320,
@@ -59,7 +54,7 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
   const destroyedRef = useRef(false);
   // dataSource 仍保留本地 state（兼容 request=undefined 时静态数据回退）
   // loading / error 委托给 useAsyncRequest（见下方 useAsyncRequest 调用）
-  const [dataSource, setDataSource] = useState<Record<string, unknown>[]>(schemaData ?? []);
+  const [dataSource, setDataSource] = useState<Record<string, unknown>[]>(schema?.dataSource ?? []);
 
   // 解析 adapter
   const [resolvedAdapter, setResolvedAdapter] = useState<ChartAdapter | null>(null);
@@ -115,12 +110,12 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
     return () => cancel();
   }, [request, params, execute, cancel]);
 
-  // 静态数据模式：request=undefined 时同步 schemaData 到 dataSource
+  // 静态数据模式：request=undefined 时同步 schema.dataSource 到 dataSource
   useEffect(() => {
     if (!request) {
-      setDataSource(schemaData ?? []);
+      setDataSource(schema?.dataSource ?? []);
     }
-  }, [request, schemaData]);
+  }, [request, schema?.dataSource]);
 
   // 自动启停轮询（用 useAsyncRequest 的 polling 能力，含 silentPolling + AbortController）
   useEffect(() => {
@@ -133,24 +128,20 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
   const option = useMemo(() => {
     if (optionProp) return optionProp as Record<string, unknown>;
 
-    if (type && resolvedAdapter) {
-      const transformer = getChartTransformer(type);
+    if (schema && resolvedAdapter) {
+      const transformer = getChartTransformer(schema.type);
       if (transformer) {
-        const schema: ChartSchema = {
-          type,
-          dataSource,
-          xField,
-          yField: yField as string | string[],
-          seriesField,
-        };
-        return transformer.transform(schema, {
-          adapterName: resolvedAdapter.name,
-          theme: theme === 'dark' ? 'dark' : 'light',
-        }) as Record<string, unknown>;
+        return transformer.transform(
+          { ...schema, dataSource },
+          {
+            adapterName: resolvedAdapter.name,
+            theme: theme === 'dark' ? 'dark' : 'light',
+          },
+        ) as Record<string, unknown>;
       }
     }
     return null;
-  }, [optionProp, type, dataSource, xField, yField, seriesField, resolvedAdapter, theme]);
+  }, [optionProp, schema, dataSource, resolvedAdapter, theme]);
 
   // 初始化图表实例
   useEffect(() => {
