@@ -5,12 +5,12 @@ import { useProForm } from './useProForm';
 import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
 import { useVirtualScroll } from '@lania-pro-components/shared';
-import { useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
+import { useGroupLazyLoad, usePriorityLoad } from '@lania-pro-components/shared';
 import { performanceMonitor } from '@lania-pro-components/utils';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
-import type { DraftData } from './core/DraftEngine';
-import { localStorageStrategy, sessionStorageStrategy } from './core/DraftEngine';
+import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
+import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-components/utils';
 import type { DraftConfig } from './types';
 
 const { Row, Col } = Grid;
@@ -203,7 +203,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     const resolveDraftStorage = (storage: DraftConfig['storage']) => {
       if (!storage || storage === 'localStorage') return localStorageStrategy;
       if (storage === 'sessionStorage') return sessionStorageStrategy;
-      return storage as import('./core/DraftEngine').DraftStorage;
+      return storage as DraftStorage;
     };
 
     const { discardDraft } = useDraft({

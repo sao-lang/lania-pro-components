@@ -98,55 +98,6 @@ export {
   createValidationEngine,
 } from './core';
 
-// 响应式系统
-export {
-  reactive,
-  effect,
-  computed,
-  watch,
-  batchUpdate,
-  ref,
-  toReactive,
-  isReactive,
-  trigger,
-  type ComputedRef,
-} from '@lania-pro-components/utils';
-
-// 性能优化 Hooks
-export {
-  useVirtualScroll,
-  useDynamicVirtualScroll,
-  type VirtualScrollConfig,
-  type VirtualScrollState,
-} from '@lania-pro-components/shared';
-
-export {
-  useLazyField,
-  useGroupLazyLoad,
-  usePriorityLoad,
-  type LazyFieldConfig,
-  type LazyFieldState,
-  type GroupLazyConfig,
-  type PriorityLoadConfig,
-} from './hooks/useLazyField';
-
-export { useArcoForm, type ArcoFormInstance } from './hooks/useArcoForm';
-
-// 性能工具
-export {
-  TaskQueue,
-  globalTaskQueue,
-  BatchUpdateManager,
-  debounce,
-  throttle,
-  memoize,
-  LRUCache,
-  PerformanceMonitor,
-  performanceMonitor,
-  scheduleIdleTask,
-  scheduleChunkedTask,
-} from '@lania-pro-components/utils';
-
 // Schema 处理工具
 // Note: schemaUtils 已移除，功能集成到 ProForm 组件中
 

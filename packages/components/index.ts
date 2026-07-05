@@ -76,7 +76,7 @@ export { getProDialogInstance, instanceRegistry as dialogInstanceRegistry } from
 export { ProForm } from './ProForm';
 export type { ProFormInstance } from './ProForm/types';
 export { ProFormProvider } from './ProForm/ProFormProvider';
-export { FormField } from './ProForm/FormField';
+export { FormField } from './ProForm/components/FormField';
 export { useProForm } from './ProForm/useProForm';
 export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProForm/types';
 export type { ProFormListProps, ProFormStepsProps } from './ProForm/components/types';

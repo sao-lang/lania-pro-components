@@ -14,8 +14,22 @@
  * - 单一来源：所有组件的验证都委托到此引擎
  * - 可测试：每个规则独立可测
  */
-
-import type { ValidationRule } from '../types';
+export interface ValidationRule {
+  required?: boolean;
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  len?: number;
+  precision?: number;
+  step?: number;
+  type?: 'number' | 'integer' | 'float' | 'string' | 'boolean';
+  sign?: 'positive' | 'negative' | 'zero';
+  whitespace?: boolean;
+  pattern?: RegExp | string;
+  validator?: (value: unknown, values: Record<string, unknown>) => string | undefined | Promise<string | undefined>;
+  message?: string;
+}
 
 /**
  * 执行单条验证规则

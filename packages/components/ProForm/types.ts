@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { ColProps } from '@arco-design/web-react/lib/Grid';
+import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
 
 /**
  * 验证规则类型
@@ -342,11 +343,11 @@ export interface DraftConfig {
   /** 草稿过期时间（毫秒），默认 24 小时 */
   ttl?: number;
   /** 存储类型：'localStorage' | 'sessionStorage' | 自定义策略 */
-  storage?: 'localStorage' | 'sessionStorage' | import('./core/DraftEngine').DraftStorage;
+  storage?: 'localStorage' | 'sessionStorage' | DraftStorage;
   /** 草稿恢复时的回调（用于展示恢复确认 UI） */
   onDraftRestored?: (values: Record<string, unknown>) => void;
   /** 发现草稿时的回调（用于展示提示） */
-  onDraftAvailable?: (data: import('./core/DraftEngine').DraftData) => void;
+  onDraftAvailable?: (data: DraftData) => void;
 }
 
 /**

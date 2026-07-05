@@ -29,7 +29,20 @@ export { useChartInstance } from './useChartInstance';
 export type { InstanceAdapter, UseChartInstanceReturn } from './useChartInstance';
 export { useResizeObserver } from './useResizeObserver';
 export type { Size, UseResizeObserverOptions, UseResizeObserverReturn } from './useResizeObserver';
-// export { usePresetManager } from './usePresetManager';
-// export { usePersistedState } from './usePersistedState';
-// export { useChartInstance } from './useChartInstance';
-// export { useResizeObserver } from './useResizeObserver';
+
+export { useDragSort } from './useDragSort';
+export type { DragSortConfig, DragState, UseDragSortReturn } from './useDragSort';
+
+export { useLazyField, useGroupLazyLoad, usePriorityLoad } from './useLazyField';
+export type { LazyFieldConfig, LazyFieldState, GroupLazyConfig, PriorityLoadConfig } from './useLazyField';
+
+export { useFieldNavigation } from './useFieldNavigation';
+export type {
+  KeyboardNavigationConfig,
+  FocusableItem,
+  FieldNavigationOptions,
+  UseFieldNavigationReturn,
+} from './useFieldNavigation';
+
+export { useDraft } from './useDraft';
+export type { DraftStoreLike, UseDraftOptions, UseDraftReturn } from './useDraft';

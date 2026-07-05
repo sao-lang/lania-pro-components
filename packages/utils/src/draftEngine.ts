@@ -97,17 +97,29 @@ export const localStorageStrategy: DraftStorage = {
       }
       return data;
     } catch {
-      try { localStorage.removeItem(key); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
       return null;
     }
   },
 
   remove(key: string): void {
-    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
   },
 
   exists(key: string): boolean {
-    try { return localStorage.getItem(key) !== null; } catch { return false; }
+    try {
+      return localStorage.getItem(key) !== null;
+    } catch {
+      return false;
+    }
   },
 };
 
@@ -116,7 +128,9 @@ export const localStorageStrategy: DraftStorage = {
  */
 export const sessionStorageStrategy: DraftStorage = {
   save(key: string, data: DraftData): void {
-    try { sessionStorage.setItem(key, JSON.stringify(data)); } catch (error) {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
       console.warn('[DraftEngine] sessionStorage save failed:', error);
     }
   },
@@ -132,17 +146,29 @@ export const sessionStorageStrategy: DraftStorage = {
       }
       return data;
     } catch {
-      try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
       return null;
     }
   },
 
   remove(key: string): void {
-    try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
   },
 
   exists(key: string): boolean {
-    try { return sessionStorage.getItem(key) !== null; } catch { return false; }
+    try {
+      return sessionStorage.getItem(key) !== null;
+    } catch {
+      return false;
+    }
   },
 };
 
@@ -334,13 +360,19 @@ export class DraftEngine {
       const result = this.config.storage.exists(this.storageKey);
       if (result instanceof Promise) return true;
       return result;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   /** 异步检查是否有草稿 */
   async hasDraftAsync(): Promise<boolean> {
     if (!this.config.enabled) return false;
-    try { return await this.config.storage.exists(this.storageKey); } catch { return false; }
+    try {
+      return await this.config.storage.exists(this.storageKey);
+    } catch {
+      return false;
+    }
   }
 
   /** 删除草稿 */
@@ -349,7 +381,9 @@ export class DraftEngine {
       this.config.storage.remove(this.storageKey);
       this.lastSavedValues = null;
       this.config.onRemove(this.config.formKey);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   /** 异步删除草稿 */
@@ -358,7 +392,9 @@ export class DraftEngine {
       await this.config.storage.remove(this.storageKey);
       this.lastSavedValues = null;
       this.config.onRemove(this.config.formKey);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   /** 检查草稿是否过期 */

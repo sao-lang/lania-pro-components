@@ -61,6 +61,23 @@ export type { InstanceAdapter, UseChartInstanceReturn } from './hooks/useChartIn
 export { useResizeObserver } from './hooks/useResizeObserver';
 export type { Size, UseResizeObserverOptions, UseResizeObserverReturn } from './hooks/useResizeObserver';
 
+export { useDragSort } from './hooks/useDragSort';
+export type { DragSortConfig, DragState, UseDragSortReturn } from './hooks/useDragSort';
+
+export { useLazyField, useGroupLazyLoad, usePriorityLoad } from './hooks/useLazyField';
+export type { LazyFieldConfig, LazyFieldState, GroupLazyConfig, PriorityLoadConfig } from './hooks/useLazyField';
+
+export { useFieldNavigation } from './hooks/useFieldNavigation';
+export type {
+  KeyboardNavigationConfig,
+  FocusableItem,
+  FieldNavigationOptions,
+  UseFieldNavigationReturn,
+} from './hooks/useFieldNavigation';
+
+export { useDraft } from './hooks/useDraft';
+export type { DraftStoreLike, UseDraftOptions, UseDraftReturn } from './hooks/useDraft';
+
 // ======================== 组件 ========================
 export { PerformanceMonitor } from './PerformanceMonitor';
 export type { PerformanceMonitorProps } from './PerformanceMonitor/types';

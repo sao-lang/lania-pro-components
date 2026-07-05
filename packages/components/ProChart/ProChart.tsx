@@ -19,7 +19,7 @@
  */
 
 import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo, useCallback } from 'react';
-import { useAsyncRequest } from '@lania-pro-components/shared';
+import { useAsyncRequest, useResizeObserver } from '@lania-pro-components/shared';
 import { resolveChartAdapter } from './chartAdapterRegistry';
 import { getChartTransformer } from './transformers';
 import { ChartStatus } from './ChartStatus';
@@ -179,17 +179,20 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
     }
   }, [option]);
 
-  // resize 监听
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const observer = new ResizeObserver(() => {
+  const { ref: observeResize } = useResizeObserver<HTMLDivElement>({
+    enabled: true,
+    onResize: () => {
       instanceRef.current?.resize();
-    });
-    observer.observe(containerRef.current);
+    },
+  });
 
-    return () => observer.disconnect();
-  }, []);
+  const containerRefCallback = useCallback(
+    (element: HTMLDivElement | null) => {
+      containerRef.current = element;
+      observeResize(element);
+    },
+    [observeResize],
+  );
 
   // ref API
   useImperativeHandle(
@@ -237,7 +240,10 @@ export const ProChart = forwardRef<ProChartInstance, ProChartProps>((props, ref)
           if (request) refresh();
         }}
       >
-        <div ref={containerRef} style={{ width: '100%', height: typeof height === 'number' ? height : height }} />
+        <div
+          ref={containerRefCallback}
+          style={{ width: '100%', height: typeof height === 'number' ? height : height }}
+        />
       </ChartStatus>
     </div>
   );

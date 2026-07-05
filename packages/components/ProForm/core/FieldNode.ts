@@ -16,7 +16,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI } from '../types';
 import { computed, watch, ref, type ComputedRef } from '@lania-pro-components/utils';
-import { executeRule, executeRules } from './ruleEngine';
+import { executeRule, executeRules } from '@lania-pro-components/utils';
 
 /**
  * 计算行为值

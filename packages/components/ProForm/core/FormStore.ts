@@ -22,7 +22,7 @@
 
 import type { FormStoreAPI, FieldNodeAPI, FieldReaction, ValidationRule } from '../types';
 import { reactive, batchUpdate, watch } from '@lania-pro-components/utils';
-import { executeRule } from './ruleEngine';
+import { executeRule } from '@lania-pro-components/utils';
 
 /**
  * 值变化监听器类型

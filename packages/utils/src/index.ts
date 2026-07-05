@@ -69,3 +69,8 @@ export * from './draftEngine';
 // 标签颜色映射、状态颜色转换等
 // 导出：getTagColor
 export * from './color';
+
+// ======================== 规则引擎 ========================
+// 表单验证规则引擎，支持 required/min/max/pattern/validator 等
+// 导出：ValidationRule, executeRule, executeRules
+export * from './ruleEngine';

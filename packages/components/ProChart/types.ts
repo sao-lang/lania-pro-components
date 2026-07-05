@@ -41,11 +41,6 @@ export interface ProChartProps<TOption = unknown> {
   error?: Error | null;
   empty?: boolean;
 
-  /** === 性能 === */
-  performance?: {
-    enabled?: boolean;
-  };
-
   /** === 事件 === */
   onChartReady?: (instance: ChartInstance<TOption>) => void;
   onChartEvent?: (event: string, payload: unknown) => void;

@@ -6,7 +6,7 @@
  */
 
 import type { FieldNodeAPI, FormStoreAPI, ValidationResult } from '../types';
-import { executeRule, executeRules } from './ruleEngine';
+import { executeRule, executeRules } from '@lania-pro-components/utils';
 
 /**
  * 验证引擎
