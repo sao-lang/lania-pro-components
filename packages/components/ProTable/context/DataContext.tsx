@@ -15,6 +15,7 @@ export interface DataContextValue<T = Record<string, unknown>> extends DataStore
   action: ProTableActionType<T>;
   formRef: React.RefObject<ProFormInstance | null>;
   onDataSourceChange?: (dataSource: T[]) => void;
+  getState: () => DataStoreState<T>;
 }
 
 const DataContext = createContext<DataContextValue<Record<string, unknown>> | null>(null);
@@ -105,6 +106,20 @@ export const DataProvider = <T extends Record<string, unknown>>({
       stopPolling: store.stopPolling.bind(store),
       reload: store.reload.bind(store),
       reset: store.reset.bind(store),
+      getState: () => ({
+        dataSource: store.dataSource,
+        loading: store.loading,
+        error: store.error,
+        total: store.total,
+        query: store.query,
+        pagination: store.pagination,
+        sorter: store.sorter,
+        filters: store.filters,
+        selectedRowKeys: store.selectedRowKeys,
+        selectedRows: store.selectedRows,
+        isPolling: store.isPolling,
+        pollingInterval: store.pollingInterval,
+      }),
       action,
       formRef,
       onDataSourceChange,

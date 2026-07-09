@@ -7,6 +7,8 @@
 import type { ProColumnType } from '../ProTable/types';
 import type { ProFormSchema, ProFormInstance, ProFormProps, SchemaProcessOptions } from '../ProForm/types';
 import type { DataStoreImpl } from '../ProTable/store/DataStore';
+import type { DataStoreState, DataStoreActions } from '../ProTable/store/types';
+import type { PresetItem } from '@lania-pro-components/shared';
 
 /** ProQueryForm 主组件 Props */
 export interface ProQueryFormProps<T = Record<string, unknown>> {
@@ -44,7 +46,7 @@ export interface ProQueryFormProps<T = Record<string, unknown>> {
 
   /** === 重量模式（与 ProTable DataStore 集成）=== */
   /** DataStore 实例（传入则启用重量模式） */
-  store?: DataStoreImpl<T>;
+  store?: DataStoreState<T> & DataStoreActions<T> & { getState: () => DataStoreState<T> };
   /** URL 同步（仅重量模式生效） */
   urlSync?: boolean | UrlSyncConfig;
   /** 查询方案管理（轻量/重量模式均可） */
@@ -75,6 +77,20 @@ export interface ProQueryFormInstance {
   setFieldsValue(values: Record<string, unknown>): void;
   /** 获取 ProForm 原始实例（escape hatch） */
   getFormInstance(): ProFormInstance | null;
+
+  /** === 查询方案管理 === */
+  /** 查询方案列表 */
+  searchSchemas?: PresetItem<Record<string, unknown>>[];
+  /** 当前选中的方案 key */
+  currentSearchSchema?: string;
+  /** 保存查询方案 */
+  saveSearchSchema?: (name: string, params?: Record<string, unknown>) => void;
+  /** 切换查询方案 */
+  switchSearchSchema?: (key: string) => void;
+  /** 删除查询方案 */
+  deleteSearchSchema?: (key: string) => void;
+  /** 重命名查询方案 */
+  renameSearchSchema?: (key: string, newName: string) => void;
 }
 
 /** URL 同步配置 */

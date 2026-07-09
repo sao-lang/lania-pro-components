@@ -36,12 +36,13 @@ import React, { useImperativeHandle, forwardRef, useRef, useMemo, useCallback, u
 import { Card } from '@arco-design/web-react';
 import type { ProTableProps, ProTableActionType, ProTableRequest, ProTableNEventHandlers } from './types';
 import type { ProFormInstance } from '../ProForm/types';
+import type { ProQueryFormInstance } from '../ProQueryForm';
 import { RootProvider, DataProvider, ColumnProvider } from './context';
 import { createDataStore } from './store/DataStore';
 import { useRequest } from './hooks/useRequest';
 import { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation } from './components';
 import { openDialog, confirm } from './components/TableDialog';
-import { useUrlSync, useSearchSchema, useProTable, useDragSort } from './hooks';
+import { useProTable, useDragSort } from './hooks';
 import { useVirtualScroll, useCache } from '@lania-pro-components/shared';
 import { useEditableTable } from './editable';
 import { CardView, ViewModeSwitch, SearchSchemaSelector } from './components';
@@ -89,7 +90,6 @@ const ProTableComponent = forwardRef<
     manual = false,
     debounceTime = 300,
     polling,
-    urlSync,
     searchSchema: searchSchemaConfig,
     editable: editableConfig,
     defaultExpandAllRows,
@@ -125,6 +125,7 @@ const ProTableComponent = forwardRef<
   } = props;
 
   const formRef = useRef<ProFormInstance | null>(null);
+  const queryFormRef = useRef<ProQueryFormInstance>(null);
 
   // 展开行状态
   const [expandedRowKeys, setExpandedRowKeys] = useState<(string | number)[]>(defaultExpandedRowKeys || []);
@@ -223,55 +224,6 @@ const ProTableComponent = forwardRef<
     getRowKey: (record: Record<string, unknown>) => getRowKey(record as T),
     dataSource: store.dataSource,
   });
-
-  // 使用 URL 同步 Hook
-  useUrlSync({
-    enabled: urlSync === true,
-    store: store,
-    config: typeof urlSync === 'object' ? urlSync : undefined,
-  });
-
-  // 使用查询方案 Hook
-  const {
-    schemas: searchSchemas,
-    currentSchema: currentSearchSchema,
-    saveSchema: saveSearchSchema,
-    switchSchema: switchSearchSchema,
-    deleteSchema: deleteSearchSchema,
-    renameSchema: renameSearchSchema,
-  } = useSearchSchema({
-    enabled: searchSchemaConfig?.enabled ?? false,
-    persistenceKey: searchSchemaConfig?.persistenceKey,
-    defaultSchema: searchSchemaConfig?.defaultSchema,
-    initialSchemas: searchSchemaConfig?.schemas,
-  });
-
-  // 切换查询方案时应用参数
-  const handleSwitchSearchSchema = useCallback(
-    (key: string) => {
-      switchSearchSchema(key);
-      const schema = searchSchemas.find((s) => s.key === key);
-      if (schema) {
-        store.setQuery(schema.params);
-        formRef.current?.setFieldsValue(schema.params);
-        store.setPage(1);
-        store.reload();
-      }
-    },
-    [switchSearchSchema, searchSchemas, store],
-  );
-
-  // 保存当前查询方案
-  const handleSaveSearchSchema = useCallback(
-    (name: string) => {
-      const currentParams = {
-        ...store.query,
-        ...formRef.current?.getFieldsValue(),
-      };
-      saveSearchSchema(name, currentParams);
-    },
-    [saveSearchSchema, store.query, formRef],
-  );
 
   // 使用 ProTable 实例管理 Hook
   useProTable<Record<string, unknown>>({
@@ -475,21 +427,21 @@ const ProTableComponent = forwardRef<
       )}
 
       {/* 查询表单 */}
-      {search && <QueryForm formRef={formRef} />}
+      {search && <QueryForm formRef={formRef} ref={queryFormRef} />}
 
       {/* 工具栏 - 添加视图切换和查询方案选择器 */}
       {toolbar && (
         <Toolbar
           extraRender={
             <>
-              {searchSchemaConfig?.enabled && (
+              {searchSchemaConfig?.enabled && queryFormRef.current && (
                 <SearchSchemaSelector
-                  schemas={searchSchemas}
-                  currentSchema={currentSearchSchema}
-                  onSwitch={handleSwitchSearchSchema}
-                  onSave={handleSaveSearchSchema}
-                  onDelete={deleteSearchSchema}
-                  onRename={renameSearchSchema}
+                  schemas={queryFormRef.current.searchSchemas ?? []}
+                  currentSchema={queryFormRef.current.currentSearchSchema}
+                  onSwitch={queryFormRef.current.switchSearchSchema ?? (() => {})}
+                  onSave={queryFormRef.current.saveSearchSchema ?? (() => {})}
+                  onDelete={queryFormRef.current.deleteSearchSchema ?? (() => {})}
+                  onRename={queryFormRef.current.renameSearchSchema}
                   getCurrentParams={() => ({
                     ...store.query,
                     ...formRef.current?.getFieldsValue(),

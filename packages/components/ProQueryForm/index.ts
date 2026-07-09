@@ -10,6 +10,8 @@ export { QueryFormRenderer } from './QueryFormRenderer';
 export type { QueryFormRendererProps } from './QueryFormRenderer';
 export { SearchSchemaBar } from './SearchSchemaBar';
 export type { SearchSchemaBarProps } from './SearchSchemaBar';
+export { SearchSchemaSelector } from './SearchSchemaSelector';
+export type { SearchSchemaSelectorProps } from './SearchSchemaSelector';
 
 // 工具函数
 export {
