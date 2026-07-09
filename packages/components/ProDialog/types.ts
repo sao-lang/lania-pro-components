@@ -99,7 +99,12 @@ export interface ProDialogInstance<TValues = Record<string, unknown>, TRow = unk
   /**
    * 更新弹窗配置
    */
-  update: (config: Partial<ProDialogProps<TValues, TRow>>) => void;
+  update: (
+    config: Partial<ProDialogProps<TValues, TRow>> &
+      Partial<Pick<DialogState, 'confirmDisabled' | 'contentLoading'>> & {
+        data?: Partial<TValues>;
+      },
+  ) => void;
 
   /**
    * 销毁弹窗
@@ -716,7 +721,12 @@ export interface TableDialogProps<TRow = unknown, TKey extends Key = Key> {
  * ProDialog 完整属性
  */
 export interface ProDialogProps<TValues = Record<string, unknown>, TRow = unknown>
-  extends BaseDialogProps, FormDialogProps<TValues>, TableDialogProps<TRow> {
+  extends Omit<BaseDialogProps, 'extraButtons'>, FormDialogProps<TValues>, TableDialogProps<TRow> {
+  /**
+   * 自定义按钮列表
+   */
+  extraButtons?: DialogButtonConfig<TValues, TRow>[];
+
   /**
    * Drawer 模式下的位置
    * @default 'right'

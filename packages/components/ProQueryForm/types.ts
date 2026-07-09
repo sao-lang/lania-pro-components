@@ -6,7 +6,6 @@
 
 import type { ProColumnType } from '../ProTable/types';
 import type { ProFormSchema, ProFormInstance, ProFormProps, SchemaProcessOptions } from '../ProForm/types';
-import type { DataStoreImpl } from '../ProTable/store/DataStore';
 import type { DataStoreState, DataStoreActions } from '../ProTable/store/types';
 import type { PresetItem } from '@lania-pro-components/shared';
 
