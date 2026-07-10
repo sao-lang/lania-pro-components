@@ -58,12 +58,18 @@ export function useChartInstance<TInstance, TOptions = unknown>(
 ): UseChartInstanceReturn<TInstance, TOptions> {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<TInstance | null>(null);
+  // 用 ref 持有 adapter，避免 adapter 变化触发重建，同时保证回调拿到最新值
   const adapterRef = useRef(adapter);
 
   useEffect(() => {
     adapterRef.current = adapter;
   }, [adapter]);
 
+  /**
+   * 销毁当前实例
+   *
+   * 调用 adapter.destroy 并清空 instanceRef，重复调用安全（空操作）。
+   */
   const destroy = useCallback(() => {
     if (instanceRef.current) {
       adapterRef.current.destroy(instanceRef.current);
@@ -71,15 +77,24 @@ export function useChartInstance<TInstance, TOptions = unknown>(
     }
   }, []);
 
-  const update = useCallback(
-    (opts: TOptions) => {
-      if (instanceRef.current) {
-        adapterRef.current.update(instanceRef.current, opts);
-      }
-    },
-    [],
-  );
+  /**
+   * 更新实例配置
+   *
+   * 委托给 adapter.update（如 echarts.setOption）。
+   * 实例不存在时安全跳过。
+   */
+  const update = useCallback((opts: TOptions) => {
+    if (instanceRef.current) {
+      adapterRef.current.update(instanceRef.current, opts);
+    }
+  }, []);
 
+  /**
+   * 重新创建实例
+   *
+   * 先销毁旧实例，再用新（或默认）options 创建新实例。
+   * 适用于容器尺寸变化、配置全量变更等场景。
+   */
   const recreate = useCallback(
     (opts?: TOptions) => {
       destroy();
@@ -90,7 +105,7 @@ export function useChartInstance<TInstance, TOptions = unknown>(
     [destroy, options],
   );
 
-  // 挂载时创建，卸载时销毁
+  // 挂载时创建实例，卸载时销毁（仅首次执行，避免重建循环）
   useEffect(() => {
     if (containerRef.current) {
       instanceRef.current = adapterRef.current.create(containerRef.current, options);

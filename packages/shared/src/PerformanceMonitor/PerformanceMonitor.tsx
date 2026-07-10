@@ -71,7 +71,12 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   const lastTimeRef = useRef(performance.now());
   const rafRef = useRef<number | null>(null);
 
-  // 计算 FPS
+  /**
+   * 计算 FPS（每秒帧数）
+   *
+   * 基于 requestAnimationFrame 累加帧计数，每 1000ms 统计一次。
+   * 未到统计窗口时累加计数并返回上一次的 FPS 值。
+   */
   const calculateFPS = useCallback(() => {
     const now = performance.now();
     const delta = now - lastTimeRef.current;
@@ -87,22 +92,27 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     return data.fps;
   }, [data.fps]);
 
-  // 收集性能数据
+  /**
+   * 收集性能数据
+   *
+   * 聚合 FPS、内存使用（Chrome only）、字段数、渲染统计、用户自定义指标，
+   * 一次性写入 state 触发 UI 刷新。
+   */
   const collectData = useCallback(() => {
     if (!enabled) return;
 
     const fps = calculateFPS();
 
-    // 获取内存使用情况
+    // 获取内存使用情况（仅 Chrome 支持 performance.memory）
     const { memory } = performance as unknown as {
       memory?: { usedJSHeapSize: number };
     };
     const memoryUsage = memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
 
-    // 获取字段数量
+    // 统计页面中带 data-field-name 属性的元素数量（表征表单字段规模）
     const fieldCount = document.querySelectorAll('[data-field-name]').length;
 
-    // 获取渲染统计（如果指定了 measures，则聚合多个 measure）
+    // 获取渲染统计：指定 measures 则聚合多个，否则默认取 'form-render'
     let totalRenderCount = 0;
     let totalUpdateTime = 0;
     let measureCount = 0;
@@ -126,9 +136,10 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       }
     }
 
+    // 多 measure 时取平均更新耗时
     const avgUpdateTime = measureCount > 0 ? totalUpdateTime / measureCount : totalUpdateTime;
 
-    // 获取自定义指标
+    // 获取用户自定义指标
     const userExtraStats = extraStats?.() ?? {};
 
     setData({
@@ -177,7 +188,13 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     'bottom-right': { bottom: 10, right: 10 },
   };
 
-  // 根据 FPS 判断性能状态
+  /**
+   * 根据 FPS 返回对应性能等级的颜色
+   *
+   * - ≥50：绿色（流畅）
+   * - 30~49：橙色（一般）
+   * - <30：红色（卡顿）
+   */
   const getFPSColor = (fps: number) => {
     if (fps >= 50) return '#00b42a';
     if (fps >= 30) return '#ff7d00';

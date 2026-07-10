@@ -54,12 +54,19 @@ export function createImperativeInstance<P extends Record<string, unknown>>(
   let idCounter = 0;
 
   return {
+    /**
+     * 打开/挂载一个实例
+     *
+     * 流程：创建容器 div → createRoot → 首次渲染 → 记录到 instances Map。
+     * 返回的句柄支持 close（卸载）和 update（部分更新 props 重渲染）。
+     */
     open(props: P) {
       const container = document.createElement('div');
       document.body.appendChild(container);
       const root = createRoot(container);
       const id = `imperative-instance-${++idCounter}`;
 
+      // 渲染函数：接收 props 调用外部传入的 render 回调
       const renderInstance = (instanceProps: P) => {
         root.render(render(instanceProps));
       };
@@ -68,6 +75,7 @@ export function createImperativeInstance<P extends Record<string, unknown>>(
       instances.set(id, { root, container });
 
       return {
+        /** 关闭当前实例：卸载 React 树并移除 DOM 容器 */
         close: () => {
           if (autoDestroy) {
             root.unmount();
@@ -77,11 +85,13 @@ export function createImperativeInstance<P extends Record<string, unknown>>(
           }
           instances.delete(id);
         },
+        /** 更新当前实例的 props（部分更新，与旧 props 合并后重渲染） */
         update: (newProps: Partial<P>) => {
           renderInstance({ ...props, ...newProps } as P);
         },
       };
     },
+    /** 关闭所有实例：遍历卸载并移除 DOM，最后清空 Map */
     closeAll: () => {
       for (const [, { root, container }] of instances) {
         if (autoDestroy) {

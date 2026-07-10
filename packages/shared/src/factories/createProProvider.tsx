@@ -62,7 +62,7 @@ export function createProProvider<TContext>(displayName?: string): ProProviderRe
     if (ctx === null) {
       throw new Error(
         `use${displayName || 'Pro'}Context must be used within its corresponding Provider. ` +
-        `Make sure the component is wrapped with the Provider.`,
+          `Make sure the component is wrapped with the Provider.`,
       );
     }
     return ctx;

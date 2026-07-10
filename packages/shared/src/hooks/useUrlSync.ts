@@ -58,6 +58,12 @@ export function useUrlSync<TState>(options: UseUrlSyncOptions<TState>): UseUrlSy
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRestoringRef = useRef(false);
 
+  /**
+   * 同步当前状态到 URL
+   *
+   * 流程：getState → serialize → 写入 URL searchParams → pushState/replaceState。
+   * 防抖处理避免频繁更新 URL；恢复中（isRestoringRef=true）跳过，避免回环。
+   */
   const syncToUrl = useCallback(() => {
     if (!enabled || isRestoringRef.current) return;
 
@@ -68,6 +74,7 @@ export function useUrlSync<TState>(options: UseUrlSyncOptions<TState>): UseUrlSy
       const params = serialize(state);
       if (typeof window === 'undefined') return;
       const url = new URL(window.location.href);
+      // 空值删除 key，非空值设置
       Object.entries(params).forEach(([key, value]) => {
         if (value === undefined || value === '' || value === null) {
           url.searchParams.delete(key);
@@ -83,6 +90,12 @@ export function useUrlSync<TState>(options: UseUrlSyncOptions<TState>): UseUrlSy
     }, debounceTime);
   }, [enabled, getState, serialize, replace, debounceTime]);
 
+  /**
+   * 从 URL 恢复状态
+   *
+   * 流程：读取 location.search → deserialize → setState。
+   * 设置 isRestoringRef 标志位 100ms，防止 setState 触发的 syncToUrl 回环。
+   */
   const restoreFromUrl = useCallback(() => {
     if (!enabled || typeof window === 'undefined') return;
 
@@ -90,13 +103,18 @@ export function useUrlSync<TState>(options: UseUrlSyncOptions<TState>): UseUrlSy
     try {
       const params = new URLSearchParams(window.location.search);
       const raw: Record<string, string> = {};
-      params.forEach((v, k) => { raw[k] = v; });
+      params.forEach((v, k) => {
+        raw[k] = v;
+      });
       const state = deserialize(raw);
       if (Object.keys(state).length > 0) {
         setState(state);
       }
     } finally {
-      setTimeout(() => { isRestoringRef.current = false; }, 100);
+      // 延迟 100ms 解除恢复标志，确保 syncToUrl 防抖窗口内被跳过
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
     }
   }, [enabled, deserialize, setState]);
 
@@ -108,4 +126,3 @@ export function useUrlSync<TState>(options: UseUrlSyncOptions<TState>): UseUrlSy
 
   return { syncToUrl, restoreFromUrl };
 }
-

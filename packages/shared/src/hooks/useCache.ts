@@ -48,20 +48,36 @@ export class CacheStorage<T = Record<string, unknown>> {
   private maxAge: number;
   private maxSize: number;
 
+  /**
+   * @param config - 缓存配置，可指定 maxAge 与 maxSize
+   */
   constructor(config: CacheConfig = {}) {
     this.cache = new Map();
     this.maxAge = config.maxAge ?? 5 * 60 * 1000;
     this.maxSize = config.maxSize ?? 50;
   }
 
+  /**
+   * 生成缓存 key
+   *
+   * 字符串直接返回；对象则 JSON.stringify 序列化为稳定 key。
+   */
   private generateKey(params: Record<string, unknown> | string): string {
     return typeof params === 'string' ? params : JSON.stringify(params);
   }
 
+  /**
+   * 判断缓存条目是否已过期
+   */
   private isExpired(entry: CacheEntry<T>): boolean {
     return Date.now() - entry.timestamp > this.maxAge;
   }
 
+  /**
+   * 清理所有过期条目
+   *
+   * 遍历缓存，删除超过 maxAge 的条目。
+   */
   private cleanup(): void {
     const now = Date.now();
     for (const [key, entry] of this.cache.entries()) {
@@ -71,6 +87,12 @@ export class CacheStorage<T = Record<string, unknown>> {
     }
   }
 
+  /**
+   * LRU + LFU 混合淘汰
+   *
+   * 当缓存条目数达到 maxSize 时，淘汰「访问次数最少」的条目；
+   * 访问次数相同时，淘汰「写入时间最早」的条目（LRU）。
+   */
   private evictLRU(): void {
     if (this.cache.size < this.maxSize) return;
 
@@ -94,6 +116,12 @@ export class CacheStorage<T = Record<string, unknown>> {
     }
   }
 
+  /**
+   * 读取缓存
+   *
+   * @param params - 缓存 key 或参数对象
+   * @returns 命中则返回数据，未命中或已过期返回 null
+   */
   get(params: Record<string, unknown> | string): T | null {
     const key = this.generateKey(params);
     const entry = this.cache.get(key);
@@ -105,12 +133,18 @@ export class CacheStorage<T = Record<string, unknown>> {
       return null;
     }
 
+    // 命中后增加访问计数，用于 LFU 淘汰策略
     entry.accessCount++;
     this.cache.set(key, entry);
 
     return entry.data;
   }
 
+  /**
+   * 写入缓存
+   *
+   * 写入前先清理过期条目并执行 LRU/LFU 淘汰，保证不超过 maxSize。
+   */
   set(params: Record<string, unknown> | string, data: T): void {
     this.cleanup();
     this.evictLRU();
@@ -123,19 +157,31 @@ export class CacheStorage<T = Record<string, unknown>> {
     });
   }
 
+  /**
+   * 删除指定缓存
+   *
+   * @returns 是否删除成功（原本存在才返回 true）
+   */
   delete(params: Record<string, unknown> | string): boolean {
     const key = this.generateKey(params);
     return this.cache.delete(key);
   }
 
+  /** 清空所有缓存 */
   clear(): void {
     this.cache.clear();
   }
 
+  /** 获取当前缓存条目数 */
   size(): number {
     return this.cache.size;
   }
 
+  /**
+   * 判断是否存在有效缓存
+   *
+   * 会自动清理已过期条目。
+   */
   has(params: Record<string, unknown> | string): boolean {
     const key = this.generateKey(params);
     const entry = this.cache.get(key);
@@ -147,6 +193,11 @@ export class CacheStorage<T = Record<string, unknown>> {
     return true;
   }
 
+  /**
+   * 获取所有有效缓存 key 列表
+   *
+   * 返回前会先清理过期条目。
+   */
   keys(): string[] {
     this.cleanup();
     return Array.from(this.cache.keys());
@@ -193,30 +244,38 @@ export interface UseCacheReturn<T = Record<string, unknown>> {
  * ```
  */
 export function useCache<T = Record<string, unknown>>(config?: CacheConfig): UseCacheReturn<T> {
+  // 使用 useRef 持有 CacheStorage 实例，避免重渲染时重建
   const cacheRef = useRef<CacheStorage<T>>(new CacheStorage<T>(config));
 
+  /** 读取缓存数据 */
   const getCache = useCallback(
     (params: Record<string, unknown> | string): T | null => cacheRef.current.get(params),
     [],
   );
 
+  /** 写入缓存数据 */
   const setCache = useCallback((params: Record<string, unknown> | string, data: T): void => {
     cacheRef.current.set(params, data);
   }, []);
 
+  /** 删除指定缓存 */
   const deleteCache = useCallback(
     (params: Record<string, unknown> | string): boolean => cacheRef.current.delete(params),
     [],
   );
 
+  /** 清空当前实例所有缓存 */
   const clearCache = useCallback((): void => {
     cacheRef.current.clear();
   }, []);
 
+  /** 检查是否存在有效缓存 */
   const hasCache = useCallback((params: Record<string, unknown> | string): boolean => cacheRef.current.has(params), []);
 
+  /** 获取当前缓存条目数 */
   const getCacheSize = useCallback((): number => cacheRef.current.size(), []);
 
+  // 组件卸载时不自动清空（缓存实例由 ref 持有，会随 GC 回收）
   useEffect(
     () => () => {
       // 组件卸载时不自动清空

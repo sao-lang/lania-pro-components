@@ -143,6 +143,10 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
 
   /**
    * 执行请求的核心函数
+   *
+   * 流程：取消上次请求 → 新建 AbortController → beforeRequest 拦截 → request → afterRequest 拦截 → setData/onSuccess。
+   * silentPolling 启用且本次被标记 silent 时跳过 loading/error 切换，适合轮询静默刷新。
+   * 请求被取消或组件已卸载时返回 undefined，不更新状态。
    */
   const execute = useCallback(
     async (

@@ -199,7 +199,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
 ② 运行时交互：用户输入 → 状态更新 → 联动 → UI
 
   handleChange(value) → fieldNode.setValue(value)
-    ├── transform.output(value) ← 输出转换
+    ├── transform.output(allValues) ← 输出转换（传入整个表单值）
     ├── _value.value = transformed ← ref 响应式
     └── store.setValue(name, transformed)
           ├── batchUpdate { state.values[name] = value }
@@ -275,9 +275,9 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
   valueFormat?: string;              // 日期值格式（提交时的格式）
   prefix?: string;                   // 前缀
   suffix?: string;                   // 后缀
-  transform?: {                      // 值转换
-    input?: (value) => unknown;
-    output?: (value) => unknown;
+  transform?: {                      // 值转换（接收整个表单值，可跨字段计算）
+    input?: (values: Record<string, unknown>) => unknown;
+    output?: (values: Record<string, unknown>) => unknown;
   };
   dependencies?: string[];           // 依赖字段
   behavior?: FieldBehavior;          // 字段行为
@@ -544,20 +544,21 @@ watch(
 
 ```typescript
 setValue(newValue) {
-  // 输出转换：组件值 → 存储值
+  // 输出转换：将新值合并进表单值后传入，使 transform 可跨字段访问
   let transformedValue = newValue;
   if (this.schema.transform?.output) {
-    transformedValue = this.schema.transform.output(newValue);
+    const allValues = { ...this.store.getValues(), [fieldName]: newValue };
+    transformedValue = this.schema.transform.output(allValues);
   }
   this._value.value = transformedValue;
   this.store.setValue(fieldName, transformedValue);
 }
 
 getValue() {
-  // 输入转换：存储值 → 显示值
+  // 输入转换：传入整个表单值（已包含当前字段值），可跨字段计算
   let result = this._value.value;
   if (this.schema.transform?.input) {
-    result = this.schema.transform.input(result);
+    result = this.schema.transform.input(this.store.getValues());
   }
   return result;
 }

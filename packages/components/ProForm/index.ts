@@ -98,12 +98,6 @@ export {
   createValidationEngine,
 } from './core';
 
-// Schema 处理工具
-// Note: schemaUtils 已移除，功能集成到 ProForm 组件中
-
-// 性能监控组件（已废弃，请使用 @lania-pro-components/shared 的 PerformanceMonitor）
-// export { FormPerformanceMonitor } from './components/FormPerformanceMonitor';
-
 // 只读渲染器（导入以执行注册）
 import './core/customRenderers';
 

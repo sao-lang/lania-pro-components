@@ -74,6 +74,12 @@ export interface UsePresetManagerReturn<TParams = Record<string, unknown>> {
 
 const STORAGE_PREFIX = 'lania-pro-preset-';
 
+/**
+ * 从 localStorage 读取预设列表
+ *
+ * @param key - 持久化 key（不含前缀）
+ * @returns 预设数组，读取失败返回空数组
+ */
 function loadFromStorage<TParams>(key: string): PresetItem<TParams>[] {
   try {
     const data = localStorage.getItem(STORAGE_PREFIX + key);
@@ -83,6 +89,12 @@ function loadFromStorage<TParams>(key: string): PresetItem<TParams>[] {
   }
 }
 
+/**
+ * 将预设列表写入 localStorage
+ *
+ * @param key - 持久化 key（不含前缀）
+ * @param items - 预设数组
+ */
 function saveToStorage<TParams>(key: string, items: PresetItem<TParams>[]) {
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(items));
@@ -91,6 +103,11 @@ function saveToStorage<TParams>(key: string, items: PresetItem<TParams>[]) {
   }
 }
 
+/**
+ * 生成预设唯一 key
+ *
+ * 格式：preset-{时间戳}-{9位随机串}，保证全局唯一性。
+ */
 function generateKey(): string {
   return `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -112,6 +129,11 @@ export function usePresetManager<TParams = Record<string, unknown>>(
   const [current, setCurrent] = useState<string | undefined>(defaultPreset);
   const maxCountRef = useRef(maxCount);
 
+  /**
+   * 持久化用户预设到 localStorage
+   *
+   * 仅持久化用户创建的预设，内置 presetList 不写入存储。
+   */
   const persist = useCallback(
     (items: PresetItem<TParams>[]) => {
       if (persistenceKey) {
@@ -123,6 +145,12 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [persistenceKey, presetList],
   );
 
+  /**
+   * 保存新预设
+   *
+   * 生成唯一 key，加入列表；若超过 maxCount 则按 FIFO 淘汰最早的用户预设。
+   * 保存后自动选中新预设。
+   */
   const save = useCallback(
     (name: string, params: TParams) => {
       if (!enabled) return;
@@ -135,6 +163,7 @@ export function usePresetManager<TParams = Record<string, unknown>>(
       setPresets((prev) => {
         const next = [...prev, newItem];
         if (next.length > maxCountRef.current) {
+          // 仅淘汰用户预设，按创建时间 FIFO 移除最早项
           const presetKeys = new Set(presetList.map((p) => p.key));
           const userItems = next.filter((p) => !presetKeys.has(p.key));
           const toRemove = userItems.slice(0, userItems.length - maxCountRef.current);
@@ -151,6 +180,11 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [enabled, presetList, persist],
   );
 
+  /**
+   * 切换到指定预设
+   *
+   * @param key - 预设 key，必须存在才会切换
+   */
   const apply = useCallback(
     (key: string) => {
       if (!enabled) return;
@@ -161,6 +195,11 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [enabled, presets],
   );
 
+  /**
+   * 删除指定预设
+   *
+   * 从列表移除并持久化；若删除的是当前选中项，则清空 current。
+   */
   const remove = useCallback(
     (key: string) => {
       if (!enabled) return;
@@ -174,6 +213,9 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [enabled, current, persist],
   );
 
+  /**
+   * 重命名指定预设
+   */
   const rename = useCallback(
     (key: string, newName: string) => {
       if (!enabled) return;
@@ -186,6 +228,9 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [enabled, persist],
   );
 
+  /**
+   * 更新指定预设的参数（整体替换，非合并）
+   */
   const update = useCallback(
     (key: string, params: TParams) => {
       if (!enabled) return;
@@ -198,6 +243,11 @@ export function usePresetManager<TParams = Record<string, unknown>>(
     [enabled, persist],
   );
 
+  /**
+   * 获取指定预设的参数
+   *
+   * @returns 预设参数，不存在返回 undefined
+   */
   const getParams = useCallback(
     (key: string): TParams | undefined => {
       return presets.find((p) => p.key === key)?.params;

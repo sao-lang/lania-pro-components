@@ -110,15 +110,16 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 计算容器高度
+  // 计算容器高度：优先使用固定值，否则取视口高度的 60% 与总高度的较小值
   const containerHeight = useMemo(() => {
     if (fixedContainerHeight) return fixedContainerHeight;
     if (typeof window === 'undefined') return 400;
     return Math.min(window.innerHeight * 0.6, items.length * itemHeight);
   }, [fixedContainerHeight, items.length, itemHeight]);
 
-  // 计算虚拟滚动状态
+  // 计算虚拟滚动状态：根据 scrollTop 推算可视区域起止索引与偏移量
   const virtualState = useMemo<VirtualScrollState<T>>(() => {
+    // 未启用虚拟滚动时直接返回全量
     if (!enabled) {
       return {
         startIndex: 0,
@@ -132,7 +133,9 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     }
 
     const totalHeight = items.length * itemHeight;
+    // 起始索引向上多渲染 overscan 项，避免滚动顶部出现空白
     const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+    // 可视项数 = 一屏容量 + 上下各 overscan
     const visibleCount = Math.ceil(containerHeight / itemHeight) + overscan * 2;
     const endIndex = Math.min(items.length - 1, startIndex + visibleCount);
     const visibleItems = items.slice(startIndex, endIndex + 1);
@@ -149,7 +152,7 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     };
   }, [items, scrollTop, itemHeight, containerHeight, overscan, isScrolling, enabled]);
 
-  // 原生 scroll 事件监听
+  // 原生 scroll 事件监听：更新 scrollTop 与 isScrolling（150ms 防抖标记停止）
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -176,7 +179,7 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     };
   }, []);
 
-  // React 合成事件 onScroll 回调（ProTable 兼容）
+  // React 合成事件 onScroll 回调（ProTable 兼容路径）
   const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
     setIsScrolling(true);
@@ -190,7 +193,7 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     }, 150);
   }, []);
 
-  // 滚动到指定索引
+  /** 滚动到指定索引位置 */
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = 'smooth') => {
       const container = containerRef.current;
@@ -201,12 +204,12 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     [itemHeight],
   );
 
-  // 滚动到顶部
+  /** 滚动到顶部 */
   const scrollToTop = useCallback((behavior: ScrollBehavior = 'smooth') => {
     containerRef.current?.scrollTo({ top: 0, behavior });
   }, []);
 
-  // 滚动到底部
+  /** 滚动到底部 */
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
       const container = containerRef.current;
@@ -217,7 +220,7 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
     [virtualState],
   );
 
-  // 获取当前滚动位置
+  /** 获取容器当前滚动位置信息 */
   const getScrollPosition = useCallback(() => {
     const container = containerRef.current;
     if (!container) return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
@@ -273,6 +276,7 @@ export function useDynamicVirtualScroll<T = unknown>(
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
+  // 已测量项的高度缓存：index → height，未测量则回退到 getItemHeight 预估
   const measuredHeightsRef = useRef<Map<number, number>>(new Map());
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -283,7 +287,7 @@ export function useDynamicVirtualScroll<T = unknown>(
     return Math.min(window.innerHeight * 0.6, items.length * estimateHeight);
   }, [fixedContainerHeight, items.length, estimateHeight]);
 
-  // 计算位置信息
+  // 预计算每项的位置信息（top/height/bottom）与总高度
   const positionInfo = useMemo(() => {
     const positions: { top: number; height: number; bottom: number }[] = [];
     let currentTop = 0;
@@ -297,11 +301,11 @@ export function useDynamicVirtualScroll<T = unknown>(
     return { positions, totalHeight: currentTop };
   }, [items, getItemHeight]);
 
-  // 计算可视区域（二分查找）
+  // 计算可视区域：使用二分查找定位起始项，线性扫描定位结束项
   const virtualState = useMemo<VirtualScrollState<T>>(() => {
     const { positions, totalHeight } = positionInfo;
 
-    // 二分查找起始索引
+    // 二分查找首个 bottom > scrollTop 的项作为可视区起点
     let low = 0;
     let high = positions.length - 1;
     let startIndex = 0;
@@ -316,7 +320,7 @@ export function useDynamicVirtualScroll<T = unknown>(
     }
     startIndex = Math.max(0, startIndex - overscan);
 
-    // 计算结束索引
+    // 从起点线性扫描至首个 top 超过可视区底部的项作为终点
     const visibleBottom = scrollTop + containerHeight;
     let endIndex = items.length - 1;
     for (let i = startIndex; i < positions.length; i++) {
@@ -381,12 +385,17 @@ export function useDynamicVirtualScroll<T = unknown>(
     }, 150);
   }, []);
 
-  // 测量项高度
+  /**
+   * 手动测量并记录项高度
+   *
+   * 由使用方在项渲染后调用，将真实高度写入缓存，
+   * 后续 positionInfo 计算会使用真实高度而非预估，提升滚动精度。
+   */
   const measureItem = useCallback((index: number, height: number) => {
     measuredHeightsRef.current.set(index, height);
   }, []);
 
-  // 滚动到指定索引
+  /** 滚动到指定索引（基于真实位置信息） */
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = 'smooth') => {
       const container = containerRef.current;
@@ -398,12 +407,12 @@ export function useDynamicVirtualScroll<T = unknown>(
     [positionInfo.positions],
   );
 
-  // 滚动到顶部
+  /** 滚动到顶部 */
   const scrollToTop = useCallback((behavior: ScrollBehavior = 'smooth') => {
     containerRef.current?.scrollTo({ top: 0, behavior });
   }, []);
 
-  // 滚动到底部
+  /** 滚动到底部 */
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
       const container = containerRef.current;
@@ -413,7 +422,7 @@ export function useDynamicVirtualScroll<T = unknown>(
     [positionInfo.totalHeight],
   );
 
-  // 获取当前滚动位置
+  /** 获取容器当前滚动位置信息 */
   const getScrollPosition = useCallback(() => {
     const container = containerRef.current;
     if (!container) return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };

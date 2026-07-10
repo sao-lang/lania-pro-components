@@ -128,11 +128,13 @@ export class FieldNode implements FieldNodeAPI {
       (newValue, oldValue) => {
         if (newValue !== this._value.value) {
           this._value.value = newValue;
-          this.onChangeCallbacks.forEach((cb) => cb(newValue));
+          // 订阅回调传递组件值（经过 input 转换），与 value getter 语义一致
+          const componentValue = this.getValue();
+          this.onChangeCallbacks.forEach((cb) => cb(componentValue));
 
-          // 触发生命周期
+          // 触发生命周期（传递组件值，用户层回调更关注展示形态）
           if (this.schema.lifecycle?.onValueChange) {
-            this.schema.lifecycle.onValueChange(newValue, oldValue, this, this.store);
+            this.schema.lifecycle.onValueChange(componentValue, oldValue, this, this.store);
           }
         }
       },
@@ -141,10 +143,13 @@ export class FieldNode implements FieldNodeAPI {
   }
 
   /**
-   * 获取值（响应式）
+   * 获取字段值（组件值，响应式）
+   *
+   * 经过 transform.input 反向转换后的值，是给组件渲染和用户操作的展示形态。
+   * 内部真实存储值（output 转换后）通过 _value 持有。
    */
   get value(): unknown {
-    return this._value.value;
+    return this.getValue();
   }
 
   /**
@@ -178,36 +183,42 @@ export class FieldNode implements FieldNodeAPI {
 
   /**
    * 设置值
+   *
+   * 接收组件值（用户输入形态），经过 transform.output 转换为存储值后写入内部状态和 store。
    */
   setValue(newValue: unknown): void {
-    // 应用转换
-    let transformedValue = newValue;
-    if (this.schema.transform?.output) {
-      transformedValue = this.schema.transform.output(newValue);
-    }
-
     // 获取字段名（数组类型使用第一个字段名）
     const fieldName = Array.isArray(this.name) ? this.name[0] : this.name;
+
+    // 应用 output 转换：将组件值转换为存储值
+    // 将新值合并进表单值，使 transform 可跨字段访问
+    let transformedValue = newValue;
+    if (this.schema.transform?.output) {
+      const allValues = { ...this.store.getValues(), [fieldName]: newValue };
+      transformedValue = this.schema.transform.output(allValues);
+    }
 
     this._value.value = transformedValue;
     this.store.setValue(fieldName, transformedValue);
 
-    // 通知回调
-    this.onChangeCallbacks.forEach((cb) => cb(transformedValue));
+    // 通知订阅者（传递组件值，与 value getter 语义一致）
+    const componentValue = this.getValue();
+    this.onChangeCallbacks.forEach((cb) => cb(componentValue));
   }
 
   /**
-   * 获取值
+   * 获取字段值（组件值）
+   *
+   * 经过 transform.input 反向转换后的值，是给组件渲染和用户操作的展示形态。
+   * 内部真实存储值（output 转换后）通过 _value 持有。
+   *
+   * 传入整个表单值（已包含当前字段值），使 transform 可跨字段计算。
    */
   getValue(): unknown {
-    let result = this._value.value;
-
-    // 应用输入转换
     if (this.schema.transform?.input) {
-      result = this.schema.transform.input(result);
+      return this.schema.transform.input(this.store.getValues());
     }
-
-    return result;
+    return this._value.value;
   }
 
   /**

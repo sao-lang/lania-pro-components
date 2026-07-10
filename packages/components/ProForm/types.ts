@@ -3,6 +3,7 @@ import { ColProps } from '@arco-design/web-react/lib/Grid';
 import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
 import { FormStore } from './core';
 import { ArcoFormInstance } from './hooks/useArcoForm';
+import { UseFieldNavigationReturn } from '@lania-pro-components/shared';
 
 /**
  * 验证规则类型
@@ -285,10 +286,10 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   prefix?: string;
   /** 后缀文本 */
   suffix?: string;
-  /** 值转换函数 */
+  /** 值转换函数（接收整个表单值，可跨字段计算） */
   transform?: {
-    input?: (value: unknown) => unknown;
-    output?: (value: unknown) => unknown;
+    input?: (values: Record<string, unknown>) => unknown;
+    output?: (values: Record<string, unknown>) => unknown;
   };
   /** 依赖的字段名列表 */
   dependencies?: string[];
@@ -308,6 +309,13 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   children?: Array<ProFormSchema<TValues>>;
   /** 字段值变化回调 */
   onFieldChange?: (value: unknown, allValues: TValues) => void;
+  /** 字段级键盘导航配置（覆盖全局 keyboardNavigation） */
+  keyboardNavigation?: KeyboardNavigationConfig & {
+    /** 字段级 focus 回调（优先于全局 onFieldFocus） */
+    onFocus?: (name: string) => void;
+    /** 字段级 blur 回调（优先于全局 onFieldBlur） */
+    onBlur?: (name: string) => void;
+  };
 }
 
 /**
@@ -480,10 +488,10 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
   /** Schema 处理配置选项 */
   schemaProcessOptions?: SchemaProcessOptions;
 
-  /** 全局值转换配置（作用于所有字段，schem 层可覆盖） */
+  /** 全局值转换配置（作用于所有字段，schema 层可覆盖，接收整个表单值） */
   transform?: {
-    input?: (value: unknown) => unknown;
-    output?: (value: unknown) => unknown;
+    input?: (values: Record<string, unknown>) => unknown;
+    output?: (values: Record<string, unknown>) => unknown;
   };
   /** 全局生命周期钩子（作用于所有字段） */
   lifecycle?: FieldLifecycle;
@@ -496,6 +504,10 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
 
   /** 键盘导航配置 */
   keyboardNavigation?: KeyboardNavigationConfig;
+  /** 全局字段聚焦回调（字段级 schema.keyboardNavigation.onFocus 优先） */
+  onFieldFocus?: (name: string) => void;
+  /** 全局字段失焦回调（字段级 schema.keyboardNavigation.onBlur 优先） */
+  onFieldBlur?: (name: string) => void;
   /** 草稿持久化配置（启用后自动保存表单草稿到 localStorage） */
   draftStorage?: DraftConfig;
 }
@@ -543,7 +555,7 @@ export interface FieldNodeAPI {
   removeFocus: () => void;
   /** 更新计算行为 */
   updateComputedBehavior: (values: Record<string, unknown>) => void;
-  /** 订阅值变化 */
+  /** 订阅值变化（回调参数为组件值，即经过 transform.input 转换后的值） */
   subscribeToValueChange: (callback: (value: unknown) => void) => () => void;
   /** 订阅状态变化 */
   subscribeToStatusChange: (callback: (status: FieldStatus, oldStatus: FieldStatus) => void) => () => void;
@@ -555,9 +567,9 @@ export interface FieldNodeAPI {
  * FormStore API（表单存储接口）
  */
 export interface FormStoreAPI {
-  /** 获取所有值 */
+  /** 获取所有值（存储值） */
   getValues: () => Record<string, unknown>;
-  /** 获取单个值 */
+  /** 获取单个值（存储值） */
   getValue: (name: string) => unknown;
   /** 设置值 */
   setValue: (name: string, value: unknown) => void;
@@ -573,6 +585,18 @@ export interface FormStoreAPI {
   runReactions: (changedField: string, newValue?: unknown, oldValue?: unknown) => void;
   /** 获取所有字段 */
   getAllFields: () => Map<string, FieldNodeAPI>;
+  /** 设置字段错误 */
+  setFieldError: (name: string, error: string | undefined) => void;
+  /** 清除所有错误 */
+  clearErrors: () => void;
+  /** 验证单个字段 */
+  validateField: (name: string) => Promise<string | undefined>;
+  /** 验证所有字段 */
+  validateAllFields: () => Promise<Record<string, string>>;
+  /** 重置所有字段到初始值 */
+  reset: () => void;
+  /** 重置指定字段到初始值 */
+  resetField: (name: string) => void;
 }
 
 /**
@@ -706,10 +730,48 @@ export interface FormItemProps {
   layout?: 'horizontal' | 'vertical' | 'inline';
 }
 
-// import { ProFormContextValue } from './useProForm';
 export interface ProFormContextValue<TValues = Record<string, unknown>> {
   formStore: FormStore | null;
   instance: ProFormInstance<TValues> | null;
   arcoForm: ArcoFormInstance | null;
 }
 export type UsrProFormFn<TValues = Record<string, unknown>> = () => ProFormContextValue<TValues>;
+
+/**
+ * useProForm Hook 配置选项
+ */
+export interface UseProFormOptions<TValues = Record<string, unknown>> extends Omit<ProFormProps<TValues>, 'schemas'> {
+  schemas?: ProFormSchema<TValues>[];
+  initialValues?: Partial<TValues>;
+  onValuesChange?: (changedValues: Partial<TValues>, allValues: TValues) => void;
+  onFieldsChange?: (changedFields: unknown, allFields: unknown) => void;
+}
+
+/**
+ * useProForm Hook 返回值
+ */
+export interface UseProFormReturn<TValues = Record<string, unknown>> {
+  arcoForm: ArcoFormInstance;
+  instance: ProFormInstance<TValues>;
+  schemas: ProFormSchema<TValues>[];
+  setSchemas: (schemas: ProFormSchema<TValues>[]) => void;
+  formProps: Partial<ProFormProps<TValues>>;
+  setComponentRef: (name: string, ref: unknown) => void;
+  fieldStatusMap: Record<string, FieldStatus>;
+  setFieldStatusMap: (statusMap: Record<string, FieldStatus>) => void;
+  isDraftState: boolean;
+  setIsDraftState: (draft: boolean) => void;
+  isPreviewState: boolean;
+  setIsPreviewState: (preview: boolean) => void;
+  options: UseProFormOptions<TValues>;
+  bindingProps: ProFormProps<TValues>;
+  formStore: FormStore;
+  /** Provider 组件，用于包裹子组件 */
+  Provider: React.FC<{ children: React.ReactNode }>;
+  /** 键盘导航功能 */
+  fieldNavigation: UseFieldNavigationReturn;
+  /** 注入 scrollToField 实现（内部使用，虚拟滚动时由 ProForm 组件调用） */
+  setScrollToFieldImpl: (fn: ((name: string) => void) | null) => void;
+}
+
+export type GetComponentRefFn = <R = unknown>(name: string) => R | undefined;

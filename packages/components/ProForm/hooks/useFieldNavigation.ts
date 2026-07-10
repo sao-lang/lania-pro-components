@@ -2,23 +2,39 @@
  * @deprecated 请从 @lania-pro-components/shared 导入 useFieldNavigation
  * 此文件为向后兼容保留的适配器壳
  */
-import type { KeyboardNavigationConfig } from '../types';
-import { useFieldNavigation as useFieldNavigationShared, type UseFieldNavigationReturn } from '@lania-pro-components/shared';
+import type { KeyboardNavigationConfig, FormStoreAPI } from '../types';
+import {
+  useFieldNavigation as useFieldNavigationShared,
+  type UseFieldNavigationReturn,
+} from '@lania-pro-components/shared';
 
 interface FieldNavigationOptions {
-  schemas: Array<{ name: string | string[] }>;
+  schemas: Array<{
+    name: string | string[];
+    keyboardNavigation?: {
+      onFocus?: (name: string) => void;
+      onBlur?: (name: string) => void;
+    };
+  }>;
   getRef: (name: string) => unknown;
   keyboardNavigation?: KeyboardNavigationConfig;
-  onFocusField?: (name: string) => void;
-  onBlurField?: (name: string) => void;
+  /** 表单 store（用于内部始终执行 field.setFocus/removeFocus） */
+  formStore: FormStoreAPI;
+  /** 用户自定义焦点回调（schema 未定义 keyboardNavigation.onFocus 时使用） */
+  onFocus?: (name: string) => void;
+  /** 用户自定义失焦回调（schema 未定义 keyboardNavigation.onBlur 时使用） */
+  onBlur?: (name: string) => void;
 }
-
+interface Focusable {
+  focus: () => void;
+}
 export const useFieldNavigation = ({
   schemas,
   getRef,
   keyboardNavigation,
-  onFocusField,
-  onBlurField,
+  formStore,
+  onFocus,
+  onBlur,
 }: FieldNavigationOptions): UseFieldNavigationReturn => {
   const getElement = (name: string): HTMLElement | null => {
     const ref = getRef(name);
@@ -27,9 +43,6 @@ export const useFieldNavigation = ({
     }
 
     if (typeof ref === 'object' && ref !== null) {
-      interface Focusable {
-        focus: () => void;
-      }
       if ('focus' in ref && typeof (ref as Focusable).focus === 'function') {
         return ref as HTMLElement;
       }
@@ -49,11 +62,21 @@ export const useFieldNavigation = ({
   };
 
   return useFieldNavigationShared({
-    items: schemas.map((schema) => ({ id: schema.name })),
+    // field.setFocus/removeFocus 始终执行（默认行为），
+    // schema.keyboardNavigation.onFocus ?? props.onFocus 择一执行（自定义行为）
+    items: schemas.map((schema) => ({
+      id: schema.name,
+      onFocus: (name: string) => {
+        formStore.getField(name)?.setFocus();
+        (schema.keyboardNavigation?.onFocus ?? onFocus)?.(name);
+      },
+      onBlur: (name: string) => {
+        formStore.getField(name)?.removeFocus();
+        (schema.keyboardNavigation?.onBlur ?? onBlur)?.(name);
+      },
+    })),
     getElement,
     config: keyboardNavigation,
-    onFocus: onFocusField,
-    onBlur: onBlurField,
   });
 };
 

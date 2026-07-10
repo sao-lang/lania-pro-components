@@ -168,9 +168,22 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     const mergedSchemas = useMemo(() => {
       return processedSchemas.map((schema) => {
         const merged: ProFormSchema = { ...schema };
+        const fieldName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
 
-        if (!merged.transform && transform) {
-          merged.transform = transform;
+        // initialValues 兜底：schema 未定义 initialValue 时使用表单级的 initialValues
+        if (merged.initialValue === undefined && initialValues && fieldName in initialValues) {
+          merged.initialValue = initialValues[fieldName as keyof typeof initialValues];
+        }
+
+        if (transform) {
+          if (!merged.transform) {
+            merged.transform = transform;
+          } else {
+            merged.transform = {
+              input: merged.transform.input ?? transform.input,
+              output: merged.transform.output ?? transform.output,
+            };
+          }
         }
         if (!merged.lifecycle && lifecycle) {
           merged.lifecycle = lifecycle;
@@ -181,10 +194,17 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         if (!merged.format && dateFormat) {
           merged.format = dateFormat;
         }
+        // keyboardNavigation：全局配置作为 base，schema 层覆盖（浅合并，schema 优先）
+        if (keyboardNavigation || schema.keyboardNavigation) {
+          merged.keyboardNavigation = {
+            ...keyboardNavigation,
+            ...schema.keyboardNavigation,
+          };
+        }
 
         return merged;
       });
-    }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat]);
+    }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
 
     // 暴露实例
     useImperativeHandle(ref, () => instance, [instance]);
@@ -344,7 +364,11 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     const virtualScrollConfig = performance?.virtualScroll;
     const isVirtualScrollEnabled = virtualScrollConfig?.enabled && mergedSchemas.length > 20;
 
-    const { containerRef: virtualContainerRef, virtualState } = useVirtualScroll(mergedSchemas, {
+    const {
+      containerRef: virtualContainerRef,
+      virtualState,
+      // scrollToIndex,
+    } = useVirtualScroll(mergedSchemas, {
       itemHeight: virtualScrollConfig?.itemHeight || 60,
       overscan: virtualScrollConfig?.overscan || 5,
       containerHeight: virtualScrollConfig?.containerHeight,
@@ -401,10 +425,11 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       lazyLoadConfig?.highPriorityFields?.length,
     ]);
 
-    // 处理表单提交
-    const handleFinish = async (values: Record<string, unknown>) => {
+    // 处理表单提交（传入存储值，即经过 transform.output 转换后的值）
+    const handleFinish = async (_values: Record<string, unknown>) => {
       try {
-        await onFinish?.(values);
+        const storedValues = formStore.getValues();
+        await onFinish?.(storedValues);
         // 提交成功后清除草稿
         if (draftStorage?.formKey) {
           discardDraft();
@@ -416,7 +441,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
 
     // 处理重置
     const handleReset = () => {
-      arcoForm.resetFields();
+      formStore.reset();
       onReset?.();
     };
 

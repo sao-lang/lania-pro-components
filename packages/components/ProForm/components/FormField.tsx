@@ -1,17 +1,17 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { Form } from '@arco-design/web-react';
-import type { ProFormSchema, FieldStatus, FieldNodeAPI } from './types';
-import { getComponent, parseQuickComponent, getReadonlyRenderer, getRendererByMode } from './registry';
+import type { ProFormSchema, FieldStatus, FieldNodeAPI } from '../types';
+import { getComponent, parseQuickComponent, getReadonlyRenderer, getRendererByMode } from '../registry';
 import {
   useRootContext,
   useLayoutContext,
   SchemaContextProvider,
   FieldContextProvider,
   LayoutContextProvider,
-} from './context';
-import { createFieldNode } from './core/FieldNode';
-import type { FormStore } from './core/FormStore';
-import type { ArcoFormInstance } from './hooks/useArcoForm';
+} from '../context';
+import { createFieldNode } from '../core/FieldNode';
+import type { FormStore } from '../core/FormStore';
+import type { ArcoFormInstance } from '../hooks/useArcoForm';
 
 type ComponentRef = React.RefObject<HTMLElement> | null;
 

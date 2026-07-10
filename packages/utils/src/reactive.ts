@@ -45,11 +45,17 @@ class Dep {
    * 依赖收集
    *
    * 在属性的 getter 中被调用。
-   * 将当前正在执行的 activeEffect 添加到订阅者集合中。
+   * 将当前正在执行的 activeEffect 添加到订阅者集合中，
+   * 同时在 activeEffect 上记录该 Dep 引用，以便清理时取消订阅。
    */
   depend() {
     if (activeEffect && !this.subscribers.has(activeEffect)) {
       this.subscribers.add(activeEffect);
+      // 在 effect 上记录 Dep 引用，用于 teardown 时取消订阅
+      const deps = (activeEffect as DepTracked).deps;
+      if (deps) {
+        deps.add(this);
+      }
     }
   }
 
@@ -233,33 +239,38 @@ export function reactive<T extends object>(target: T): T {
 // ======================== effect ========================
 
 /**
+ * 带依赖追踪的 effect 类型
+ * 在普通函数上附加 deps 属性，记录该 effect 订阅的所有 Dep 实例。
+ */
+interface DepTracked {
+  (): void;
+  /** 该 effect 订阅的 Dep 实例集合，用于 teardown 时取消订阅 */
+  deps: Set<Dep>;
+}
+
+/**
  * 创建副作用函数
  *
  * effect 是响应式系统的消费端。在 effect 执行期间，
  * 所有被访问的响应式属性都会被自动收集为该 effect 的依赖。
  * 当这些依赖发生变化时，effect 会自动重新执行。
  *
- * 实现细节：
- * - 使用 effectStack 处理嵌套 effect（effect 内部调用另一个 effect）
- * - 每次执行前将自身设为 activeEffect，执行后恢复之前的 activeEffect
- * - 返回一个清理函数（当前简化实现，完整版应包含依赖清除逻辑）
- *
- * @param fn - 副作用函数（函数体内部访问响应式属性即建立依赖关系）
+ * @param fn - 副作用函数
  * @param options - 配置项
- * @param options.immediate - 是否立即执行，默认 true（设为 false 则只在依赖变化时执行）
- * @returns 清理函数，调用后可手动触发 effect（简化版，完整版应包含 teardown）
+ * @param options.immediate - 是否立即执行，默认 true
+ * @returns 清理函数，调用后从所有 Dep 中移除该 effect 的订阅
  *
  * @example
  * ```ts
- * const state = reactive({ count: 0, name: 'Alice' });
+ * const state = reactive({ count: 0 });
  *
- * // 自动追踪依赖：state.count 和 state.name
- * effect(() => {
- *   document.title = `${state.name}: ${state.count}`;
+ * const dispose = effect(() => {
+ *   console.log('count:', state.count);
  * });
  *
- * state.count = 1; // 自动更新 document.title => 'Alice: 1'
- * state.name = 'Bob'; // 自动更新 document.title => 'Bob: 1'
+ * state.count = 1; // 输出: count: 1
+ * dispose();       // 取消订阅，后续变更不再触发
+ * state.count = 2; // 不输出
  * ```
  */
 export function effect(fn: () => void, options: { immediate?: boolean } = {}): () => void {
@@ -267,11 +278,16 @@ export function effect(fn: () => void, options: { immediate?: boolean } = {}): (
    * 包装后的 effect 执行函数
    *
    * 核心流程：
-   * 1. 将自身设为 activeEffect（推入栈顶）
-   * 2. 执行 fn()（此时 fn 内访问的响应式属性会通过 dep.depend() 建立依赖）
-   * 3. 执行完毕后恢复之前的 activeEffect（从栈中弹出）
+   * 1. 执行前清理旧的 Dep 订阅（重新收集，保证依赖是最新的）
+   * 2. 将自身设为 activeEffect（推入栈顶）
+   * 3. 执行 fn()（此时 fn 内访问的响应式属性会通过 dep.depend() 建立依赖）
+   * 4. 执行完毕后恢复之前的 activeEffect（从栈中弹出）
    */
-  const effectFn = () => {
+  const effectFn: DepTracked = () => {
+    // 清除旧的 Dep 订阅，确保依赖是最新的（避免残留订阅）
+    effectFn.deps.forEach((dep) => dep.remove(effectFn));
+    effectFn.deps.clear();
+
     try {
       // 推入栈顶，设为当前活跃 effect
       activeEffect = effectFn;
@@ -284,16 +300,28 @@ export function effect(fn: () => void, options: { immediate?: boolean } = {}): (
       activeEffect = effectStack[effectStack.length - 1] || null;
     }
   };
+  effectFn.deps = new Set();
 
   // 默认立即执行一次（首次执行建立所有依赖关系）
   if (options.immediate !== false) {
     effectFn();
   }
 
-  // 返回清理函数（简化版，完整实现应清除所有 Dep 中的订阅）
-  return () => {
-    effectFn();
-  };
+  // 返回 effectFn 本身，调用可重新执行（自动清除旧依赖并重新收集）
+  return effectFn;
+}
+
+/**
+ * 从所有 Dep 中移除指定 effect 的订阅（停止响应）
+ *
+ * @param effectFn - 需要清理的 effect 函数
+ */
+export function disposeEffect(effectFn: () => void): void {
+  const tracked = effectFn as DepTracked;
+  if (tracked.deps) {
+    tracked.deps.forEach((dep) => dep.remove(tracked));
+    tracked.deps.clear();
+  }
 }
 
 // ======================== computed ========================
@@ -366,6 +394,36 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
 // ======================== watch ========================
 
 /**
+ * 深度遍历对象的所有属性
+ *
+ * 在 effect 中调用此函数时，会触发所有嵌套属性的 Proxy getter，
+ * 从而使 effect 订阅所有嵌套路径的变更。
+ * 用于 watch 的 deep: true 选项。
+ *
+ * @param value - 需要遍历的值
+ * @param seen - 已访问对象集合，防止循环引用导致的死循环
+ */
+function traverse(value: unknown, seen: Set<unknown> = new Set()): void {
+  if (value === null || typeof value !== 'object' || seen.has(value)) {
+    return;
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      traverse(value[i], seen);
+    }
+  } else {
+    const keys = Object.keys(value as Record<string, unknown>);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      // 访问属性 → 触发 Proxy get → dep.depend() → 建立依赖
+      traverse((value as Record<string, unknown>)[key], seen);
+    }
+  }
+}
+
+/**
  * 监听数据变化并执行回调
  *
  * 与 effect 的区别：
@@ -378,25 +436,27 @@ export function computed<T>(getter: () => T): ComputedRef<T> {
  * @param callback - 变化时的回调函数，接收新值和旧值
  * @param options - 配置项
  * @param options.immediate - 是否立即执行一次回调（此时 oldValue 为 undefined）
- * @param options.deep - 是否深度监听（预留参数，当前未完全实现）
+ * @param options.deep - 是否深度监听，设为 true 时会遍历对象所有嵌套属性，
+ *   使其中任意属性变化都能触发回调（仅对对象类型生效）
  * @returns 停止监听的清理函数
  *
  * @template T - 监听值的类型
  *
  * @example
  * ```ts
- * const state = reactive({ name: 'Alice' });
+ * const state = reactive({ user: { name: 'Alice', age: 25 } });
  *
- * // 监听特定属性
+ * // 深度监听：user 内任何属性变化都触发
  * const unwatch = watch(
- *   () => state.name,
- *   (newName, oldName) => {
- *     console.log(`name 从 ${oldName} 变为 ${newName}`);
+ *   () => state.user,
+ *   (newUser, oldUser) => {
+ *     console.log('user 变化:', newUser);
  *   },
+ *   { deep: true },
  * );
  *
- * state.name = 'Bob'; // 输出: name 从 Alice 变为 Bob
- * unwatch(); // 停止监听
+ * state.user.age = 26; // 输出: user 变化: { name: 'Alice', age: 26 }
+ * unwatch();
  * ```
  */
 export function watch<T>(
@@ -407,18 +467,25 @@ export function watch<T>(
   let getter: () => T;
   let oldValue: T | undefined;
 
-  // 根据 source 类型确定 getter 函数
   if (typeof source === 'function') {
-    // 函数形式：直接使用（精确监听某个表达式的结果）
     getter = source as () => T;
   } else {
-    // 对象形式：监听整个对象的引用替换
+    // 对象形式：监听整个对象，默认启用 deep
     getter = () => source as T;
+    if (options.deep !== false) {
+      options.deep = true;
+    }
   }
 
   // 创建内部 effect，在 getter 值变化时执行回调
   const effectFn = effect(() => {
     const newValue = getter();
+
+    // deep 模式：遍历返回值的所有属性，收集嵌套依赖
+    if (options.deep) {
+      traverse(newValue);
+    }
+
     if (callback && newValue !== oldValue) {
       callback(newValue, oldValue);
     }
@@ -428,14 +495,15 @@ export function watch<T>(
   // 处理 immediate 选项：立即执行一次回调
   if (options.immediate) {
     const initialValue = getter();
-    callback?.(initialValue, undefined); // 首次执行 oldValue 为 undefined
+    if (options.deep) {
+      traverse(initialValue);
+    }
+    callback?.(initialValue, undefined);
     oldValue = initialValue;
   }
 
   // 返回停止监听的清理函数
-  return () => {
-    effectFn();
-  };
+  return () => disposeEffect(effectFn);
 }
 
 // ======================== 批量更新 ========================

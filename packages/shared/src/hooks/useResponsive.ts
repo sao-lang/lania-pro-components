@@ -79,7 +79,11 @@ const defaultBreakpoints: Required<Breakpoints> = {
 };
 
 /**
- * 获取当前断点
+ * 根据屏幕宽度计算当前断点
+ *
+ * @param width - 屏幕宽度（像素）
+ * @param breakpoints - 自定义断点配置（与默认断点合并）
+ * @returns 当前匹配的断点标识
  */
 function getBreakpoint(width: number, breakpoints: Breakpoints): Breakpoint {
   const bp = { ...defaultBreakpoints, ...breakpoints };
@@ -93,7 +97,9 @@ function getBreakpoint(width: number, breakpoints: Breakpoints): Breakpoint {
 }
 
 /**
- * 根据断点获取列数
+ * 根据断点计算列数
+ *
+ * 优先使用 config.breakpoints 中的列数配置，否则使用默认映射。
  */
 function getColumnsByBreakpoint(breakpoint: Breakpoint, config?: ResponsiveConfig): number {
   if (config?.breakpoints) {
@@ -177,6 +183,11 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     };
   });
 
+  /**
+   * 根据当前窗口宽度更新响应式状态
+   *
+   * 计算 breakpoint / columns / isMobile / isTablet / isDesktop 五项状态。
+   */
   const updateState = useCallback(() => {
     if (typeof window === 'undefined') return;
 
@@ -213,13 +224,16 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     };
   }, [enabled, updateState]);
 
+  /** 获取当前断点 */
   const getCurrentBreakpoint = useCallback((): Breakpoint => state.breakpoint, [state.breakpoint]);
 
+  /** 判断当前断点是否等于指定断点 */
   const matchBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => state.breakpoint === breakpoint,
     [state.breakpoint],
   );
 
+  /** 判断当前断点是否大于等于指定断点（如当前 lg，gteBreakpoint('md') 为 true） */
   const gteBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => {
       const order: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'];
@@ -228,6 +242,7 @@ export function useResponsive(config?: ResponsiveConfig): UseResponsiveReturn {
     [state.breakpoint],
   );
 
+  /** 判断当前断点是否小于等于指定断点 */
   const lteBreakpoint = useCallback(
     (breakpoint: Breakpoint): boolean => {
       const order: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'];
@@ -275,6 +290,11 @@ export function useResponsiveColumns(options?: {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    /**
+     * 根据容器宽度计算列数
+     *
+     * 公式：可用宽度 / (最小列宽 + 间距) + 1，并限制在 [1, maxColumns] 范围内。
+     */
     const calculateColumns = () => {
       const container = containerRef?.current;
       const width = container ? container.clientWidth : window.innerWidth;
@@ -285,6 +305,7 @@ export function useResponsiveColumns(options?: {
 
     calculateColumns();
 
+    // 100ms 防抖，避免 resize 频繁触发
     let timeoutId: ReturnType<typeof setTimeout>;
     const handleResize = () => {
       clearTimeout(timeoutId);
