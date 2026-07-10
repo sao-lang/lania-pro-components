@@ -230,7 +230,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
 
   schema.lifecycle: onInit/onMount/onValueChange/onStatusChange/onFocus/onBlur/onDestroy
   ProFormProps.lifecycle: schema 未定义 lifecycle 时作为 fallback
-
+、、、
 ---
 
 ## 二、使用方式
