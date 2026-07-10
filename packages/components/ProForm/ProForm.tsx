@@ -6,7 +6,6 @@ import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
 import { useVirtualScroll } from '@lania-pro-components/shared';
 import { useGroupLazyLoad, usePriorityLoad } from '@lania-pro-components/shared';
-import { performanceMonitor } from '@lania-pro-components/utils';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
 import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
@@ -74,6 +73,11 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       cardContainer,
       performance,
       schemaProcessOptions,
+      transform,
+      lifecycle,
+      validateMessages,
+      valueFormat,
+      dateFormat,
       keyboardNavigation,
       draftStorage,
     } = props;
@@ -159,6 +163,28 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       }
       return schemas.map((schema) => processSchema(schema, schemaProcessOptions));
     }, [schemas, schemaProcessOptions, processSchema]);
+
+    // 全局配置合并到每个 schema（schema 层可覆盖）
+    const mergedSchemas = useMemo(() => {
+      return processedSchemas.map((schema) => {
+        const merged: ProFormSchema = { ...schema };
+
+        if (!merged.transform && transform) {
+          merged.transform = transform;
+        }
+        if (!merged.lifecycle && lifecycle) {
+          merged.lifecycle = lifecycle;
+        }
+        if (!merged.valueFormat && valueFormat) {
+          merged.valueFormat = valueFormat;
+        }
+        if (!merged.format && dateFormat) {
+          merged.format = dateFormat;
+        }
+
+        return merged;
+      });
+    }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat]);
 
     // 暴露实例
     useImperativeHandle(ref, () => instance, [instance]);
@@ -268,8 +294,20 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         onFieldsChange: onFieldsChange,
         onFinish: onFinish,
         onFinishFailed: onFinishFailed,
+        validateMessages,
       }),
-      [formState, instance, arcoForm, layout, size, onValuesChange, onFieldsChange, onFinish, onFinishFailed],
+      [
+        formState,
+        instance,
+        arcoForm,
+        layout,
+        size,
+        onValuesChange,
+        onFieldsChange,
+        onFinish,
+        onFinishFailed,
+        validateMessages,
+      ],
     );
 
     // 构建 LayoutContext
@@ -304,9 +342,9 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
 
     // ===== 性能优化：虚拟滚动 =====
     const virtualScrollConfig = performance?.virtualScroll;
-    const isVirtualScrollEnabled = virtualScrollConfig?.enabled && processedSchemas.length > 20;
+    const isVirtualScrollEnabled = virtualScrollConfig?.enabled && mergedSchemas.length > 20;
 
-    const { containerRef: virtualContainerRef, virtualState } = useVirtualScroll(processedSchemas, {
+    const { containerRef: virtualContainerRef, virtualState } = useVirtualScroll(mergedSchemas, {
       itemHeight: virtualScrollConfig?.itemHeight || 60,
       overscan: virtualScrollConfig?.overscan || 5,
       containerHeight: virtualScrollConfig?.containerHeight,
@@ -314,11 +352,11 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
 
     // ===== 性能优化：懒加载 =====
     const lazyLoadConfig = performance?.lazyLoad;
-    const isLazyLoadEnabled = lazyLoadConfig?.enabled && processedSchemas.length > 10;
+    const isLazyLoadEnabled = lazyLoadConfig?.enabled && mergedSchemas.length > 10;
 
     // 优先级加载
     const { visibleFields: priorityVisibleFields } = usePriorityLoad(
-      processedSchemas.map((s) => (Array.isArray(s.name) ? s.name[0] : s.name)),
+      mergedSchemas.map((s) => (Array.isArray(s.name) ? s.name[0] : s.name)),
       {
         highPriority: lazyLoadConfig?.highPriorityFields || [],
         mediumPriority: lazyLoadConfig?.mediumPriorityFields || [],
@@ -328,7 +366,7 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
     );
 
     // 分组懒加载（当没有配置优先级时使用）
-    const { loadedCount: groupLoadedCount } = useGroupLazyLoad(processedSchemas.length, {
+    const { loadedCount: groupLoadedCount } = useGroupLazyLoad(mergedSchemas.length, {
       groupSize: lazyLoadConfig?.groupSize || 10,
       groupDelay: lazyLoadConfig?.groupDelay || 100,
       enabled: isLazyLoadEnabled && !lazyLoadConfig?.highPriorityFields?.length,
@@ -343,18 +381,18 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       if (isLazyLoadEnabled) {
         if (lazyLoadConfig?.highPriorityFields?.length) {
           // 使用优先级加载
-          return processedSchemas.filter((s) =>
+          return mergedSchemas.filter((s) =>
             priorityVisibleFields.includes(Array.isArray(s.name) ? s.name[0] : s.name),
           );
         } else {
           // 使用分组加载
-          return processedSchemas.slice(0, groupLoadedCount);
+          return mergedSchemas.slice(0, groupLoadedCount);
         }
       }
 
-      return processedSchemas;
+      return mergedSchemas;
     }, [
-      processedSchemas,
+      mergedSchemas,
       isVirtualScrollEnabled,
       isLazyLoadEnabled,
       virtualState.visibleItems,
@@ -362,15 +400,6 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
       groupLoadedCount,
       lazyLoadConfig?.highPriorityFields?.length,
     ]);
-
-    // ===== 性能优化：渲染性能监控 =====
-    // 始终打点，监控 UI 由使用方通过 <PerformanceMonitor> 组合接入
-    useEffect(() => {
-      performanceMonitor.mark('form-render-start');
-      return () => {
-        performanceMonitor.measure('form-render', 'form-render-start');
-      };
-    }, [visibleSchemas]);
 
     // 处理表单提交
     const handleFinish = async (values: Record<string, unknown>) => {
@@ -688,7 +717,6 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
                 );
               })()
             : FormComponent}
-          {/* 性能监控组件已迁移到 @lania-pro-components/shared，请使用组合方式接入 <PerformanceMonitor> */}
         </LayoutContextProvider>
       </RootContextProvider>
     );

@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
 import { ColProps } from '@arco-design/web-react/lib/Grid';
 import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
+import { FormStore } from './core';
+import { ArcoFormInstance } from './hooks/useArcoForm';
 
 /**
  * 验证规则类型
@@ -54,14 +56,19 @@ export type FieldStatus = 'edit' | 'readonly' | 'disabled' | 'hidden' | 'preview
 
 /**
  * 字段行为配置
+ *
+ * 控制字段的 UI 交互状态，仅包含纯 UI 层面的行为：
+ * - visible: 是否渲染显示
+ * - disabled: 是否禁用（显示但不可交互）
+ * - readonly: 是否只读（显示但不可修改值）
+ *
+ * 注意：required（必填）属于数据校验语义，已移至 schema 顶层，
+ * 并由 boolean 扩展为支持函数形式。
  */
 export interface FieldBehavior {
   visible?: boolean | ((values: Record<string, unknown>) => boolean);
-  display?: boolean | ((values: Record<string, unknown>) => boolean);
   disabled?: boolean | ((values: Record<string, unknown>) => boolean);
   readonly?: boolean | ((values: Record<string, unknown>) => boolean);
-  preview?: boolean | ((values: Record<string, unknown>) => boolean);
-  required?: boolean | ((values: Record<string, unknown>) => boolean);
 }
 
 /**
@@ -246,8 +253,8 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   component?: string;
   /** 组件属性 */
   componentProps?: Record<string, unknown>;
-  /** 是否必填 */
-  required?: boolean;
+  /** 是否必填（支持函数形式实现条件必填） */
+  required?: boolean | ((values: Record<string, unknown>) => boolean);
   /** 必填项错误提示 */
   requiredMessage?: string;
   /** 验证规则 */
@@ -272,6 +279,8 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   options?: Array<{ label: string; value: unknown; [key: string]: unknown }>;
   /** 日期/时间格式化字符串 */
   format?: string;
+  /** 日期值格式（提交时的格式） */
+  valueFormat?: string;
   /** 前缀文本 */
   prefix?: string;
   /** 后缀文本 */
@@ -470,6 +479,21 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
   performance?: ProFormPerformanceConfig;
   /** Schema 处理配置选项 */
   schemaProcessOptions?: SchemaProcessOptions;
+
+  /** 全局值转换配置（作用于所有字段，schem 层可覆盖） */
+  transform?: {
+    input?: (value: unknown) => unknown;
+    output?: (value: unknown) => unknown;
+  };
+  /** 全局生命周期钩子（作用于所有字段） */
+  lifecycle?: FieldLifecycle;
+  /** 全局校验消息模板 */
+  validateMessages?: Record<string, string>;
+  /** 全局日期值格式 */
+  valueFormat?: string;
+  /** 全局日期显示格式 */
+  dateFormat?: string;
+
   /** 键盘导航配置 */
   keyboardNavigation?: KeyboardNavigationConfig;
   /** 草稿持久化配置（启用后自动保存表单草稿到 localStorage） */
@@ -481,11 +505,8 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
  */
 export interface ComputedFieldBehavior {
   visible: boolean;
-  display: boolean;
   disabled: boolean;
   readonly: boolean;
-  preview: boolean;
-  required: boolean;
 }
 
 /**
@@ -504,6 +525,8 @@ export interface FieldNodeAPI {
   status: FieldStatus;
   /** 计算后的行为 */
   computedBehavior: ComputedFieldBehavior;
+  /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
+  computedRequired: boolean;
   /** 焦点状态 */
   focused?: boolean;
   /** 设置值 */
@@ -604,11 +627,6 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   getFocusedField: () => string | undefined;
   /** 获取指定字段的聚焦状态 */
   getFieldFocused: (name: string) => boolean;
-  /** 获取性能统计 */
-  getStats: () => {
-    fieldCount: number;
-    renderStats: { avg: number; min: number; max: number; count: number } | null;
-  };
 }
 
 /**
@@ -687,3 +705,11 @@ export interface FormItemProps {
   /** 布局模式 */
   layout?: 'horizontal' | 'vertical' | 'inline';
 }
+
+// import { ProFormContextValue } from './useProForm';
+export interface ProFormContextValue<TValues = Record<string, unknown>> {
+  formStore: FormStore | null;
+  instance: ProFormInstance<TValues> | null;
+  arcoForm: ArcoFormInstance | null;
+}
+export type UsrProFormFn<TValues = Record<string, unknown>> = () => ProFormContextValue<TValues>;

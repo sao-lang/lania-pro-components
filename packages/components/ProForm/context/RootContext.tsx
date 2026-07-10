@@ -53,6 +53,8 @@ export interface RootContextValue {
   onFinish?: (values: Record<string, unknown>) => void | Promise<void>;
   /** 表单提交失败回调 */
   onFinishFailed?: (errorInfo: unknown) => void;
+  /** 全局校验消息模板 */
+  validateMessages?: Record<string, string>;
 }
 
 /**

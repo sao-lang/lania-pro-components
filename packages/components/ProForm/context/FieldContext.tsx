@@ -33,12 +33,11 @@ export interface FieldContextValue {
   focused?: boolean;
   computedBehavior: {
     visible: boolean;
-    display: boolean;
     disabled: boolean;
     readonly: boolean;
-    preview: boolean;
-    required: boolean;
   };
+  /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
+  required: boolean;
   formState: FormState;
   error?: string;
 
@@ -65,12 +64,10 @@ const defaultFieldContext: FieldContextValue = {
   focused: false,
   computedBehavior: {
     visible: true,
-    display: true,
     disabled: false,
     readonly: false,
-    preview: false,
-    required: false,
   },
+  required: false,
   formState: {
     draft: false,
     readonly: false,

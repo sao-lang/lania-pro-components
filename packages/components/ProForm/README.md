@@ -36,77 +36,200 @@ instance.validate().then((values) => {
 
 ---
 
-## 一、架构分层
+## 一、架构总览
 
-### 1.1 整体架构
+### 1.1 三级架构模型
+
+ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ProForm (组件层) — Schema 驱动的表单容器             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
-│  │ ProForm  │ │FormField │ │ProFormList│ │ProForm  │ │
-│  │ 主组件   │ │字段渲染器 │ │动态列表  │ │Steps    │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬────┘ │
-├───────┼────────────┼────────────┼────────────┼──────┤
-│  Context 层 ── 上下文传递                           │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │RootCtx   │ │SchemaCtx │ │FieldCtx  │ │Layout  │ │
-│  ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤ │
-│  │ExtCtx    │ │FormConfigCtx         │            │ │
-│  └──────────┘ └──────────────────────┘            │
-├───────────────────────────────────────────────────┤
-│  Hooks 层 ── 逻辑复用                              │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐│
-│  │useProForm│ │useArco   │ │useDraft  │ │useField││
-│  │          │ │Form      │ │草稿持久化 │ │Navigatn││
-│  ├──────────┤ ├──────────┤ ├──────────┤ ├────────┤│
-│  │useLazyField│ │ (useVirtualScroll from shared)  ││
-│  └──────────┘ └───────────────────────────────────┘│
-├───────────────────────────────────────────────────┤
-│  Core 层 ── 核心引擎 (与 UI 框架解耦)               │
-│  ┌──────────┐ ┌──────────┐ ┌────────────────────┐  │
-│  │FormStore │ │FieldNode │ │ValidationEngine     │  │
-│  │          │ │          │ │ + ruleEngine        │  │
-│  ├──────────┤ ├──────────┤ ├────────────────────┤  │
-│  │DraftEngine                                    │  │
-│  └──────────┘ └──────────┘ └────────────────────┘  │
-├───────────────────────────────────────────────────┤
-│  Registry 层 ── 组件/渲染器注册                    │
-│  ┌──────────────────┐ ┌────────────────────────┐  │
-│  │componentRegistry  │ │readonlyRegistry        │  │
-│  │ + baseComponents  │ │ + customRenderers      │  │
-│  └──────────────────┘ └────────────────────────┘  │
-└───────────────────────────────────────────────────┘
-         ↕ 依赖外部包
-┌────────────────────────────────────────────────────┐
-│  @lania-pro-components/utils                       │
-│  reactive / ref / computed / watch / batchUpdate   │
-│  createStore / PerformanceMonitor / TaskQueue      │
-├────────────────────────────────────────────────────┤
-│  @lania-pro-components/shared                      │
-│  useVirtualScroll / useAsyncRequest / createProProv│
-│  PerformanceMonitor (组件)                         │
-└────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  第1层: 字段 Schema 层 — 声明式配置，用户编写                           │
+│                                                                         │
+│  用户定义：有什么字段、用什么组件、行为规则、联动规则                    │
+│                                                                         │
+│  ProFormSchema  { name, component, behavior, reactions, ... }            │
+│  FieldBehavior  { visible, disabled, readonly }                         │
+│  FieldReaction  { dependencies, run }                                   │
+│  ProFormProps   { schemas, transform, lifecycle, validateMessages, ... } │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  第2层: 表单控件 Core 层 — 响应式状态管理，与 UI 框架解耦               │
+│                                                                         │
+│  FormStore     管理 values/fields/errors/touched/reactions 五个状态     │
+│  FieldNode     单字段运行时：值/状态/错误/行为计算/校验                 │
+│                                                                         │
+│  核心机制：基于 computed() 自动追踪依赖                                 │
+│  behavior 函数以 values 为输入 → computed → watch → setStatus           │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  第3层: 表单组件 UI 层 — React 渲染                                     │
+│                                                                         │
+│  ProForm     表单容器：组装 Context + 布局 + 性能优化                   │
+│  FormField   字段渲染器：根据 status 切换编辑/只读/隐藏                  │
+│  Contexts    RootCtx / SchemaCtx / FieldCtx / LayoutCtx / ExtCtx        │
+│  Registry    组件注册表 + 只读渲染器注册表 + 快速组件                  │
+│  Hooks       useProForm / useArcoForm / useFieldNavigation / 懒加载    │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 层级职责
+### 1.2 行为→状态→渲染 管道
 
-| 层级             | 文件路径                     | 核心职责               | 关键组件/类                                                                                              |
-| ---------------- | ---------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Schema 层**    | `types.ts`                   | 定义字段配置结构和类型 | `ProFormSchema`, `FieldBehavior`, `FieldReaction`, `ProFormProps`                                        |
-| **Core 层**      | `core/`                      | 表单状态管理核心引擎   | `FormStore`, `FieldNode`, `ValidationEngine`, `DraftEngine`                                              |
-| **Context 层**   | `context/`                   | React 上下文传递       | `RootContext`, `SchemaContext`, `FieldContext`, `LayoutContext`, `ExtensionContext`, `FormConfigContext` |
-| **Hooks 层**     | `hooks/`                     | 可复用逻辑封装         | `useProForm`, `useArcoForm`, `useDraft`, `useFieldNavigation`, `useLazyField`                            |
-| **Registry 层**  | `registry/`                  | 扩展注册机制           | `componentRegistry`, `readonlyRegistry`                                                                  |
-| **Component 层** | `components/`, `ProForm.tsx` | UI 渲染组件            | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`, 快捷组件                                          |
-| **Provider**     | `ProFormProvider.tsx`        | 全局配置 Provider      | `ProFormProvider`                                                                                        |
+这是 ProForm 最核心的数据流：
 
-### 1.3 核心设计原则
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 1: Schema 声明行为 (声明式)                                       │
+│                                                                         │
+│  { behavior: { visible: (v) => v.type === 'company',                    │
+│                disabled: (v) => v.status === 'approved',                │
+│                readonly: (v) => v.role !== 'admin' } }                  │
+│  { required: (v) => v.type === 'personal' }    ← schema 顶层            │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓ FieldNode 构造时创建 computed()
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 2: FieldNode 解析行为 → 计算状态 (响应式)                         │
+│                                                                         │
+│  _computedBehavior = computed(() => {                                   │
+│    const values = store.getValues();   ← 自动追踪所有字段值              │
+│    return {                                                             │
+│      visible: computeBehaviorValue(behavior.visible, values, true),     │
+│      disabled: computeBehaviorValue(behavior.disabled, values, false),  │
+│      readonly: computeBehaviorValue(behavior.readonly, values, false),  │
+│    };                                                                   │
+│  });                                                                    │
+│                                                                         │
+│  _computedRequired = computed(() => {                                   │
+│    const values = store.getValues();                                    │
+│    return typeof schema.required === 'function'                         │
+│      ? schema.required(values)                                          │
+│      : schema.required ?? false;                                        │
+│  });                                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓ watch(computedBehavior.value) 触发
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 3: updateStatusFromBehavior() — 行为 → 状态转换                   │
+│                                                                         │
+│  const { visible, disabled, readonly } = this._computedBehavior.value;  │
+│                                                                         │
+│  if (!visible)      → setStatus('hidden')     — 不可见，return null     │
+│  else if (readonly) → setStatus('readonly')   — 只读渲染器              │
+│  else if (disabled) → setStatus('disabled')   — 禁用但可见              │
+│  else               → setStatus('edit')       — 正常编辑态              │
+│                                                                         │
+│  优先级: hidden > readonly > disabled > edit                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓ setStatus() 触发 onStatusChangeCallbacks
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 4: FormField 接收状态 → 切换渲染策略 (React)                       │
+│                                                                         │
+│  status === 'hidden'   → return null                                    │
+│  status === 'readonly' → renderReadonlyContent()   — 只读展示           │
+│  status === 'disabled' → renderComponent({ disabled: true })            │
+│  status === 'edit'     → renderComponent({})                            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-- **单向数据流**：Schema → FormStore → FieldNode → Context → Component
-- **关注点分离**：状态管理（Core）与视图渲染（Component）完全解耦
-- **响应式驱动**：基于 `@lania-pro-components/utils` 的 `reactive/ref/computed/watch` 响应式系统
-- **可插拔扩展**：通过 Registry 层实现组件和渲染器的动态注册
+### 1.3 行为状态分层图
+
+```
+ Schema 声明             运行时计算（FieldNode）         UI 渲染（FormField）
+────────────────────  ────────────────────────────  ───────────────────────────
+required: boolean|fn  →  _computedRequired         →  Form.Item 红星标 + rules
+                       （独立于 behavior 计算）
+behavior.visible: fn  →  _computedBehavior         →  status === 'hidden' → null
+behavior.readonly: fn →  visible/disabled/readonly →  status === 'readonly' → 只读渲染器
+behavior.disabled: fn →  (响应式 boolean)          →  status === 'disabled' → 禁用组件
+                                                      status === 'edit' → 正常组件
+```
+
+设计原则：
+
+- **单向数据流**：Schema → FieldNode(computed) → Status → UI，没有反向回路
+- **声明式行为**：行为函数以 `values` 为唯一入参，纯函数
+- **响应式自动传播**：computed 自动追踪依赖，值变化自动标记 dirty，无需手动触发
+- **required 分离**：必填属于数据校验语义，不在 FieldBehavior 中，独立计算
+
+### 1.4 全链路串联图
+
+````
+① 初始化阶段：Schemas → 注册 → FieldNode → FormStore → Context → UI
+
+  ProForm 接收 props.schemas[]
+    │
+    ├── schemaProcessOptions 处理（autoLabel/autoPlaceholder/autoRules 等）
+    │   └── processSchema() → 返回增强后的 schema
+    │
+    ├── 全局配置合并（mergedSchemas）
+    │   └── schema 未定义 transform/lifecycle/valueFormat/dateFormat 时，
+    │       使用 ProFormProps 对应值作为 fallback
+    │
+    ├── visibleSchemas 计算（虚拟滚动/懒加载/全部）
+    │
+    └── renderField(schema) → FormField 组件
+          ├── useMemo → 获取或创建 FieldNode
+          │   ├── formStore.getField(name) → 已存在则复用
+          │   └── createFieldNode(schema, formStore)
+          │         ├── _value = ref(schema.initialValue ?? store.getValue(name))
+          │         ├── _computedBehavior = computed(...) → 见 1.2
+          │         ├── _computedRequired = computed(...)
+          │         └── setupStoreValueWatch()
+          │               └── watch(store.getValue(name)) → 同步 _value
+          │
+          ├── formStore.registerField(field)
+          │   ├── state.fields[name] = field
+          │   ├── 初始化值
+          │   ├── 注册 reactions → state.reactions[name]
+          │   ├── setupFieldValueWatch()
+          │   │   ├── watch(state.values[name]) → runReactions(name)
+          │   │   └── watch(state.values[dep]) × N → updateComputedBehavior()
+          │   └── lifecycle.onInit(field, form)
+          │
+          ├── useEffect → subscribeToValueChange / subscribeToStatusChange
+          │
+          └── Context Provider 包装
+              ├── SchemaContext → schema 配置
+              ├── LayoutContext → 布局配置
+              └── FieldContext → value/status/computedBehavior/...
+                    ├── status === 'hidden'  → return null
+                    ├── status === 'readonly' → 只读渲染器（readonlyRegistry）
+                    ├── status === 'disabled' → 禁用组件
+                    └── status === 'edit' → 正常组件（componentRegistry）
+
+② 运行时交互：用户输入 → 状态更新 → 联动 → UI
+
+  handleChange(value) → fieldNode.setValue(value)
+    ├── transform.output(value) ← 输出转换
+    ├── _value.value = transformed ← ref 响应式
+    └── store.setValue(name, transformed)
+          ├── batchUpdate { state.values[name] = value }
+          │   └── Proxy.set → Dep.notify()
+          │       ├──→ _computedBehavior 标记 dirty
+          │       │     → 重算 → watch → updateStatusFromBehavior → setStatus
+          │       │       → onStatusChangeCallbacks → FormField 重渲染
+          │       ├──→ watch(values[name]) → runReactions(name)
+          │       │     → 遍历所有 fields.reactions
+          │       │       → 匹配 dependencies → reaction.run(field, form)
+          │       └──→ watch(values[dep])（其他字段依赖）
+          │             → field.updateComputedBehavior → 同上链路
+          └── 响应式传播全部自动，无需手动触发
+    ├── arcoForm.setFieldValue(name, value) ← 同步 Arco Form
+    └── rootContext.onValuesChange({ [name]: value }, allValues)
+
+③ 校验流程
+
+  validate() → ValidationEngine.validateField(field)
+    → skip hidden/disabled
+    → schema.required（函数解析）
+    → schema.rules（min/max/pattern/validator）
+    → schema.validate（异步）
+
+  FieldNode.validate() 使用 _computedRequired.value（响应式驱动）
+
+④ 生命周期
+
+  schema.lifecycle: onInit/onMount/onValueChange/onStatusChange/onFocus/onBlur/onDestroy
+  ProFormProps.lifecycle: schema 未定义 lifecycle 时作为 fallback
 
 ---
 
@@ -136,7 +259,7 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
   label?: string;                    // 字段标签
   component?: string;                // 组件类型
   componentProps?: Record<string, unknown>; // 组件属性
-  required?: boolean;                // 是否必填
+  required?: boolean | ((values) => boolean); // 是否必填（支持函数形式的条件必填）
   requiredMessage?: string;          // 必填提示
   rules?: ValidationRule[];          // 验证规则
   validate?: (value, values) => string | undefined | Promise<...>;
@@ -149,6 +272,7 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
   placeholder?: string;              // 占位符
   options?: Array<{ label; value; [key: string]: unknown }>;
   format?: string;                   // 日期格式化
+  valueFormat?: string;              // 日期值格式（提交时的格式）
   prefix?: string;                   // 前缀
   suffix?: string;                   // 后缀
   transform?: {                      // 值转换
@@ -165,7 +289,7 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
   children?: ProFormSchema[];        // 子字段
   onFieldChange?: (value, allValues) => void;
 }
-```
+````
 
 ### 3.2 ValidationRule
 
@@ -190,12 +314,9 @@ interface ValidationRule {
 
 ```typescript
 interface FieldBehavior {
-  visible?: boolean | ((values) => boolean);
-  display?: boolean | ((values) => boolean);
-  disabled?: boolean | ((values) => boolean);
-  readonly?: boolean | ((values) => boolean);
-  preview?: boolean | ((values) => boolean);
-  required?: boolean | ((values) => boolean);
+  visible?: boolean | ((values) => boolean); // 是否可见
+  disabled?: boolean | ((values) => boolean); // 是否禁用
+  readonly?: boolean | ((values) => boolean); // 是否只读
 }
 ```
 
@@ -235,7 +356,7 @@ Core 层与 UI 框架解耦。
 
 每个字段对应一个 FieldNode，使用 `ref` / `computed` / `watch`。
 
-**状态优先级**：`visible=false` → `'hidden'` → `preview=true` → `'preview'` → `readonly=true` → `'readonly'` → `disabled=true` → `'disabled'` → 默认 `'edit'`
+**状态优先级**：`visible=false` → `'hidden'` → `readonly=true` → `'readonly'` → `disabled=true` → `'disabled'` → 默认 `'edit'`
 
 ### 4.3 ValidationEngine & DraftEngine
 
@@ -246,13 +367,7 @@ Core 层与 UI 框架解耦。
 
 ---
 
-## 五、Context 层
-
-`RootContext`, `SchemaContext`, `FieldContext`, `LayoutContext`, `ExtensionContext`, `FormConfigContext`
-
----
-
-## 六、使用方式
+## 五、使用方式
 
 ### 6.1 useProForm
 
@@ -274,20 +389,20 @@ const {
 
 ### 6.2 ProFormProps
 
-| 分类     | 属性                                                                                                                            |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 表单配置 | `schemas`, `layout`, `labelCol`, `wrapperCol`, `colon`, `labelAlign`, `size`                                                    |
-| 表单状态 | `disabled`, `readonly`, `draft`, `preview`, `initialValues`                                                                     |
-| 事件     | `onFinish`, `onFinishFailed`, `onValuesChange`, `onFieldsChange`, `onDraftChange`, `onPreviewChange`, `onReset`                 |
-| 按钮     | `showButton`, `submitText`, `resetText`, `showSubmitButton`, `showResetButton`, `buttonPosition`, `buttons`, `buttonList`       |
-| 折叠     | `collapsible`, `collapsed`, `collapsedRows`, `expandText`, `collapseText`                                                       |
-| 布局     | `rows`, `columns`, `gutter`, `rowProps`, `colProps`                                                                             |
-| 样式     | `className`, `style`, `cardContainer`                                                                                           |
-| 功能     | `formRef`, `scrollToFirstError`, `validateTrigger`, `performance`, `schemaProcessOptions`, `keyboardNavigation`, `draftStorage` |
+| 分类     | 属性                                                                                                                                                                                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 表单配置 | `schemas`, `layout`, `labelCol`, `wrapperCol`, `colon`, `labelAlign`, `size`                                                                                                                               |
+| 表单状态 | `disabled`, `readonly`, `draft`, `preview`, `initialValues`                                                                                                                                                |
+| 事件     | `onFinish`, `onFinishFailed`, `onValuesChange`, `onFieldsChange`, `onDraftChange`, `onPreviewChange`, `onReset`                                                                                            |
+| 按钮     | `showButton`, `submitText`, `resetText`, `showSubmitButton`, `showResetButton`, `buttonPosition`, `buttons`, `buttonList`                                                                                  |
+| 折叠     | `collapsible`, `collapsed`, `collapsedRows`, `expandText`, `collapseText`                                                                                                                                  |
+| 布局     | `rows`, `columns`, `gutter`, `rowProps`, `colProps`                                                                                                                                                        |
+| 样式     | `className`, `style`, `cardContainer`                                                                                                                                                                      |
+| 功能     | `formRef`, `scrollToFirstError`, `validateTrigger`, `transform`, `lifecycle`, `validateMessages`, `valueFormat`, `dateFormat`, `performance`, `schemaProcessOptions`, `keyboardNavigation`, `draftStorage` |
 
 ### 6.3 ProFormInstance 方法
 
-`validate()`, `validateField()`, `clearValidate()`, `setFieldsValue()`, `setFieldValue()`, `getFieldValue()`, `getFieldsValue()`, `resetFields()`, `submit()`, `setSchemas()`, `setProps()`, `getRef()`, `getFieldStatus()`, `setFieldStatus()`, `scrollToField()`, `isDraft()`, `setDraft()`, `isPreview()`, `setPreview()`, `focusField()`, `focusNextField()`, `focusPrevField()`, `getFocusedField()`, `getStats()`
+`validate()`, `validateField()`, `clearValidate()`, `setFieldsValue()`, `setFieldValue()`, `getFieldValue()`, `getFieldsValue()`, `resetFields()`, `submit()`, `setSchemas()`, `setProps()`, `getRef()`, `getFieldStatus()`, `setFieldStatus()`, `scrollToField()`, `isDraft()`, `setDraft()`, `isPreview()`, `setPreview()`, `focusField()`, `focusNextField()`, `focusPrevField()`, `getFocusedField()`
 
 ### 6.4 ProFormList & ProFormSteps
 
@@ -384,30 +499,33 @@ class FieldNode implements FieldNodeAPI {
 ```
 状态计算逻辑（updateStatusFromBehavior）：
   visible=false        → 'hidden'
-  preview=true         → 'preview'
   readonly=true        → 'readonly'
   disabled=true        → 'disabled'
   以上都不满足           → 'edit'
 
-优先级：hidden > preview > readonly > disabled > edit
+优先级：hidden > readonly > disabled > edit
 ```
 
 **计算行为机制**：
 
-FieldNode 在构造时通过 `computed()` 创建计算属性，自动追踪 `store.getValues()` 的变化：
+FieldNode 在构造时创建两个独立的计算属性：
 
 ```typescript
+// 行为计算（仅包含 UI 交互状态）
 this._computedBehavior = computed(() => {
-  const values = store.getValues(); // 自动追踪所有字段值
+  const values = store.getValues();
   const behavior = schema.behavior || {};
   return {
     visible: computeBehaviorValue(behavior.visible, values, true),
-    display: computeBehaviorValue(behavior.display, values, true),
     disabled: computeBehaviorValue(behavior.disabled, values, false),
     readonly: computeBehaviorValue(behavior.readonly, values, false),
-    preview: computeBehaviorValue(behavior.preview, values, false),
-    required: computeBehaviorValue(behavior.required, values, schema.required || false),
   };
+});
+
+// 必填标识独立计算（由 schema.required 解析，支持函数形式的条件必填）
+this._computedRequired = computed(() => {
+  const values = store.getValues();
+  return typeof schema.required === 'function' ? schema.required(values) : (schema.required ?? false);
 });
 
 // watch 计算行为变化 → 自动更新状态
@@ -471,7 +589,7 @@ private setupStoreValueWatch(): void {
 validate(): Promise<string | undefined> {
   // 1. hidden 状态不验证
   if (this._status.value === 'hidden') return Promise.resolve(undefined);
-  // 2. 检查 computedBehavior.required（动态必填）
+  // 2. 检查 _computedRequired.value（动态必填，由 schema.required 解析）
   // 3. 遍历 schema.rules 执行规则
   // 4. 返回错误信息或 undefined
 }
@@ -624,6 +742,7 @@ interface SchemaContextValue {
   placeholder?: string;
   options?: Array<{ label; value }>;
   format?: string;
+  valueFormat?: string; // 日期值格式（提交时的格式）
   prefix?: string;
   suffix?: string;
   required?: boolean;
@@ -649,7 +768,13 @@ interface FieldContextValue {
   // 状态
   status: FieldStatus;
   focused?: boolean;
-  computedBehavior: ComputedFieldBehavior;
+  computedBehavior: {
+    visible: boolean;
+    disabled: boolean;
+    readonly: boolean;
+  };
+  /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
+  required: boolean;
   formState: FormState;
   error?: string;
 
@@ -1092,7 +1217,7 @@ ProForm 渲染流程
     │     ├── 懒加载（字段数 > 10 && lazyLoad.enabled）
     │     │     ├── usePriorityLoad（配置了 highPriorityFields 时）
     │     │     └── useGroupLazyLoad（否则）
-    │     └── 性能监控（performance.monitor.enabled）
+    │     └── 全局配置合并：schema 未定义时使用 ProFormProps 的全局配置
     │
     ├── 5. 计算 visibleSchemas
     │     ├── 虚拟滚动 → virtualState.visibleItems
@@ -1112,12 +1237,12 @@ ProForm 渲染流程
     ├── 8. Arco Form 包装
     │     └── <Form form={arcoForm} layout onKeyDown={fieldNavigation.handleKeyDown}>
     │
-    ├── 9. Context Provider 包装
-    │     ├── RootContextProvider
+    ├── 9. Context Provider 包裹
+    │     ├── RootContextProvider（含 validateMessages）
     │     └── LayoutContextProvider
     │
     └── 10. Card 容器包装（如果 cardContainer 启用）
-          └── 性能监控组件（如果 monitor.enabled）
+          └──
 ```
 
 **布局模式**：
@@ -1193,7 +1318,7 @@ FormField（外层）
                 │
                 ├── FieldContextProvider → 提供字段运行时上下文
                 │
-                └── Arco Form.Item → 包装字段组件
+                └── Arco Form.Item → 包裹字段组件
 ```
 
 **只读渲染逻辑**：
@@ -1335,23 +1460,20 @@ const handleNext = async () => {
 | `QuickInputWithSuffix`       | Input                    | 带前后缀的输入框                      |
 | `QuickInputNumberWithSuffix` | InputNumber              | 带前后缀的数字输入框                  |
 
-### 13.6 FormPerformanceMonitor — 性能监控
+### 13.6 FormPerformanceMonitor — 性能监控（已废弃）
 
-**文件**：`components/FormPerformanceMonitor.tsx`
+**已迁移至 `@lania-pro-components/shared` 的 `PerformanceMonitor`**。
 
-**职责**：开发环境下监控表单性能
+旧版 `FormPerformanceMonitor` 已移除。如需性能监控，请使用组合方式接入：
 
-**监控指标**：FPS（帧率）、字段数量、渲染次数、平均更新时间、内存使用
+```tsx
+import { PerformanceMonitor } from '@lania-pro-components/shared';
 
-**配置**：
-
-```typescript
-interface PerformanceMonitorConfig {
-  enabled?: boolean; // 是否启用
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  refreshInterval?: number; // 刷新间隔（默认 1000ms）
-}
+<ProForm schemas={schemas} />
+<PerformanceMonitor measures={['form-render']} title='ProForm' />
 ```
+
+ProForm 不再内置打点逻辑。
 
 ---
 
@@ -1636,11 +1758,6 @@ export const performanceMonitor = new PerformanceMonitor(process.env.NODE_ENV ==
       enabled: true,
       delay: 16,
     },
-    monitor: {
-      enabled: process.env.NODE_ENV === 'development',
-      position: 'bottom-right',
-      refreshInterval: 1000,
-    },
   }}
 />
 ```
@@ -1774,7 +1891,7 @@ registerReadonlyRenderer('MyCustomInput', (value, options, config, componentProp
 });
 ```
 
-### 13.3 快速组件注册
+### 13.3 快捷组件注册
 
 ```typescript
 import { registerQuickComponent } from '@/pro-components/ProForm';
@@ -1806,7 +1923,7 @@ import { ExtensionContextProvider, useExtension } from '@/pro-components/ProForm
   },
   audit: {
     log: (action, data) => auditLog(action, data),
-    logFieldChange: (name, oldVal, newVal) => auditLog('fieldChange', { name, oldVal, newVal }),
+    logFieldChange: (fieldName, oldVal, newVal) => auditLog('fieldChange', { name, oldVal, newVal }),
   },
 }}>
   <ProForm schemas={schemas} />
@@ -1823,16 +1940,16 @@ const isVisible = permission?.checkVisible('fieldName');
 
 ProForm 通过 `index.ts` 统一导出所有能力：
 
-| 分类           | 导出内容                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **类型**       | `ProFormSchema`, `ProFormProps`, `ProFormInstance`, `FieldNodeAPI`, `FormStoreAPI`, `FieldBehavior`, `FieldReaction`, `FieldLifecycle`, `ReadonlyRenderConfig`, `ReadonlyRenderer`, `QuickComponentConfig`, `ComponentRegistry`, `ReadonlyRegistry`, `LayoutMode`, `FormStatus`, `FieldStatus`, `ComputedFieldBehavior`, `ButtonConfig`, `ProFormPerformanceConfig`, `LazyLoadConfig`, `BatchUpdateConfig`, `PerformanceMonitorConfig` |
-| **组件**       | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`, `FormPerformanceMonitor`                                                                                                                                                                                                                                                                                                                                                        |
-| **Hooks**      | `useProForm`, `useProFormContext`, `useArcoForm`, `useVirtualScroll`, `useDynamicVirtualScroll`, `useLazyField`, `useGroupLazyLoad`, `usePriorityLoad`                                                                                                                                                                                                                                                                                 |
-| **Context**    | `RootContext`, `useRootContext`, `SchemaContext`, `useSchemaContext`, `FieldContext`, `useFieldContext`, `LayoutContext`, `useLayoutContext`, `ProFormContext`, `ProFormProvider`                                                                                                                                                                                                                                                      |
-| **Core**       | `FormStore`, `createFormStore`, `FieldNode`, `createFieldNode`, `ValidationEngine`, `createValidationEngine`                                                                                                                                                                                                                                                                                                                           |
-| **Registry**   | `componentRegistry`, `registerComponent`, `registerQuickComponent`, `parseQuickComponent`, `readonlyRegistry`, `registerReadonlyRenderer`, `getReadonlyRenderer`                                                                                                                                                                                                                                                                       |
-| **响应式系统** | `reactive`, `effect`, `computed`, `watch`, `batchUpdate`, `ref`, `toReactive`, `isReactive`, `trigger`                                                                                                                                                                                                                                                                                                                                 |
-| **性能工具**   | `TaskQueue`, `globalTaskQueue`, `BatchUpdateManager`, `debounce`, `throttle`, `memoize`, `LRUCache`, `PerformanceMonitor`, `performanceMonitor`, `scheduleIdleTask`, `scheduleChunkedTask`                                                                                                                                                                                                                                             |
+| 分类           | 导出内容                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **类型**       | `ProFormSchema`, `ProFormProps`, `ProFormInstance`, `FieldNodeAPI`, `FormStoreAPI`, `FieldBehavior`, `FieldReaction`, `FieldLifecycle`, `ReadonlyRenderConfig`, `ReadonlyRenderer`, `QuickComponentConfig`, `ComponentRegistry`, `ReadonlyRegistry`, `LayoutMode`, `FormStatus`, `FieldStatus`, `ComputedFieldBehavior`, `ButtonConfig`, `ProFormPerformanceConfig`, `LazyLoadConfig`, `BatchUpdateConfig` |
+| **组件**       | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`                                                                                                                                                                                                                                                                                                                                                      |
+| **Hooks**      | `useProForm`, `useProFormContext`, `useArcoForm`, `useVirtualScroll`, `useDynamicVirtualScroll`, `useLazyField`, `useGroupLazyLoad`, `usePriorityLoad`                                                                                                                                                                                                                                                     |
+| **Context**    | `RootContext`, `useRootContext`, `SchemaContext`, `useSchemaContext`, `FieldContext`, `useFieldContext`, `LayoutContext`, `useLayoutContext`, `ProFormContext`, `ProFormProvider`                                                                                                                                                                                                                          |
+| **Core**       | `FormStore`, `createFormStore`, `FieldNode`, `createFieldNode`, `ValidationEngine`, `createValidationEngine`                                                                                                                                                                                                                                                                                               |
+| **Registry**   | `componentRegistry`, `registerComponent`, `registerQuickComponent`, `parseQuickComponent`, `readonlyRegistry`, `registerReadonlyRenderer`, `getReadonlyRenderer`                                                                                                                                                                                                                                           |
+| **响应式系统** | `reactive`, `effect`, `computed`, `watch`, `batchUpdate`, `ref`, `toReactive`, `isReactive`, `trigger`                                                                                                                                                                                                                                                                                                     |
+| **性能工具**   | `TaskQueue`, `globalTaskQueue`, `BatchUpdateManager`, `debounce`, `throttle`, `memoize`, `LRUCache`, `PerformanceMonitor`, `performanceMonitor`, `scheduleIdleTask`, `scheduleChunkedTask`                                                                                                                                                                                                                 |
 
 **自动注册的模块**（import 副作用）：
 
@@ -1986,12 +2103,12 @@ const schemas = [
     behavior: { visible: (values) => values.type === 'company' },
   },
 
-  // behavior 动态控制必填
+  // schema.required 动态控制必填（支持函数形式的条件必填）
   {
     name: 'idCard',
     label: '身份证号',
     component: 'IdCard',
-    behavior: { required: (values) => values.type === 'personal' },
+    required: (values) => values.type === 'personal',
   },
 
   // reactions 联动：选省后联动市的选项
@@ -2105,47 +2222,54 @@ function ListForm() {
 
 ### 15.9 分步表单 ProFormSteps
 
-```tsx
-import { ProForm, ProFormSteps, useProForm } from '@/pro-components/ProForm';
+**文件**：`components/ProFormSteps.tsx`
 
-function StepsForm() {
-  const { instance } = useProForm();
-  const [stepsRef, setStepsRef] = useState<ProFormStepsInstance>();
+**职责**：支持多步骤表单，每步独立验证
 
-  const steps = [
-    {
-      title: '基本信息',
-      schemas: [
-        { name: 'name', label: '姓名', component: 'Input', required: true },
-        { name: 'age', label: '年龄', component: 'InputNumber' },
-      ],
-    },
-    {
-      title: '联系方式',
-      schemas: [
-        { name: 'phone', label: '手机号', component: 'Phone', required: true },
-        { name: 'email', label: '邮箱', component: 'Email' },
-      ],
-    },
-    {
-      title: '确认信息',
-      schemas: [{ name: 'remark', label: '备注', component: 'TextArea' }],
-    },
-  ];
+**Props**：
 
-  return (
-    <ProForm form={instance} onFinish={async (values) => console.log('提交', values)}>
-      <ProFormSteps
-        ref={setStepsRef}
-        steps={steps}
-        validateOnNext // 切换下一步时验证当前步
-        showSteps
-        direction='horizontal'
-        submitText='提交'
-      />
-    </ProForm>
-  );
+| 属性                                   | 类型                       | 说明                                           |
+| -------------------------------------- | -------------------------- | ---------------------------------------------- |
+| `steps`                                | ProFormStepSchema[]        | 步骤配置（每步含 title, description, schemas） |
+| `current`                              | number                     | 当前步骤（受控）                               |
+| `defaultCurrent`                       | number                     | 默认步骤（默认 0）                             |
+| `onChange(current)`                    | function                   | 步骤变化回调                                   |
+| `onStepChange(from, to)`               | function                   | 步骤切换回调                                   |
+| `prevText` / `nextText` / `submitText` | string                     | 按钮文本                                       |
+| `validateOnNext`                       | boolean                    | 切换时是否验证（默认 true）                    |
+| `showSteps`                            | boolean                    | 是否显示步骤条                                 |
+| `direction`                            | 'horizontal' \| 'vertical' | 步骤条方向                                     |
+| `showButton`                           | boolean                    | 是否显示按钮                                   |
+
+**实例接口**：
+
+```typescript
+interface ProFormStepsInstance {
+  prev: () => void;
+  next: () => void;
+  goTo: (index: number) => void;
+  getCurrent: () => number;
 }
+```
+
+**步骤验证逻辑**：
+
+```typescript
+const handleNext = async () => {
+  if (validateOnNext && formStore) {
+    const currentStepSchemas = steps[current]?.schemas || [];
+    let hasError = false;
+    for (const fieldName of currentStepSchemas.map((s) => s.name)) {
+      const field = formStore.getField(fieldName);
+      if (field) {
+        const error = await field.validate();
+        if (error) hasError = true;
+      }
+    }
+    if (hasError) return; // 验证失败，阻止切换
+  }
+  setCurrent(Math.min(steps.length - 1, current + 1));
+};
 ```
 
 ### 15.10 大表单性能优化
@@ -2166,14 +2290,12 @@ const largeSchemas = Array.from({ length: 100 }, (_, i) => ({
     lazyLoad: {
       enabled: true,
       highPriorityFields: ['field_0', 'field_1', 'field_2'],
-      mediumPriorityFields: ['field_3', 'field_4'],
+      mediumPriorityFields: ['field_3', 'field_4', 'field_5', 'field_6'],
       mediumPriorityDelay: 200,
       lowPriorityDelay: 500,
     },
     // 合并多次状态变更
     batchUpdate: { enabled: true, delay: 16 },
-    // 开发环境监控
-    monitor: { enabled: process.env.NODE_ENV === 'development', position: 'bottom-right' },
   }}
 />;
 ```
@@ -2214,7 +2336,7 @@ const schemas = [
 ];
 ```
 
-### 15.13 快速组件语法
+### 15.13 快捷组件语法
 
 ```tsx
 const schemas = [
@@ -2602,11 +2724,6 @@ const largeSchemas = Array.from({ length: 100 }, (_, i) => ({
     batchUpdate: {
       enabled: true,
       delay: 16,
-    },
-    monitor: {
-      enabled: process.env.NODE_ENV === 'development',
-      position: 'bottom-right',
-      refreshInterval: 1000,
     },
   }}
 />;

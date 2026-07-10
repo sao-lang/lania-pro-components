@@ -52,8 +52,8 @@ export interface SchemaContextValue {
   prefix?: string;
   /** 后缀文本 */
   suffix?: string;
-  /** 是否必填 */
-  required?: boolean;
+  /** 是否必填（支持函数形式实现条件必填） */
+  required?: boolean | ((values: Record<string, unknown>) => boolean);
   /** 只读/预览渲染模式 */
   readonlyMode?: ReadonlyRenderConfig['mode'];
   /** 只读/预览渲染配置 */

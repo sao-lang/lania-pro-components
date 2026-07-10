@@ -40,11 +40,8 @@ function computeBehaviorValue(
  */
 export interface ComputedFieldBehavior {
   visible: boolean;
-  display: boolean;
   disabled: boolean;
   readonly: boolean;
-  preview: boolean;
-  required: boolean;
 }
 
 /**
@@ -63,6 +60,7 @@ export class FieldNode implements FieldNodeAPI {
 
   // 计算属性 - 自动追踪依赖
   private _computedBehavior: ComputedRef<ComputedFieldBehavior>;
+  private _computedRequired: ComputedRef<boolean>;
 
   private store: FormStoreAPI;
   private onChangeCallbacks: Set<(value: unknown) => void> = new Set();
@@ -91,12 +89,15 @@ export class FieldNode implements FieldNodeAPI {
 
       return {
         visible: computeBehaviorValue(behavior.visible, values, true),
-        display: computeBehaviorValue(behavior.display, values, true),
         disabled: computeBehaviorValue(behavior.disabled, values, false),
         readonly: computeBehaviorValue(behavior.readonly, values, false),
-        preview: computeBehaviorValue(behavior.preview, values, false),
-        required: computeBehaviorValue(behavior.required, values, schema.required || false),
       };
+    });
+
+    // 必填标识独立计算（schema.required 支持函数形式的条件必填）
+    this._computedRequired = computed(() => {
+      const values = store.getValues();
+      return typeof schema.required === 'function' ? schema.required(values) : (schema.required ?? false);
     });
 
     // 监听计算行为变化，自动更新状态
@@ -165,6 +166,14 @@ export class FieldNode implements FieldNodeAPI {
    */
   get computedBehavior(): ComputedFieldBehavior {
     return this._computedBehavior.value;
+  }
+
+  /**
+   * 获取计算后的必填标识（响应式）
+   * 由 schema.required 解析而来，支持函数形式的条件必填
+   */
+  get computedRequired(): boolean {
+    return this._computedRequired.value;
   }
 
   /**
@@ -266,14 +275,13 @@ export class FieldNode implements FieldNodeAPI {
 
   /**
    * 根据行为计算状态
+   * 优先级: hidden > readonly > disabled > edit
    */
   private updateStatusFromBehavior(): void {
-    const { visible, disabled, readonly, preview } = this._computedBehavior.value;
+    const { visible, disabled, readonly } = this._computedBehavior.value;
 
     if (!visible) {
       this.setStatus('hidden');
-    } else if (preview) {
-      this.setStatus('preview');
     } else if (readonly) {
       this.setStatus('readonly');
     } else if (disabled) {
@@ -325,7 +333,7 @@ export class FieldNode implements FieldNodeAPI {
     const { value } = this._value;
 
     // required 检查
-    if (this._computedBehavior.value.required) {
+    if (this._computedRequired.value) {
       const error = await executeRule({ required: true, message: `${label} 不能为空` }, value, {}, label);
       if (error) {
         this.setError(error);

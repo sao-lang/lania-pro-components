@@ -135,6 +135,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       status,
       focused,
       computedBehavior: fieldNode.computedBehavior,
+      required: fieldNode.computedRequired,
       formState: rootContext.formState,
       error,
       setValue: (v: unknown) => {
@@ -259,25 +260,23 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         label={fieldNode.schema.label}
         focused={focused}
         error={error}
-        required={fieldNode.computedBehavior.required}
+        required={fieldNode.computedRequired}
         visible={fieldNode.computedBehavior.visible}
-        display={fieldNode.computedBehavior.display}
         readonly={fieldNode.computedBehavior.readonly}
-        preview={fieldNode.computedBehavior.preview}
       />
     );
   };
 
   const finalRules = useMemo(() => {
     const rules: { required?: boolean; message?: string }[] = [];
-    if (fieldNode.computedBehavior.required) {
+    if (fieldNode.computedRequired) {
       rules.push({
         required: true,
         message: `请输入${fieldNode.schema.label || (Array.isArray(fieldNode.name) ? fieldNode.name.join('.') : fieldNode.name)}`,
       });
     }
     return rules;
-  }, [fieldNode.computedBehavior.required, fieldNode.schema.label, fieldNode.name]);
+  }, [fieldNode.computedRequired, fieldNode.schema.label, fieldNode.name]);
 
   const getValidateStatus = (): 'success' | 'warning' | 'error' | 'validating' | undefined => {
     if (error) {
@@ -306,7 +305,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       <div
         data-field-name={fieldName}
         style={{
-          display: fieldNode.computedBehavior.display ? undefined : 'none',
+          display: fieldNode.computedBehavior.visible ? undefined : 'none',
         }}
       >
         <FormItem

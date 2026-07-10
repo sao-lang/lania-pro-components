@@ -26,8 +26,9 @@ export class ValidationEngine {
     const values = this.formStore.getValues();
     const label = schema.label as string | undefined;
 
-    // 1. required 快捷检查
-    if (schema.required) {
+    // 1. required 快捷检查（支持函数形式的条件必填）
+    const resolvedRequired = typeof schema.required === 'function' ? schema.required(values) : schema.required;
+    if (resolvedRequired) {
       const error = await executeRule({ required: true, message: schema.requiredMessage }, value, values, label);
       if (error) return error;
     }
