@@ -20,9 +20,8 @@
  * - 重置（单个/全部）
  */
 
-import type { FormStoreAPI, FieldNodeAPI, FieldReaction, ValidationRule } from '../types';
+import type { FormStoreAPI, FieldNodeAPI, FieldReaction } from '../types';
 import { reactive, batchUpdate, watch } from '@lania-pro-components/utils';
-import { executeRule } from '@lania-pro-components/utils';
 
 /**
  * 值变化监听器类型
@@ -349,23 +348,11 @@ export class FormStore implements FormStoreAPI {
    */
   async validateField(name: string): Promise<string | undefined> {
     const field = this.state.fields[name];
-    if (!field) {
-      return undefined;
-    }
-
-    const value = this.getValue(name);
-    const rules = field.schema.rules || [];
-
-    for (const rule of rules) {
-      const error = await this.executeRule(rule, value, name);
-      if (error) {
-        this.setFieldError(name, error);
-        return error;
-      }
-    }
-
-    this.setFieldError(name, undefined);
-    return undefined;
+    if (!field) return undefined;
+    const error = await field.validate();
+    if (error) this.setFieldError(name, error);
+    else this.setFieldError(name, undefined);
+    return error;
   }
 
   /**
@@ -383,13 +370,6 @@ export class FormStore implements FormStoreAPI {
     }
 
     return errors;
-  }
-
-  /**
-   * 执行验证规则（委托给 ruleEngine）
-   */
-  private async executeRule(rule: ValidationRule, value: unknown, fieldName: string): Promise<string | undefined> {
-    return executeRule(rule, value, this.getValues(), fieldName);
   }
 
   /**
