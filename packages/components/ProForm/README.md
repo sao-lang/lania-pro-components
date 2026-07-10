@@ -152,7 +152,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
 
 ### 1.4 全链路串联图
 
-````
+```
 ① 初始化阶段：Schemas → 注册 → FieldNode → FormStore → Context → UI
 
   ProForm 接收 props.schemas[]
@@ -230,7 +230,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
 
   schema.lifecycle: onInit/onMount/onValueChange/onStatusChange/onFocus/onBlur/onDestroy
   ProFormProps.lifecycle: schema 未定义 lifecycle 时作为 fallback
-、、、
+```
 ---
 
 ## 二、使用方式
