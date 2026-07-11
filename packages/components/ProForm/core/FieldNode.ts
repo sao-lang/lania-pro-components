@@ -86,7 +86,7 @@ export class FieldNode implements FieldNodeAPI {
       // 2. 合并：全局优先级高于字段级
       //    hidden 是绝对隐藏，不受表单级覆盖
       if (fieldWanted === 'hidden') return 'hidden';
-      if (formConstraints.preview)  return 'readonly';
+      if (formConstraints.preview) return 'readonly';
       if (formConstraints.readonly) return 'readonly';
       if (formConstraints.disabled) return 'disabled';
       return fieldWanted ?? 'edit';

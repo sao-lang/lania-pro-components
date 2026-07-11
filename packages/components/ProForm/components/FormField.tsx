@@ -274,7 +274,14 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         ? getRendererByMode(readonlyConfig.mode)
         : getReadonlyRenderer(readonlyComponentName || 'Input');
 
-    return <>{renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps, { status, values: rootContext.instance.getFieldsValue() })}</>;
+    return (
+      <>
+        {renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps, {
+          status,
+          values: rootContext.instance.getFieldsValue(),
+        })}
+      </>
+    );
   }, [resolvedSchema, parsedQuickComponent, displayValue]);
 
   // ========== 编辑态组件渲染 ==========

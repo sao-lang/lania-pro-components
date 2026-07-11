@@ -358,16 +358,16 @@ type BehaviorDecl = FieldStatus | ((values: Record<string, unknown>) => FieldSta
 
 ### 3.4 核心类型
 
-| 类型                       | 说明                                                          |
-| -------------------------- | ------------------------------------------------------------- |
-| `FormStatus`               | `'edit' \| 'preview' \| 'readonly' \| 'disabled'`             |
-| `FieldStatus`              | `'edit' \| 'readonly' \| 'disabled' \| 'hidden'`              |
-| `BehaviorDecl`             | `FieldStatus \| ((values) => FieldStatus) \| undefined`       |
-| `LayoutMode`               | `'horizontal' \| 'vertical' \| 'inline' \| 'compact'`         |
-| `ProFormInstance`          | 表单实例 API                                                  |
-| `FieldNodeAPI`             | 字段运行时接口                                                |
-| `KeyboardNavigationConfig` | 键盘导航配置                                                  |
-| `DraftConfig`              | 草稿持久化配置                                                |
+| 类型                       | 说明                                                    |
+| -------------------------- | ------------------------------------------------------- |
+| `FormStatus`               | `'edit' \| 'preview' \| 'readonly' \| 'disabled'`       |
+| `FieldStatus`              | `'edit' \| 'readonly' \| 'disabled' \| 'hidden'`        |
+| `BehaviorDecl`             | `FieldStatus \| ((values) => FieldStatus) \| undefined` |
+| `LayoutMode`               | `'horizontal' \| 'vertical' \| 'inline' \| 'compact'`   |
+| `ProFormInstance`          | 表单实例 API                                            |
+| `FieldNodeAPI`             | 字段运行时接口                                          |
+| `KeyboardNavigationConfig` | 键盘导航配置                                            |
+| `DraftConfig`              | 草稿持久化配置                                          |
 
 ---
 
@@ -570,7 +570,7 @@ this._effectiveStatus = computed<FieldStatus>(() => {
   }
 
   if (fieldWanted === 'hidden') return 'hidden';
-  if (formConstraints.preview)  return 'readonly';
+  if (formConstraints.preview) return 'readonly';
   if (formConstraints.readonly) return 'readonly';
   if (formConstraints.disabled) return 'disabled';
   return fieldWanted ?? 'edit';
@@ -724,7 +724,7 @@ Context 层负责在 React 组件树中传递状态，避免 prop drilling。共
 | **RootContext**       | `RootContext.tsx`       | 全局状态（表单状态、实例、布局、尺寸、回调） | 整个表单            |
 | **LayoutContext**     | `LayoutContext.tsx`     | 布局配置（列数、间距、标签对齐、折叠状态）   | 整个表单 / 单个字段 |
 | **SchemaContext**     | `SchemaContext.tsx`     | 字段静态配置（来自 ProFormSchema）           | 单个字段            |
-| **FieldContext**      | `FieldContext.tsx`      | 字段运行时状态（值、状态、方法）            | 单个字段            |
+| **FieldContext**      | `FieldContext.tsx`      | 字段运行时状态（值、状态、方法）             | 单个字段            |
 | **ExtensionContext**  | `ExtensionContext.tsx`  | 扩展机制（权限、审计、国际化）               | 整个表单            |
 | **FormConfigContext** | `FormConfigContext.tsx` | 表单全局配置                                 | 整个表单            |
 
@@ -749,7 +749,7 @@ interface RootContextValue {
 ```typescript
 function createFormState(preview, readonly, disabled, submitting): FormState {
   let status: FormStatus = 'edit';
-  if (preview)       status = 'preview';
+  if (preview) status = 'preview';
   else if (readonly) status = 'readonly';
   else if (disabled) status = 'disabled';
   return { readonly, disabled, preview, submitting, status };
@@ -1196,6 +1196,7 @@ type ReadonlyRenderer = (
 ```
 
 第5个参数 `meta` 携带字段上下文信息：
+
 - `meta.status` — 当前字段的有效状态（edit / readonly / disabled / hidden）
 - `meta.values` — 全表单的当前值，可用于跨字段联动显示
 
@@ -1998,16 +1999,16 @@ const isVisible = permission?.checkVisible('fieldName');
 
 ProForm 通过 `index.ts` 统一导出所有能力：
 
-| 分类           | 导出内容                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 分类           | 导出内容                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **类型**       | `ProFormSchema`, `ProFormProps`, `ProFormInstance`, `FieldNodeAPI`, `FormStoreAPI`, `BehaviorDecl`, `FieldReaction`, `FieldLifecycle`, `ReadonlyRenderConfig`, `ReadonlyRenderer`, `QuickComponentConfig`, `ComponentRegistry`, `ReadonlyRegistry`, `LayoutMode`, `FormStatus`, `FieldStatus`, `ButtonConfig`, `ProFormPerformanceConfig`, `LazyLoadConfig`, `BatchUpdateConfig` |
-| **组件**       | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`                                                                                                                                                                                                                                                                                                                                                      |
-| **Hooks**      | `useProForm`, `useProFormContext`, `useArcoForm`, `useVirtualScroll`, `useDynamicVirtualScroll`, `useLazyField`, `useGroupLazyLoad`, `usePriorityLoad`                                                                                                                                                                                                                                                     |
-| **Context**    | `RootContext`, `useRootContext`, `SchemaContext`, `useSchemaContext`, `FieldContext`, `useFieldContext`, `LayoutContext`, `useLayoutContext`, `ProFormContext`, `ProFormProvider`                                                                                                                                                                                                                          |
-| **Core**       | `FormStore`, `createFormStore`, `FieldNode`, `createFieldNode`, `ValidationEngine`, `createValidationEngine`                                                                                                                                                                                                                                                                                               |
-| **Registry**   | `componentRegistry`, `registerComponent`, `registerQuickComponent`, `parseQuickComponent`, `readonlyRegistry`, `registerReadonlyRenderer`, `getReadonlyRenderer`                                                                                                                                                                                                                                           |
-| **响应式系统** | `reactive`, `effect`, `computed`, `watch`, `batchUpdate`, `ref`, `toReactive`, `isReactive`, `trigger`                                                                                                                                                                                                                                                                                                     |
-| **性能工具**   | `TaskQueue`, `globalTaskQueue`, `BatchUpdateManager`, `debounce`, `throttle`, `memoize`, `LRUCache`, `PerformanceMonitor`, `performanceMonitor`, `scheduleIdleTask`, `scheduleChunkedTask`                                                                                                                                                                                                                 |
+| **组件**       | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`                                                                                                                                                                                                                                                                                                                            |
+| **Hooks**      | `useProForm`, `useProFormContext`, `useArcoForm`, `useVirtualScroll`, `useDynamicVirtualScroll`, `useLazyField`, `useGroupLazyLoad`, `usePriorityLoad`                                                                                                                                                                                                                           |
+| **Context**    | `RootContext`, `useRootContext`, `SchemaContext`, `useSchemaContext`, `FieldContext`, `useFieldContext`, `LayoutContext`, `useLayoutContext`, `ProFormContext`, `ProFormProvider`                                                                                                                                                                                                |
+| **Core**       | `FormStore`, `createFormStore`, `FieldNode`, `createFieldNode`, `ValidationEngine`, `createValidationEngine`                                                                                                                                                                                                                                                                     |
+| **Registry**   | `componentRegistry`, `registerComponent`, `registerQuickComponent`, `parseQuickComponent`, `readonlyRegistry`, `registerReadonlyRenderer`, `getReadonlyRenderer`                                                                                                                                                                                                                 |
+| **响应式系统** | `reactive`, `effect`, `computed`, `watch`, `batchUpdate`, `ref`, `toReactive`, `isReactive`, `trigger`                                                                                                                                                                                                                                                                           |
+| **性能工具**   | `TaskQueue`, `globalTaskQueue`, `BatchUpdateManager`, `debounce`, `throttle`, `memoize`, `LRUCache`, `PerformanceMonitor`, `performanceMonitor`, `scheduleIdleTask`, `scheduleChunkedTask`                                                                                                                                                                                       |
 
 **自动注册的模块**（import 副作用）：
 

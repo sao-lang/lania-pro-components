@@ -43,7 +43,14 @@ function stripFormControlProps<P extends Record<string, unknown>>(
   Component: React.ComponentType<P>,
 ): React.ComponentType<P> {
   const Wrapped: React.FC<P> = (props) => {
-    const { status: _s, values: _v, schema: _sc, field: _f, form: _fm, ...rest } = props as P & {
+    const {
+      status: _s,
+      values: _v,
+      schema: _sc,
+      field: _f,
+      form: _fm,
+      ...rest
+    } = props as P & {
       status?: unknown;
       values?: unknown;
       schema?: unknown;
@@ -81,9 +88,13 @@ registerComponents({
   'DatePicker.MonthPicker': stripFormControlProps(DatePicker.MonthPicker),
   'DatePicker.WeekPicker': stripFormControlProps(DatePicker.WeekPicker),
   'DatePicker.QuarterPicker': stripFormControlProps(DatePicker.QuarterPicker),
-  'DatePicker.RangePicker': stripFormControlProps(DatePicker.RangePicker as React.ComponentType<Record<string, unknown>>),
+  'DatePicker.RangePicker': stripFormControlProps(
+    DatePicker.RangePicker as React.ComponentType<Record<string, unknown>>,
+  ),
   TimePicker: stripFormControlProps(TimePicker),
-  'TimePicker.RangePicker': stripFormControlProps(TimePicker.RangePicker as React.ComponentType<Record<string, unknown>>),
+  'TimePicker.RangePicker': stripFormControlProps(
+    TimePicker.RangePicker as React.ComponentType<Record<string, unknown>>,
+  ),
 
   // 其他
   Transfer: stripFormControlProps(Transfer),
