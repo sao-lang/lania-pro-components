@@ -82,7 +82,8 @@ class ProFormInstanceRegistry {
    */
   subscribe(name: string, listener: () => void): () => void {
     return this.registry.subscribe(name, () => {
-      const instance = this.registry.get(name);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      this.registry.get(name);
       listener();
     });
   }

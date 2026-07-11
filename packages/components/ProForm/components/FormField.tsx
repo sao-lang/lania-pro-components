@@ -15,8 +15,17 @@ import { createFieldNode } from '../core/FieldNode';
 import type { FormStore } from '../core/FormStore';
 import type { ArcoFormInstance } from '../hooks/useArcoForm';
 
+/** 组件 ref 类型：Arco 组件实例或 null */
 type ComponentRef = React.RefObject<HTMLElement> | null;
 
+/**
+ * FormField 组件的 Props
+ * @property schema - 表单项的 JSON schema 定义
+ * @property formStore - 表单状态管理核心 store
+ * @property arcoForm - Arco Design Form 实例
+ * @property setComponentRef - 注册组件 ref 的回调
+ * @property onFieldChange - 字段值变化回调
+ */
 interface FormFieldProps {
   schema: ProFormSchema;
   formStore: FormStore;
@@ -25,6 +34,13 @@ interface FormFieldProps {
   onFieldChange?: (value: unknown, allValues: Record<string, unknown>) => void;
 }
 
+/**
+ * FormFieldInner（内部渲染组件）的 Props
+ * @property fieldNode - 已创建的 FieldNode 实例（含状态订阅能力）
+ * @property arcoForm - Arco Design Form 实例
+ * @property setComponentRef - 注册组件 ref 的回调
+ * @property onFieldChange - 字段值变化回调
+ */
 interface FormFieldInnerProps {
   fieldNode: FieldNodeAPI;
   arcoForm: ArcoFormInstance;
@@ -32,17 +48,30 @@ interface FormFieldInnerProps {
   onFieldChange?: (value: unknown, allValues: Record<string, unknown>) => void;
 }
 
+/**
+ * FormFieldInner
+ *
+ * 表单项的实际渲染组件，负责：
+ * 1. 订阅 FieldNode 的状态变化（value / status / resolvedSchema）并驱动 UI 更新
+ * 2. 处理用户交互事件（onChange / onFocus / onBlur）并同步回 FieldNode 和 ArcoForm
+ * 3. 根据 status 切换编辑态 / 只读态 / 预览态 / 隐藏态
+ * 4. 对 RangePicker 等复合组件做特殊处理（双字段映射）
+ * 5. 构建 FieldContext 供子组件消费
+ */
 const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, setComponentRef, onFieldChange }) => {
   const rootContext = useRootContext();
   const layoutContext = useLayoutContext();
 
+  // ========== 本地状态（由 FieldNode 驱动） ==========
   const [value, setValueState] = useState<unknown>(fieldNode.value);
   const [status, setStatusState] = useState<FieldStatus>(fieldNode.status);
   const [error, setErrorState] = useState<string | undefined>(fieldNode.error);
   const [focused, setFocused] = useState<boolean>(fieldNode.focused || false);
+  const [resolvedSchema, setResolvedSchema] = useState<ResolvedSchema>(fieldNode.resolvedSchema);
 
   const componentRef = useRef<ComponentRef>(null);
 
+  // ========== 焦点管理 ==========
   const handleFocus = useCallback(() => {
     fieldNode.setFocus();
     setFocused(true);
@@ -53,6 +82,9 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     setFocused(false);
   }, [fieldNode]);
 
+  // ========== RangePicker 双字段特殊处理 ==========
+  // _rangePickerNames 由 ProForm 解析 schema 时注入
+  // 若存在，则 RangePicker 的 [start, end] 对应两个独立 field
   const rangePickerNames = (fieldNode.schema as ProFormSchema & { _rangePickerNames?: [string, string] })
     ._rangePickerNames;
   const isRangePickerArray = !!rangePickerNames;
@@ -72,26 +104,30 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return value;
   }, [isRangePickerArray, rangePickerNames, value, rootContext.instance]);
 
-  const [resolvedSchema, setResolvedSchema] = useState<ResolvedSchema>(fieldNode.resolvedSchema);
-
+  // ========== 订阅 FieldNode 状态变更 ==========
   useEffect(() => {
+    // 初始化本地状态
     setValueState(fieldNode.value);
     setStatusState(fieldNode.status);
     setResolvedSchema(fieldNode.resolvedSchema);
 
+    // 订阅 value 变化 → 同步回 ArcoForm
     const unsubscribeValue = fieldNode.subscribeToValueChange((newValue) => {
       setValueState(newValue);
       arcoForm.setFieldValue(fieldName, newValue);
     });
 
+    // 订阅 status 变化（hidden / disabled / readonly / preview / edit）
     const unsubscribeStatus = fieldNode.subscribeToStatusChange((newStatus) => {
       setStatusState(newStatus);
     });
 
+    // 订阅 resolvedSchema 变化（label / componentProps / rules 等解析结果）
     const unsubscribeResolved = fieldNode.subscribeToResolvedSchemaChange((resolved) => {
       setResolvedSchema(resolved);
     });
 
+    // 清理订阅
     return () => {
       unsubscribeValue();
       unsubscribeStatus();
@@ -99,19 +135,30 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     };
   }, [fieldNode, arcoForm, fieldName]);
 
+  // ========== 注册组件 ref 到上层 ==========
   useEffect(() => {
     if (setComponentRef && componentRef.current) {
       setComponentRef(fieldName, componentRef.current);
     }
   }, [fieldName, setComponentRef]);
 
+  // ========== 值变更处理 ==========
+  /**
+   * 处理组件值变化：
+   * 1. 调用 schema 中定义的原始 onChange
+   * 2. RangePicker 模式 → 拆分 [startValue, endValue] 分别写入两个 field
+   * 3. 普通模式 → 写入单个 field
+   * 4. 触发外部 onFieldChange 回调
+   */
   const handleChange = useCallback(
     (newValue: unknown, ...rest: unknown[]) => {
+      // 调用 schema 中定义的原始 onChange
       const { onChange: originalOnChange } = resolvedSchema.componentProps || {};
       if (typeof originalOnChange === 'function') {
         (originalOnChange as (value: unknown, ...args: unknown[]) => void)(newValue, ...rest);
       }
 
+      // RangePicker 双字段模式
       if (isRangePickerArray && Array.isArray(newValue) && rangePickerNames) {
         const [startName, endName] = rangePickerNames;
         const [startValue, endValue] = newValue as [unknown, unknown];
@@ -126,6 +173,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
           rootContext.instance.getFieldsValue(),
         );
       } else {
+        // 普通单字段模式
         fieldNode.setValue(newValue);
         arcoForm.setFieldValue(fieldName, newValue);
 
@@ -136,6 +184,13 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     [fieldNode, arcoForm, rootContext, onFieldChange, isRangePickerArray, rangePickerNames, fieldName, resolvedSchema],
   );
 
+  // ========== 构建 FieldContext ==========
+  /**
+   * FieldContext 提供给子组件消费，包含：
+   * - 字段元数据（name / label / value / status / error）
+   * - 操作方法（setValue / validate / setError / clearError）
+   * - 字段节点引用（fieldNode）
+   */
   const fieldContextValue = useMemo(
     () => ({
       name: fieldName,
@@ -193,6 +248,14 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return rootContext.instance.getFieldValue(fieldName);
   }, [isRangePickerArray, rangePickerNames, fieldName, rootContext.instance]);
 
+  // ========== 只读/预览态渲染 ==========
+  /**
+   * 构建只读模式下的渲染内容：
+   * 1. 优先使用 readonlyComponent 指定的组件名称查找渲染器
+   * 2. 否则根据 readonlyMode 使用 getRendererByMode 查找（如 'phone'/'email'/'currency' 等）
+   * 3. 若 mode 为 'custom'，使用 getReadonlyRenderer 按组件类型查找
+   * 4. 兜底使用 textRenderer
+   */
   const renderReadonlyContent = useMemo(() => {
     const readonlyComponentName =
       resolvedSchema.readonlyComponent ||
@@ -215,6 +278,17 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return <>{renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps)}</>;
   }, [resolvedSchema, parsedQuickComponent, displayValue]);
 
+  // ========== 编辑态组件渲染 ==========
+  /**
+   * 根据 status 渲染不同 UI：
+   * - preview / readonly → 只读渲染器
+   * - edit（默认）→ 实际表单组件
+   * - hidden → 不渲染（已在外部处理）
+   *
+   * 组件查找优先级：
+   * 1. QuickComponent 解析（unit / prefix / quick 类型）
+   * 2. 直接按组件名称查找
+   */
   const renderComponent = () => {
     if (status === 'preview' || status === 'readonly') {
       return renderReadonlyContent;
@@ -277,6 +351,11 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     );
   };
 
+  // ========== 校验规则 ==========
+  /**
+   * 根据 computedRequired 动态生成 Arco Form.Item 的 required 规则。
+   * 规则消息使用 resolvedSchema.label 或 fieldName 作为提示文案。
+   */
   const finalRules = useMemo(() => {
     const rules: { required?: boolean; message?: string }[] = [];
     if (fieldNode.computedRequired) {
@@ -288,6 +367,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return rules;
   }, [fieldNode.computedRequired, resolvedSchema.label, fieldNode.name]);
 
+  // ========== 校验状态映射 ==========
   const getValidateStatus = (): 'success' | 'warning' | 'error' | 'validating' | undefined => {
     if (error) {
       return 'error';
@@ -295,6 +375,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return undefined;
   };
 
+  // Arco Form.Item 类型声明（避免 @types 缺失导致的 TS 报错）
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const FormItem = Form.Item as React.FC<{
     field?: string;
@@ -310,6 +391,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     children?: React.ReactNode;
   }>;
 
+  // ========== 渲染 ==========
   return (
     <FieldContextProvider value={fieldContextValue}>
       <div
@@ -318,6 +400,12 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
           display: fieldNode.computedBehavior.visible ? undefined : 'none',
         }}
       >
+        {/*
+         * Arco Form.Item：
+         * - field: 字段名，用于 ArcoForm 的值绑定和校验
+         * - rules: 动态 required 规则
+         * - validateStatus / help: 错误态展示
+         */}
         <FormItem
           field={fieldName}
           label={resolvedSchema.label}
@@ -337,6 +425,18 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   );
 };
 
+/**
+ * FormField
+ *
+ * ProForm 表单项的"胶水"组件，职责：
+ * 1. 根据 schema 创建/复用 FieldNode 实例，注册到 FormStore
+ * 2. 构建 SchemaContext（供子组件消费 schema 元数据）
+ * 3. 继承并合并布局上下文（LayoutContext）
+ * 4. 组件卸载时从 FormStore 注销该字段
+ *
+ * 渲染结构：
+ * SchemaContextProvider → LayoutContextProvider → FormFieldInner → Arco Form.Item
+ */
 export const FormField: React.FC<FormFieldProps> = ({
   schema,
   formStore,
@@ -346,6 +446,12 @@ export const FormField: React.FC<FormFieldProps> = ({
 }) => {
   const layoutContext = useLayoutContext();
 
+  // ========== 创建/复用 FieldNode ==========
+  /**
+   * 优先从 FormStore 查找已有 FieldNode（schema 展开时复用），
+   * 不存在则创建新节点并注册到 store。
+   * 组件卸载时自动注销。
+   */
   const fieldNode = useMemo(() => {
     const existingField = formStore.getField(schema.name);
     if (existingField) {
@@ -364,6 +470,12 @@ export const FormField: React.FC<FormFieldProps> = ({
 
   const resolvedSchema = fieldNode.resolvedSchema;
 
+  // ========== 构建 SchemaContext ==========
+  /**
+   * 将 resolvedSchema 展开为扁平结构注入上下文，
+   * 供内部组件（FormFieldInner 及其子组件）通过 useSchemaContext 消费。
+   * 包含字段元数据、校验规则、布局参数、只读配置等。
+   */
   const schemaContextValue = useMemo(
     () => ({
       name: schema.name,
@@ -397,6 +509,11 @@ export const FormField: React.FC<FormFieldProps> = ({
     [schema, resolvedSchema],
   );
 
+  // ========== 合并布局上下文 ==========
+  /**
+   * 继承上层 LayoutContext，并用当前字段的 col/labelCol/wrapperCol 覆盖，
+   * 实现字段级别的布局覆盖能力。
+   */
   const layoutContextValue = useMemo(
     () => ({
       ...layoutContext,

@@ -33,12 +33,32 @@
  * - statusRenderer: 状态标签
  */
 import React, { ReactNode, useState } from 'react';
-import { Image, Tag, Space, Typography } from '@arco-design/web-react';
+import { Image, Tag, Space } from '@arco-design/web-react';
 import { IconEye, IconFile, IconLink, IconPlayCircle } from '@arco-design/web-react/icon';
 import { formatNumber, formatMoney, formatPercent, formatDate } from '@lania-pro-components/utils';
 import type { ReadonlyRenderer, ReadonlyRendererRegistry, ReadonlyRenderConfig } from '../types';
 
-const { Text } = Typography;
+/** 选项类型 */
+interface OptionItem {
+  label: string;
+  value: string | number;
+  [key: string]: unknown;
+}
+
+/** 媒体资源（图片/视频） */
+interface MediaItem {
+  url: string;
+  [key: string]: unknown;
+}
+
+/** 文件列表项 */
+interface FileItem {
+  name: string;
+  url: string;
+  [key: string]: unknown;
+}
+
+// const { Text } = Typography;
 
 // ==================== 内联格式器（原 shared formatters） ====================
 
@@ -247,8 +267,8 @@ export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {})
 /**
  * 选项渲染器
  */
-export const optionRenderer: ReadonlyRenderer = (value, options = [], config = {}) => {
-  const rendered = inlineRenderOption(value, options as { value: string | number; label: ReactNode }[], {
+export const optionRenderer: ReadonlyRenderer = (value, options, config = {}) => {
+  const rendered = inlineRenderOption(value, (options ?? []) as OptionItem[], {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     separator: config.separator,
     tagMode: config.mode === 'tag',
@@ -260,15 +280,23 @@ export const optionRenderer: ReadonlyRenderer = (value, options = [], config = {
 /**
  * 多选框渲染器
  */
-export const checkboxRenderer: ReadonlyRenderer = (value, options = [], config = {}) => {
+export const checkboxRenderer: ReadonlyRenderer = (value, options, config = {}) => {
   return optionRenderer(value, options, { ...config, mode: 'tag' });
 };
 
 /**
  * Switch 渲染器
  */
-export const switchRenderer: ReadonlyRenderer = (value, _options, _config = {}, componentProps = {}) => {
-  const { checkedText, uncheckedText, trueText, falseText } = componentProps as Record<string, string>;
+export const switchRenderer: ReadonlyRenderer = (
+  value,
+  _options,
+  _config = {},
+  componentProps?: Record<string, unknown>,
+) => {
+  const { checkedText, uncheckedText, trueText, falseText } = (componentProps ?? {}) as Record<
+    string,
+    string | undefined
+  >;
   const rendered = inlineRenderSwitch(value, {
     trueText: checkedText || trueText || '是',
     falseText: uncheckedText || falseText || '否',
@@ -377,8 +405,10 @@ export const imageRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
     return <span>{withAffix(empty, config)}</span>;
   }
 
-  const images = Array.isArray(value) ? value : [value];
-  const urls = images.map((item) => (typeof item === 'string' ? item : item?.url)).filter(Boolean);
+  const images: unknown[] = Array.isArray(value) ? value : [value];
+  const urls: string[] = images
+    .map((item: unknown): string | undefined => (typeof item === 'string' ? item : (item as MediaItem | null)?.url))
+    .filter((url): url is string => !!url);
 
   if (urls.length === 0) {
     return <span>{withAffix(DEFAULT_EMPTY_TEXT, config)}</span>;
@@ -451,8 +481,10 @@ export const videoRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
     return <span>{withAffix(empty, config)}</span>;
   }
 
-  const videos = Array.isArray(value) ? value : [value];
-  const urls = videos.map((item) => (typeof item === 'string' ? item : item?.url)).filter(Boolean);
+  const videos: unknown[] = Array.isArray(value) ? value : [value];
+  const urls: string[] = videos
+    .map((item: unknown): string | undefined => (typeof item === 'string' ? item : (item as MediaItem | null)?.url))
+    .filter((url): url is string => !!url);
 
   if (urls.length === 0) {
     return <span>{withAffix(DEFAULT_EMPTY_TEXT, config)}</span>;
@@ -541,10 +573,19 @@ export const fileRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
     return <span>{withAffix(empty, config)}</span>;
   }
 
-  const files = Array.isArray(value) ? value : [value];
-  const fileList = files
-    .map((item) => (typeof item === 'string' ? { name: item.split('/').pop() || item, url: item } : item))
-    .filter(Boolean);
+  const files: unknown[] = Array.isArray(value) ? value : [value];
+  const fileList: FileItem[] = files
+    .map((item: unknown): FileItem | null => {
+      if (typeof item === 'string') {
+        return { name: item.split('/').pop() || item, url: item };
+      }
+      const maybeFile = item as FileItem | null;
+      if (maybeFile && typeof maybeFile.url === 'string') {
+        return { name: maybeFile.name || maybeFile.url, url: maybeFile.url };
+      }
+      return null;
+    })
+    .filter((f): f is FileItem => f !== null);
 
   if (fileList.length === 0) {
     return <span>{withAffix(DEFAULT_EMPTY_TEXT, config)}</span>;
@@ -552,7 +593,7 @@ export const fileRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 
   return (
     <Space direction='vertical' style={{ width: '100%' }}>
-      {fileList.map((file, index) => (
+      {fileList.map((file: FileItem, index: number) => (
         <a
           key={index}
           href={file.url}
@@ -767,9 +808,9 @@ export const statusRenderer: ReadonlyRenderer = (value, _options, config = {}) =
     inactive: { label: '已失效', color: 'gray' },
   };
 
-  const status = statusMap[String(value).toLowerCase()] || {
-    label: value,
-    color: 'gray',
+  const status = statusMap[String(value).toLowerCase()] ?? {
+    label: String(value),
+    color: 'gray' as const,
   };
 
   return <Tag color={status.color}>{status.label}</Tag>;
