@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { TableProps, TableColumnProps, PaginationProps, ButtonProps } from '@arco-design/web-react';
 import type { ProFormSchema, ProFormInstance, ProFormProps } from '../ProForm/types';
+import type { UseProTableReturn } from './hooks/useProTable';
 
 /**
  * 操作按钮配置
@@ -1012,6 +1013,9 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
   TableProps<T>,
   'columns' | 'pagination' | 'rowSelection'
 > {
+  /** 表格状态对象（由 useProTable 返回）。传入后复用该状态，不再内部调用 useProTable */
+  table?: UseProTableReturn<T>;
+
   /** 表格列配置 */
   columns: ProColumnType<T>[];
   /** 操作实例引用（示例用） */

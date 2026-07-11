@@ -7,30 +7,26 @@ Schema 驱动的企业级表单组件，基于 FormStore + FieldNode + Renderer 
 ```tsx
 import { ProForm, useProForm } from '@lania-pro-components/components';
 
-// Schema 驱动
+// 方式 A：独立使用（简单场景）
 <ProForm
   schemas={[
     { name: 'name', label: '姓名', component: 'Input', required: true },
     { name: 'email', label: '邮箱', component: 'Input', rules: [{ type: 'email' }] },
-    {
-      name: 'role',
-      label: '角色',
-      component: 'Select',
-      options: [
-        { label: '管理员', value: 'admin' },
-        { label: '用户', value: 'user' },
-      ],
-    },
   ]}
   onFinish={async (values) => await save(values)}
 />;
 
-// 编程式控制（推荐）
-const { instance, bindingProps } = useProForm();
-<ProForm {...bindingProps} schemas={mySchemas} />;
-instance.setFieldsValue({ name: '张三' });
-instance.validate().then((values) => {
-  /* ... */
+// 方式 B：配合 useProForm（推荐，避免重复实例）
+const form = useProForm({
+  schemas: [
+    { name: 'name', label: '姓名', component: 'Input', required: true },
+    { name: 'email', label: '邮箱', component: 'Input' },
+  ],
+  initialValues: { name: '张三' },
+});
+<ProForm form={form} columns={2} />;
+form.instance.validate().then((values) => {
+  /* form.instance 是唯一的 */
 });
 ```
 
@@ -231,6 +227,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
   schema.lifecycle: onInit/onMount/onValueChange/onStatusChange/onFocus/onBlur/onDestroy
   ProFormProps.lifecycle: schema 未定义 lifecycle 时作为 fallback
 ```
+
 ---
 
 ## 二、使用方式
@@ -289,7 +286,7 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
   children?: ProFormSchema[];        // 子字段
   onFieldChange?: (value, allValues) => void;
 }
-````
+```
 
 ### 3.2 ValidationRule
 

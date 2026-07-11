@@ -289,7 +289,9 @@ const createProDialogComponent = <
         rowKey,
         children,
         bodyStyle,
-        closeDialog: () => {},
+        closeDialog: () => {
+          if (!isControlled) setState((prev) => ({ ...prev, visible: false }));
+        },
         isControlled,
         destroyDialog: () => {},
       });

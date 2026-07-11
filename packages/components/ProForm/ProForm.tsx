@@ -1,660 +1,511 @@
+/**
+ * ProForm — Schema 驱动的表单组件。
+ *
+ * 三层架构：
+ * - useProForm（状态层）：创建 FormStore / arcoForm / instance / 字段导航
+ * - ProFormRenderer（渲染层）：Schema 合并、Grid 布局、按钮组、草稿持久化
+ * - ProForm（调度层）：检测 form prop，分发到受控/独立模式
+ *
+ * 使用方式：
+ * ```tsx
+ * // 独立使用
+ * <ProForm schemas={[...]} ref={formRef} />
+ *
+ * // 配合 useProForm（避免重复实例）
+ * const form = useProForm({ schemas });
+ * <ProForm form={form} />
+ * ```
+ */
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions } from './types';
-import { useProForm } from './useProForm';
+import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions, UseProFormReturn } from './types';
+import { useProForm, ProFormContext } from './useProForm';
 import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
-import { useVirtualScroll } from '@lania-pro-components/shared';
 import { useGroupLazyLoad, usePriorityLoad } from '@lania-pro-components/shared';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
 import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
 import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-components/utils';
 import type { DraftConfig } from './types';
+import type { UseFieldNavigationReturn, VirtualScrollState } from '@lania-pro-components/shared';
+import type { ArcoFormInstance } from './hooks/useArcoForm';
+import type { FormStore } from './core/FormStore';
 
 const { Row, Col } = Grid;
 
-/**
- * ProForm 组件
- */
-export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProFormProps<Record<string, unknown>>>(
-  (props, ref) => {
-    const {
-      schemas = [],
-      layout = 'vertical',
-      labelCol,
-      wrapperCol,
-      colon = true,
-      labelAlign = 'left',
-      size = 'default',
-      disabled = false,
-      readonly = false,
-      draft,
-      preview,
-      initialValues,
+// ===== ProFormRenderer Props =====
+interface ProFormRendererProps extends ProFormProps {
+  formStore: FormStore;
+  arcoForm: ArcoFormInstance;
+  instance: ProFormInstance;
+  setComponentRef: (name: string, ref: unknown) => void;
+  fieldNavigation: UseFieldNavigationReturn;
+  virtualState: VirtualScrollState<ProFormSchema>;
+  virtualContainerRef: React.RefObject<HTMLDivElement | null>;
+  isDraftState: boolean;
+  isPreviewState: boolean;
+  setIsDraftState: (v: boolean) => void;
+  setIsPreviewState: (v: boolean) => void;
+}
+
+// ===== 纯渲染组件（无 useProForm 调用）=====
+const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
+  const {
+    // 内部状态
+    formStore,
+    arcoForm,
+    instance,
+    setComponentRef,
+    fieldNavigation,
+    virtualState,
+    virtualContainerRef,
+    isDraftState,
+    isPreviewState,
+    setIsDraftState,
+    setIsPreviewState,
+    // 用户 props
+    schemas = [],
+    layout = 'vertical',
+    labelCol,
+    wrapperCol,
+    colon = true,
+    labelAlign = 'left',
+    size = 'default',
+    disabled = false,
+    readonly = false,
+    draft,
+    preview,
+    initialValues,
+    onFinish,
+    onFinishFailed,
+    onValuesChange,
+    onFieldsChange,
+    onDraftChange,
+    onPreviewChange,
+    showButton = true,
+    submitText = '确认',
+    resetText = '取消',
+    submitLoading = false,
+    resetLoading = false,
+    showSubmitButton = true,
+    showResetButton = true,
+    onReset,
+    buttonPosition = 'right',
+    collapsible = false,
+    collapsed: collapsedProp,
+    defaultCollapsed = true,
+    expandText = '展开',
+    collapseText = '收起',
+    collapsedRows = 1,
+    onCollapseChange,
+    rows,
+    buttons,
+    buttonList,
+    okButtonProps,
+    cancelButtonProps,
+    rowProps = {},
+    colProps = {},
+    columns = 1,
+    gutter = 16,
+    className,
+    style,
+    formRef,
+    scrollToFirstError,
+    validateTrigger,
+    labelColProps,
+    wrapperColProps,
+    cardContainer,
+    performance,
+    schemaProcessOptions,
+    transform,
+    lifecycle,
+    validateMessages,
+    valueFormat,
+    dateFormat,
+    keyboardNavigation,
+    draftStorage,
+  } = props;
+
+  const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
+    const { autoLabel, autoPlaceholder, autoAllowClear, autoRules, autoDefaultValue, autoRangePickerName } = options;
+    const processed: ProFormSchema = { ...schema };
+    if (autoLabel && !processed.label) {
+      const name = Array.isArray(schema.name) ? schema.name.join('.') : schema.name;
+      processed.label = name.replace(/([A-Z])/g, ' $1').trim();
+    }
+    if (autoPlaceholder && !processed.placeholder) {
+      processed.placeholder = processed.label ? `请输入${processed.label}` : '请输入';
+    }
+    if (autoAllowClear && processed.componentProps) {
+      processed.componentProps = { ...processed.componentProps, allowClear: true };
+    } else if (autoAllowClear && !processed.componentProps) {
+      processed.componentProps = { allowClear: true };
+    }
+    if (autoRules && !processed.rules && processed.required) {
+      processed.rules = [{ required: true, message: `${processed.label || schema.name} 不能为空` }];
+    }
+    if (autoDefaultValue && processed.initialValue === undefined) {
+      const comp = processed.component || 'Input';
+      if (comp === 'Input' || comp === 'TextArea') processed.initialValue = '';
+      else if (comp === 'Select' || comp === 'Cascader') processed.initialValue = undefined;
+      else if (comp === 'Checkbox' || comp === 'Switch') processed.initialValue = false;
+      else if (comp === 'InputNumber') processed.initialValue = undefined;
+      else if (comp === 'DatePicker' || comp === 'TimePicker') processed.initialValue = undefined;
+    }
+    if (autoRangePickerName && processed.component?.toLowerCase().includes('rangepicker')) {
+      const baseName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
+      processed.name = [`${baseName}_start`, `${baseName}_end`];
+      (processed as ProFormSchema & { _rangePickerNames?: [string, string] })._rangePickerNames = [
+        `${baseName}_start`,
+        `${baseName}_end`,
+      ];
+    }
+    return processed;
+  }, []);
+
+  const processedSchemas = useMemo(() => {
+    if (!schemaProcessOptions || Object.keys(schemaProcessOptions).length === 0) return schemas;
+    return schemas.map((s) => processSchema(s, schemaProcessOptions));
+  }, [schemas, schemaProcessOptions, processSchema]);
+
+  const mergedSchemas = useMemo(() => {
+    return processedSchemas.map((schema) => {
+      const merged: ProFormSchema = { ...schema };
+      const fieldName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
+      if (merged.initialValue === undefined && initialValues && fieldName in initialValues) {
+        merged.initialValue = initialValues[fieldName as keyof typeof initialValues];
+      }
+      if (transform) {
+        if (!merged.transform) merged.transform = transform;
+        else
+          merged.transform = {
+            input: merged.transform.input ?? transform.input,
+            output: merged.transform.output ?? transform.output,
+          };
+      }
+      if (!merged.lifecycle && lifecycle) merged.lifecycle = lifecycle;
+      if (!merged.valueFormat && valueFormat) merged.valueFormat = valueFormat;
+      if (!merged.format && dateFormat) merged.format = dateFormat;
+      if (keyboardNavigation || schema.keyboardNavigation) {
+        merged.keyboardNavigation = { ...keyboardNavigation, ...schema.keyboardNavigation };
+      }
+      return merged;
+    });
+  }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
+
+  // 同步 formRef
+  useEffect(() => {
+    if (formRef && typeof formRef === 'function') formRef(instance);
+    else if (formRef && typeof formRef === 'object' && formRef !== null)
+      (formRef as React.MutableRefObject<ProFormInstance>).current = instance;
+  }, [instance, formRef]);
+
+  // 同步 draft 状态
+  useEffect(() => {
+    if (draft !== undefined && draft !== isDraftState) {
+      setIsDraftState(draft);
+      onDraftChange?.(draft);
+    }
+  }, [draft, isDraftState, setIsDraftState, onDraftChange]);
+
+  // 同步 preview 状态
+  useEffect(() => {
+    if (preview !== undefined && preview !== isPreviewState) {
+      setIsPreviewState(preview);
+      onPreviewChange?.(preview);
+    }
+  }, [preview, isPreviewState, setIsPreviewState, onPreviewChange]);
+
+  // 初始化表单值
+  useEffect(() => {
+    if (initialValues && arcoForm && formStore) {
+      const timer = setTimeout(() => {
+        formStore.setValues(initialValues);
+        arcoForm.setFieldsValue(initialValues);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialValues, arcoForm, formStore]);
+
+  // 草稿持久化
+  const resolveDraftStorage = (storage: DraftConfig['storage']) => {
+    if (!storage || storage === 'localStorage') return localStorageStrategy;
+    if (storage === 'sessionStorage') return sessionStorageStrategy;
+    return storage as DraftStorage;
+  };
+  const { discardDraft } = useDraft({
+    formKey: draftStorage?.formKey || '',
+    formStore,
+    enabled: !!(draftStorage?.formKey && (draftStorage?.enabled ?? true)),
+    autoSaveDelay: draftStorage?.autoSaveDelay ?? 3000,
+    ttl: draftStorage?.ttl,
+    storage: draftStorage?.storage ? resolveDraftStorage(draftStorage.storage) : undefined,
+    onDraftAvailable: (data: DraftData) => draftStorage?.onDraftAvailable?.(data),
+    onDraftRestored: (values: Record<string, unknown>) => {
+      if (arcoForm) arcoForm.setFieldsValue(values);
+      formStore.setValues(values);
+      draftStorage?.onDraftRestored?.(values);
+    },
+  });
+
+  // 批量更新配置
+  useEffect(() => {
+    const bc = performance?.batchUpdate;
+    if (bc?.enabled) {
+      setAsyncBatchConfig({ delay: bc.delay, maxBatchSize: bc.maxBatchSize });
+    }
+    return () => {
+      clearAsyncBatch();
+    };
+  }, [performance?.batchUpdate]);
+
+  // 折叠状态
+  const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);
+  const isControlledCollapse = typeof collapsedProp !== 'undefined';
+  const finalCollapsed = isControlledCollapse ? collapsedProp : innerCollapsed;
+  const toggleCollapse = () => {
+    const next = !finalCollapsed;
+    if (!isControlledCollapse) setInnerCollapsed(next);
+    onCollapseChange?.(next);
+  };
+
+  const formState = useMemo(
+    () => createFormState(isDraftState, readonly, disabled, isPreviewState, submitLoading),
+    [isDraftState, readonly, disabled, isPreviewState, submitLoading],
+  );
+
+  const rootContextValue = useMemo(
+    () => ({
+      formState,
+      instance,
+      arcoForm,
+      layout: layout === 'compact' ? 'inline' : layout,
+      size,
+      onValuesChange,
+      onFieldsChange,
       onFinish,
       onFinishFailed,
+      validateMessages,
+    }),
+    [
+      formState,
+      instance,
+      arcoForm,
+      layout,
+      size,
       onValuesChange,
       onFieldsChange,
-      onDraftChange,
-      onPreviewChange,
-      showButton = true,
-      submitText = '确认',
-      resetText = '取消',
-      submitLoading = false,
-      resetLoading = false,
-      showSubmitButton = true,
-      showResetButton = true,
-      onReset,
-      buttonPosition = 'right',
-      collapsible = false,
-      collapsed: collapsedProp,
-      defaultCollapsed = true,
-      expandText = '展开',
-      collapseText = '收起',
-      collapsedRows = 1,
-      onCollapseChange,
-      rows,
-      buttons,
-      buttonList,
-      okButtonProps,
-      cancelButtonProps,
-      rowProps = {},
-      colProps = {},
-      columns = 1,
-      gutter = 16,
-      className,
-      style,
-      formRef,
-      scrollToFirstError,
-      validateTrigger,
+      onFinish,
+      onFinishFailed,
+      validateMessages,
+    ],
+  );
+
+  const layoutContextValue = useMemo(
+    () => ({
+      columns,
+      gutter,
+      labelCol: labelColProps || labelCol,
+      wrapperCol: wrapperColProps || wrapperCol,
+      rowProps,
+      colProps,
+      colon,
+      labelAlign,
+      collapsed: finalCollapsed,
+      collapsedRows,
+    }),
+    [
+      columns,
+      gutter,
+      labelCol,
+      wrapperCol,
       labelColProps,
       wrapperColProps,
-      cardContainer,
-      performance,
-      schemaProcessOptions,
-      transform,
-      lifecycle,
-      validateMessages,
-      valueFormat,
-      dateFormat,
-      keyboardNavigation,
-      draftStorage,
-    } = props;
+      rowProps,
+      colProps,
+      colon,
+      labelAlign,
+      finalCollapsed,
+      collapsedRows,
+    ],
+  );
 
-    const {
-      arcoForm,
-      instance,
-      setComponentRef,
-      isDraftState,
-      setIsDraftState,
-      isPreviewState,
-      setIsPreviewState,
-      formStore,
-      fieldNavigation,
-    } = useProForm({
-      initialValues,
-      onValuesChange,
-      onFieldsChange,
-      keyboardNavigation,
-    });
+  // 性能优化
+  const virtualScrollConfig = performance?.virtualScroll;
+  const isVirtualScrollEnabled = virtualScrollConfig?.enabled && mergedSchemas.length > 20;
+  const lazyLoadConfig = performance?.lazyLoad;
+  const isLazyLoadEnabled = lazyLoadConfig?.enabled && mergedSchemas.length > 10;
 
-    const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
-      const {
-        autoLabel = false,
-        autoPlaceholder = false,
-        autoAllowClear = false,
-        autoRules = false,
-        autoDefaultValue = false,
-        autoRangePickerName = false,
-      } = options;
+  const { visibleFields: priorityVisibleFields } = usePriorityLoad(
+    mergedSchemas.map((s) => (Array.isArray(s.name) ? s.name[0] : s.name)),
+    {
+      highPriority: lazyLoadConfig?.highPriorityFields || [],
+      mediumPriority: lazyLoadConfig?.mediumPriorityFields || [],
+      mediumPriorityDelay: lazyLoadConfig?.groupDelay || 200,
+      lowPriorityDelay: (lazyLoadConfig?.groupDelay || 200) * 2,
+    },
+  );
 
-      const processed: ProFormSchema = { ...schema };
+  const { loadedCount: groupLoadedCount } = useGroupLazyLoad(mergedSchemas.length, {
+    groupSize: lazyLoadConfig?.groupSize || 10,
+    groupDelay: lazyLoadConfig?.groupDelay || 100,
+    enabled: isLazyLoadEnabled && !lazyLoadConfig?.highPriorityFields?.length,
+  });
 
-      if (autoLabel && !processed.label) {
-        const name = Array.isArray(schema.name) ? schema.name.join('.') : schema.name;
-        processed.label = name.replace(/([A-Z])/g, ' $1').trim();
+  const visibleSchemas = useMemo(() => {
+    if (isVirtualScrollEnabled) return virtualState.visibleItems as ProFormSchema[];
+    if (isLazyLoadEnabled) {
+      if (lazyLoadConfig?.highPriorityFields?.length) {
+        return mergedSchemas.filter((s) => priorityVisibleFields.includes(Array.isArray(s.name) ? s.name[0] : s.name));
       }
+      return mergedSchemas.slice(0, groupLoadedCount);
+    }
+    return mergedSchemas;
+  }, [
+    mergedSchemas,
+    isVirtualScrollEnabled,
+    isLazyLoadEnabled,
+    virtualState.visibleItems,
+    priorityVisibleFields,
+    groupLoadedCount,
+    lazyLoadConfig?.highPriorityFields?.length,
+  ]);
 
-      if (autoPlaceholder && !processed.placeholder) {
-        processed.placeholder = processed.label ? `请输入${processed.label}` : '请输入';
-      }
+  const handleFinish = async (_values: Record<string, unknown>) => {
+    try {
+      const storedValues = formStore.getValues();
+      await onFinish?.(storedValues);
+      if (draftStorage?.formKey) discardDraft();
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  };
 
-      if (autoAllowClear && processed.componentProps) {
-        processed.componentProps = { ...processed.componentProps, allowClear: true };
-      } else if (autoAllowClear && !processed.componentProps) {
-        processed.componentProps = { allowClear: true };
-      }
+  const handleReset = () => {
+    formStore.reset();
+    onReset?.();
+  };
 
-      if (autoRules && !processed.rules && processed.required) {
-        processed.rules = [{ required: true, message: `${processed.label || schema.name} 不能为空` }];
-      }
+  const getButtonSpan = (totalColumns: number): number => {
+    switch (totalColumns) {
+      case 1:
+        return 12;
+      case 2:
+        return 12;
+      case 3:
+        return 8;
+      case 4:
+        return 6;
+      default:
+        return Math.floor(24 / totalColumns);
+    }
+  };
 
-      if (autoDefaultValue && processed.initialValue === undefined) {
-        const component = processed.component || 'Input';
-        if (component === 'Input' || component === 'TextArea') {
-          processed.initialValue = '';
-        } else if (component === 'Select' || component === 'Cascader') {
-          processed.initialValue = undefined;
-        } else if (component === 'Checkbox' || component === 'Switch') {
-          processed.initialValue = false;
-        } else if (component === 'InputNumber') {
-          processed.initialValue = undefined;
-        } else if (component === 'DatePicker' || component === 'TimePicker') {
-          processed.initialValue = undefined;
-        }
-      }
-
-      if (autoRangePickerName && processed.component?.toLowerCase().includes('rangepicker')) {
-        const baseName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
-        processed.name = [`${baseName}_start`, `${baseName}_end`];
-        (processed as ProFormSchema & { _rangePickerNames?: [string, string] })._rangePickerNames = [
-          `${baseName}_start`,
-          `${baseName}_end`,
-        ];
-      }
-
-      return processed;
-    }, []);
-
-    const processedSchemas = useMemo(() => {
-      if (!schemaProcessOptions || Object.keys(schemaProcessOptions).length === 0) {
-        return schemas;
-      }
-      return schemas.map((schema) => processSchema(schema, schemaProcessOptions));
-    }, [schemas, schemaProcessOptions, processSchema]);
-
-    // 全局配置合并到每个 schema（schema 层可覆盖）
-    const mergedSchemas = useMemo(() => {
-      return processedSchemas.map((schema) => {
-        const merged: ProFormSchema = { ...schema };
-        const fieldName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
-
-        // initialValues 兜底：schema 未定义 initialValue 时使用表单级的 initialValues
-        if (merged.initialValue === undefined && initialValues && fieldName in initialValues) {
-          merged.initialValue = initialValues[fieldName as keyof typeof initialValues];
-        }
-
-        if (transform) {
-          if (!merged.transform) {
-            merged.transform = transform;
-          } else {
-            merged.transform = {
-              input: merged.transform.input ?? transform.input,
-              output: merged.transform.output ?? transform.output,
-            };
-          }
-        }
-        if (!merged.lifecycle && lifecycle) {
-          merged.lifecycle = lifecycle;
-        }
-        if (!merged.valueFormat && valueFormat) {
-          merged.valueFormat = valueFormat;
-        }
-        if (!merged.format && dateFormat) {
-          merged.format = dateFormat;
-        }
-        // keyboardNavigation：全局配置作为 base，schema 层覆盖（浅合并，schema 优先）
-        if (keyboardNavigation || schema.keyboardNavigation) {
-          merged.keyboardNavigation = {
-            ...keyboardNavigation,
-            ...schema.keyboardNavigation,
-          };
-        }
-
-        return merged;
-      });
-    }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
-
-    // 暴露实例
-    useImperativeHandle(ref, () => instance, [instance]);
-
-    // 同步 formRef
-    useEffect(() => {
-      if (formRef && typeof formRef === 'function') {
-        formRef(instance);
-      } else if (formRef && typeof formRef === 'object' && formRef !== null) {
-        (formRef as React.MutableRefObject<ProFormInstance<Record<string, unknown>>>).current = instance;
-      }
-    }, [instance, formRef]);
-
-    // 同步 draft 状态
-    useEffect(() => {
-      if (draft !== undefined && draft !== isDraftState) {
-        setIsDraftState(draft);
-        onDraftChange?.(draft);
-      }
-    }, [draft, isDraftState, setIsDraftState, onDraftChange]);
-
-    // 同步 preview 状态
-    useEffect(() => {
-      if (preview !== undefined && preview !== isPreviewState) {
-        setIsPreviewState(preview);
-        onPreviewChange?.(preview);
-      }
-    }, [preview, isPreviewState, setIsPreviewState, onPreviewChange]);
-
-    // 初始化表单值
-    useEffect(() => {
-      if (initialValues && arcoForm && formStore) {
-        const timer = setTimeout(() => {
-          formStore.setValues(initialValues);
-          arcoForm.setFieldsValue(initialValues);
-        }, 0);
-        return () => clearTimeout(timer);
-      }
-    }, [initialValues, arcoForm, formStore]);
-
-    // ===== 草稿持久化 =====
-    const resolveDraftStorage = (storage: DraftConfig['storage']) => {
-      if (!storage || storage === 'localStorage') return localStorageStrategy;
-      if (storage === 'sessionStorage') return sessionStorageStrategy;
-      return storage as DraftStorage;
-    };
-
-    const { discardDraft } = useDraft({
-      formKey: draftStorage?.formKey || '',
-      formStore,
-      enabled: !!(draftStorage?.formKey && (draftStorage?.enabled ?? true)),
-      autoSaveDelay: draftStorage?.autoSaveDelay ?? 3000,
-      ttl: draftStorage?.ttl,
-      storage: draftStorage?.storage ? resolveDraftStorage(draftStorage.storage) : undefined,
-      onDraftAvailable: (data: DraftData) => draftStorage?.onDraftAvailable?.(data),
-      onDraftRestored: (values: Record<string, unknown>) => {
-        if (arcoForm) {
-          arcoForm.setFieldsValue(values);
-        }
-        formStore.setValues(values);
-        draftStorage?.onDraftRestored?.(values);
-      },
-    });
-
-    // 设置批量更新配置
-    useEffect(() => {
-      const batchUpdateConfig = performance?.batchUpdate;
-      if (batchUpdateConfig?.enabled) {
-        setAsyncBatchConfig({
-          delay: batchUpdateConfig.delay,
-          maxBatchSize: batchUpdateConfig.maxBatchSize,
-        });
-      }
-      return () => {
-        clearAsyncBatch();
-      };
-    }, [performance?.batchUpdate]);
-
-    // 折叠状态
-    const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);
-    const isControlledCollapse = typeof collapsedProp !== 'undefined';
-    const finalCollapsed = isControlledCollapse ? collapsedProp : innerCollapsed;
-
-    const toggleCollapse = () => {
-      const next = !finalCollapsed;
-      if (!isControlledCollapse) {
-        setInnerCollapsed(next);
-      }
-      onCollapseChange?.(next);
-    };
-
-    // 构建表单全局状态
-    const formState = useMemo(
-      () => createFormState(isDraftState, readonly, disabled, isPreviewState, submitLoading),
-      [isDraftState, readonly, disabled, isPreviewState, submitLoading],
-    );
-
-    // 构建 RootContext
-    const rootContextValue = useMemo(
-      () => ({
-        formState,
-        instance: instance,
-        arcoForm,
-        layout: layout === 'compact' ? 'inline' : layout,
-        size,
-        onValuesChange: onValuesChange,
-        onFieldsChange: onFieldsChange,
-        onFinish: onFinish,
-        onFinishFailed: onFinishFailed,
-        validateMessages,
-      }),
-      [
-        formState,
-        instance,
-        arcoForm,
-        layout,
-        size,
-        onValuesChange,
-        onFieldsChange,
-        onFinish,
-        onFinishFailed,
-        validateMessages,
-      ],
-    );
-
-    // 构建 LayoutContext
-    const layoutContextValue = useMemo(
-      () => ({
-        columns,
-        gutter,
-        labelCol: labelColProps || labelCol,
-        wrapperCol: wrapperColProps || wrapperCol,
-        rowProps,
-        colProps,
-        colon,
-        labelAlign,
-        collapsed: finalCollapsed,
-        collapsedRows,
-      }),
-      [
-        columns,
-        gutter,
-        labelCol,
-        wrapperCol,
-        labelColProps,
-        wrapperColProps,
-        rowProps,
-        colProps,
-        colon,
-        labelAlign,
-        finalCollapsed,
-        collapsedRows,
-      ],
-    );
-
-    // ===== 性能优化：虚拟滚动 =====
-    const virtualScrollConfig = performance?.virtualScroll;
-    const isVirtualScrollEnabled = virtualScrollConfig?.enabled && mergedSchemas.length > 20;
-
-    const {
-      containerRef: virtualContainerRef,
-      virtualState,
-      // scrollToIndex,
-    } = useVirtualScroll(mergedSchemas, {
-      itemHeight: virtualScrollConfig?.itemHeight || 60,
-      overscan: virtualScrollConfig?.overscan || 5,
-      containerHeight: virtualScrollConfig?.containerHeight,
-    });
-
-    // ===== 性能优化：懒加载 =====
-    const lazyLoadConfig = performance?.lazyLoad;
-    const isLazyLoadEnabled = lazyLoadConfig?.enabled && mergedSchemas.length > 10;
-
-    // 优先级加载
-    const { visibleFields: priorityVisibleFields } = usePriorityLoad(
-      mergedSchemas.map((s) => (Array.isArray(s.name) ? s.name[0] : s.name)),
-      {
-        highPriority: lazyLoadConfig?.highPriorityFields || [],
-        mediumPriority: lazyLoadConfig?.mediumPriorityFields || [],
-        mediumPriorityDelay: lazyLoadConfig?.groupDelay || 200,
-        lowPriorityDelay: (lazyLoadConfig?.groupDelay || 200) * 2,
-      },
-    );
-
-    // 分组懒加载（当没有配置优先级时使用）
-    const { loadedCount: groupLoadedCount } = useGroupLazyLoad(mergedSchemas.length, {
-      groupSize: lazyLoadConfig?.groupSize || 10,
-      groupDelay: lazyLoadConfig?.groupDelay || 100,
-      enabled: isLazyLoadEnabled && !lazyLoadConfig?.highPriorityFields?.length,
-    });
-
-    // 确定要渲染的 schemas
-    const visibleSchemas = useMemo(() => {
-      if (isVirtualScrollEnabled) {
-        return virtualState.visibleItems as ProFormSchema[];
-      }
-
-      if (isLazyLoadEnabled) {
-        if (lazyLoadConfig?.highPriorityFields?.length) {
-          // 使用优先级加载
-          return mergedSchemas.filter((s) =>
-            priorityVisibleFields.includes(Array.isArray(s.name) ? s.name[0] : s.name),
-          );
-        } else {
-          // 使用分组加载
-          return mergedSchemas.slice(0, groupLoadedCount);
-        }
-      }
-
-      return mergedSchemas;
-    }, [
-      mergedSchemas,
-      isVirtualScrollEnabled,
-      isLazyLoadEnabled,
-      virtualState.visibleItems,
-      priorityVisibleFields,
-      groupLoadedCount,
-      lazyLoadConfig?.highPriorityFields?.length,
-    ]);
-
-    // 处理表单提交（传入存储值，即经过 transform.output 转换后的值）
-    const handleFinish = async (_values: Record<string, unknown>) => {
-      try {
-        const storedValues = formStore.getValues();
-        await onFinish?.(storedValues);
-        // 提交成功后清除草稿
-        if (draftStorage?.formKey) {
-          discardDraft();
-        }
-      } catch (error) {
-        console.error('Form submission error:', error);
-      }
-    };
-
-    // 处理重置
-    const handleReset = () => {
-      formStore.reset();
-      onReset?.();
-    };
-
-    // 计算按钮列宽
-    const getButtonSpan = (totalColumns: number): number => {
-      switch (totalColumns) {
-        case 1:
-          return 12;
-        case 2:
-          return 12;
-        case 3:
-          return 8;
-        case 4:
-          return 6;
-        default:
-          return Math.floor(24 / totalColumns);
-      }
-    };
-
-    // 渲染按钮组
-    const renderButtonsInline = () => {
-      if (!showButton || isPreviewState) {
-        return null;
-      }
-
-      if (buttons) {
-        return buttons;
-      }
-
-      const buttonContent = (
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent:
-              buttonPosition === 'left' ? 'flex-start' : buttonPosition === 'center' ? 'center' : 'flex-end',
-            gap: 12,
-          }}
-        >
-          {buttonList && buttonList.length > 0 ? (
-            buttonList.map((button, index) => (
-              <Button
-                key={button.key || index}
-                type={button.type}
-                status={button.status}
-                loading={button.loading}
-                disabled={button.disabled}
-                htmlType={button.htmlType}
-                onClick={() => button.onClick?.(instance.getFieldsValue(), instance)}
-                {...button.props}
-              >
-                {button.text}
-              </Button>
-            ))
-          ) : (
-            <>
-              {showSubmitButton !== false && (
-                <Button type='primary' loading={submitLoading} htmlType='submit' {...okButtonProps}>
-                  {submitText}
-                </Button>
-              )}
-              {showResetButton !== false && (
-                <Button loading={resetLoading} onClick={handleReset} {...cancelButtonProps}>
-                  {resetText}
-                </Button>
-              )}
-            </>
-          )}
-          {collapsible && (
-            <Button type='text' onClick={toggleCollapse}>
-              {finalCollapsed ? expandText : collapseText}
+  const renderButtonsInline = () => {
+    if (!showButton || isPreviewState) return null;
+    if (buttons) return buttons;
+    return (
+      <div
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent:
+            buttonPosition === 'left' ? 'flex-start' : buttonPosition === 'center' ? 'center' : 'flex-end',
+          gap: 12,
+        }}
+      >
+        {buttonList && buttonList.length > 0 ? (
+          buttonList.map((button, index) => (
+            <Button
+              key={button.key || index}
+              type={button.type}
+              status={button.status}
+              loading={button.loading}
+              disabled={button.disabled}
+              htmlType={button.htmlType}
+              onClick={() => button.onClick?.(instance.getFieldsValue(), instance)}
+              {...button.props}
+            >
+              {button.text}
             </Button>
-          )}
-        </div>
-      );
+          ))
+        ) : (
+          <>
+            {showSubmitButton !== false && (
+              <Button type='primary' loading={submitLoading} htmlType='submit' {...okButtonProps}>
+                {submitText}
+              </Button>
+            )}
+            {showResetButton !== false && (
+              <Button loading={resetLoading} onClick={handleReset} {...cancelButtonProps}>
+                {resetText}
+              </Button>
+            )}
+          </>
+        )}
+        {collapsible && (
+          <Button type='text' onClick={toggleCollapse}>
+            {finalCollapsed ? expandText : collapseText}
+          </Button>
+        )}
+      </div>
+    );
+  };
 
-      return buttonContent;
-    };
+  const renderField = (schema: ProFormSchema, index: number) => {
+    const key = Array.isArray(schema.name) ? schema.name[0] : schema.name || index;
+    return (
+      <FormField
+        key={key}
+        schema={schema}
+        formStore={formStore}
+        arcoForm={arcoForm}
+        setComponentRef={setComponentRef}
+        onFieldChange={schema.onFieldChange}
+      />
+    );
+  };
 
-    // 渲染单个字段
-    const renderField = (schema: ProFormSchema, index: number) => {
-      const key = Array.isArray(schema.name) ? schema.name[0] : schema.name || index;
-      return (
-        <FormField
-          key={key}
-          schema={schema}
-          formStore={formStore}
-          arcoForm={arcoForm}
-          setComponentRef={setComponentRef}
-          onFieldChange={schema.onFieldChange}
-        />
-      );
-    };
+  const renderFields = () => {
+    const useGrid = columns > 1;
+    const baseSpan = Math.floor(24 / columns);
+    const buttonSpan = getButtonSpan(columns);
 
-    // 渲染所有字段
-    const renderFields = () => {
-      const useGrid = columns > 1;
-      const baseSpan = Math.floor(24 / columns);
-      const buttonSpan = getButtonSpan(columns);
+    if (useGrid) {
+      const filteredSchemas = visibleSchemas.filter((s) => {
+        const f = formStore.getField(s.name);
+        return !f || f.status !== 'hidden';
+      });
+      let maxFields = collapsible && finalCollapsed ? columns * collapsedRows - 1 : filteredSchemas.length;
+      if (rows !== undefined && !collapsible) maxFields = Math.min(maxFields, rows * columns);
+      const schemasToRender = filteredSchemas.slice(0, maxFields);
 
-      if (useGrid) {
-        // 过滤隐藏字段
-        const filteredSchemas = visibleSchemas.filter((schema) => {
-          const field = formStore.getField(schema.name);
-          return !field || field.status !== 'hidden';
-        });
-
-        // 如果是折叠状态，计算可以显示的字段总数（按钮组占1个位置）
-        let maxFields = collapsible && finalCollapsed ? columns * collapsedRows - 1 : filteredSchemas.length;
-
-        // 如果设置了 rows，限制显示的行数
-        if (rows !== undefined && !collapsible) {
-          maxFields = Math.min(maxFields, rows * columns);
-        }
-
-        // 限制显示的字段数量
-        const schemasToRender = filteredSchemas.slice(0, maxFields);
-
-        // 折叠状态下的特殊布局处理
-        if (collapsible && finalCollapsed) {
-          const items: React.ReactNode[] = [];
-
-          // 简单直接：第一行前 columns-1 个位置放字段，最后一个位置放按钮组
-          const fieldCount = Math.min(columns - 1, schemasToRender.length);
-
-          // 添加前 columns-1 个字段
-          for (let i = 0; i < fieldCount; i++) {
-            const schema = schemasToRender[i];
-            const colKey = Array.isArray(schema.name) ? schema.name[0] : schema.name || i;
-            items.push(
-              <Col key={colKey} span={baseSpan} {...colProps}>
-                {renderField(schema, i)}
-              </Col>,
-            );
-          }
-
-          // 添加按钮组在第一行的最后一列
-          if (showButton && !isPreviewState) {
-            items.push(
-              <Col key='__proform_buttons__' span={baseSpan} {...colProps}>
-                {renderButtonsInline()}
-              </Col>,
-            );
-          }
-
-          // 添加剩余的字段
-          for (let i = fieldCount; i < schemasToRender.length; i++) {
-            const schema = schemasToRender[i];
-            const colKey = Array.isArray(schema.name) ? schema.name[0] : schema.name || i;
-            items.push(
-              <Col key={colKey} span={baseSpan} {...colProps}>
-                {renderField(schema, i)}
-              </Col>,
-            );
-          }
-
-          return (
-            <div style={{ width: '100%', overflow: 'hidden' }}>
-              <Row gutter={gutter} {...rowProps}>
-                {items}
-              </Row>
-            </div>
-          );
-        }
-
-        // 非折叠状态，正常布局
+      if (collapsible && finalCollapsed) {
         const items: React.ReactNode[] = [];
-        let rowAcc = 0;
-
-        for (let i = 0; i < schemasToRender.length; i++) {
-          const schema = schemasToRender[i];
-          const colSpan = schema.col || baseSpan;
-
-          // 检查是否需要换行
-          if (rowAcc + colSpan > 24) {
-            rowAcc = 0;
-          }
-
-          const colKey = Array.isArray(schema.name) ? schema.name[0] : schema.name || i;
+        const fieldCount = Math.min(columns - 1, schemasToRender.length);
+        for (let i = 0; i < fieldCount; i++) {
+          const s = schemasToRender[i];
           items.push(
-            <Col key={colKey} span={colSpan} {...colProps}>
-              {renderField(schema, i)}
+            <Col key={Array.isArray(s.name) ? s.name[0] : s.name || i} span={baseSpan} {...colProps}>
+              {renderField(s, i)}
             </Col>,
           );
-          rowAcc += colSpan;
         }
-
-        // 添加按钮组
-        if (showButton && !isPreviewState) {
-          const usedInRow = rowAcc % 24;
-          const remaining = 24 - usedInRow;
-
-          if (remaining >= buttonSpan) {
-            // 当前行剩余空间足够
-            const spacer = remaining - buttonSpan;
-            if (spacer > 0) {
-              items.push(<Col key='__proform_spacer__' span={spacer} {...colProps} />);
-            }
-            items.push(
-              <Col key='__proform_buttons__' span={buttonSpan} {...colProps}>
-                {renderButtonsInline()}
-              </Col>,
-            );
-          } else {
-            // 当前行放不下，按钮放新行
-            items.push(
-              <Col key='__proform_buttons__' span={24} {...colProps}>
-                {renderButtonsInline()}
-              </Col>,
-            );
-          }
+        if (showButton && !isPreviewState)
+          items.push(
+            <Col key='__proform_buttons__' span={baseSpan} {...colProps}>
+              {renderButtonsInline()}
+            </Col>,
+          );
+        for (let i = fieldCount; i < schemasToRender.length; i++) {
+          const s = schemasToRender[i];
+          items.push(
+            <Col key={Array.isArray(s.name) ? s.name[0] : s.name || i} span={baseSpan} {...colProps}>
+              {renderField(s, i)}
+            </Col>,
+          );
         }
-
         return (
           <div style={{ width: '100%', overflow: 'hidden' }}>
             <Row gutter={gutter} {...rowProps}>
@@ -664,88 +515,222 @@ export const ProForm = forwardRef<ProFormInstance<Record<string, unknown>>, ProF
         );
       }
 
-      // 非 Grid 布局
+      const items: React.ReactNode[] = [];
+      let rowAcc = 0;
+      for (let i = 0; i < schemasToRender.length; i++) {
+        const s = schemasToRender[i];
+        const colSpan = s.col || baseSpan;
+        if (rowAcc + colSpan > 24) rowAcc = 0;
+        items.push(
+          <Col key={Array.isArray(s.name) ? s.name[0] : s.name || i} span={colSpan} {...colProps}>
+            {renderField(s, i)}
+          </Col>,
+        );
+        rowAcc += colSpan;
+      }
+      if (showButton && !isPreviewState) {
+        const usedInRow = rowAcc % 24;
+        const remaining = 24 - usedInRow;
+        if (remaining >= buttonSpan) {
+          const spacer = remaining - buttonSpan;
+          if (spacer > 0) items.push(<Col key='__proform_spacer__' span={spacer} {...colProps} />);
+          items.push(
+            <Col key='__proform_buttons__' span={buttonSpan} {...colProps}>
+              {renderButtonsInline()}
+            </Col>,
+          );
+        } else {
+          items.push(
+            <Col key='__proform_buttons__' span={24} {...colProps}>
+              {renderButtonsInline()}
+            </Col>,
+          );
+        }
+      }
       return (
-        <>
-          {schemas.map((schema, index) => renderField(schema, index))}
-          {showButton && !isPreviewState && (
-            <Form.Item wrapperCol={{ offset: labelCol?.span || 0 }}>{renderButtonsInline()}</Form.Item>
-          )}
-        </>
-      );
-    };
-
-    const finalLayout = layout === 'compact' ? 'inline' : layout;
-    const compactStyle = layout === 'compact' ? { gap: 8 } : undefined;
-
-    // 表单内容
-    const formContent = renderFields();
-
-    // 虚拟滚动容器包装
-    const FormContent = isVirtualScrollEnabled ? (
-      <div
-        ref={virtualContainerRef}
-        style={{
-          height: virtualScrollConfig?.containerHeight || 400,
-          overflow: 'auto',
-        }}
-      >
-        <div style={{ height: virtualState.totalHeight, position: 'relative' }}>
-          <div style={{ transform: `translateY(${virtualState.offsetY}px)` }}>{formContent}</div>
+        <div style={{ width: '100%', overflow: 'hidden' }}>
+          <Row gutter={gutter} {...rowProps}>
+            {items}
+          </Row>
         </div>
-      </div>
-    ) : (
-      formContent
-    );
-
-    const FormComponent = (
-      <Form
-        form={arcoForm}
-        layout={finalLayout}
-        labelCol={labelColProps || labelCol}
-        wrapperCol={wrapperColProps || wrapperCol}
-        colon={colon}
-        labelAlign={labelAlign}
-        size={size}
-        disabled={disabled}
-        initialValues={initialValues}
-        onSubmit={handleFinish}
-        onSubmitFailed={onFinishFailed}
-        onValuesChange={onValuesChange}
-        scrollToFirstError={scrollToFirstError}
-        validateTrigger={validateTrigger}
-        className={className}
-        style={{ ...style, ...compactStyle, width: '100%' }}
-        onKeyDown={fieldNavigation.handleKeyDown}
-      >
-        {FormContent}
-      </Form>
-    );
+      );
+    }
 
     return (
-      <RootContextProvider value={rootContextValue}>
-        <LayoutContextProvider value={layoutContextValue}>
-          {cardContainer
-            ? (() => {
-                const cardConfig = typeof cardContainer === 'object' ? cardContainer : {};
-                return (
-                  <Card
-                    title={cardConfig.title}
-                    extra={cardConfig.extra}
-                    bordered={cardConfig.bordered}
-                    style={cardConfig.style}
-                    className={cardConfig.className}
-                    bodyStyle={cardConfig.bodyStyle}
-                  >
-                    {FormComponent}
-                  </Card>
-                );
-              })()
-            : FormComponent}
-        </LayoutContextProvider>
-      </RootContextProvider>
+      <>
+        {schemas.map((schema, index) => renderField(schema, index))}
+        {showButton && !isPreviewState && (
+          <Form.Item wrapperCol={{ offset: labelCol?.span || 0 }}>{renderButtonsInline()}</Form.Item>
+        )}
+      </>
     );
-  },
-);
+  };
+
+  const finalLayout = layout === 'compact' ? 'inline' : layout;
+  const compactStyle = layout === 'compact' ? { gap: 8 } : undefined;
+  const formContent = renderFields();
+
+  const FormContent = isVirtualScrollEnabled ? (
+    <div ref={virtualContainerRef} style={{ height: virtualScrollConfig?.containerHeight || 400, overflow: 'auto' }}>
+      <div style={{ height: virtualState.totalHeight, position: 'relative' }}>
+        <div style={{ transform: `translateY(${virtualState.offsetY}px)` }}>{formContent}</div>
+      </div>
+    </div>
+  ) : (
+    formContent
+  );
+
+  const FormComponent = (
+    <Form
+      form={arcoForm}
+      layout={finalLayout}
+      labelCol={labelColProps || labelCol}
+      wrapperCol={wrapperColProps || wrapperCol}
+      colon={colon}
+      labelAlign={labelAlign}
+      size={size}
+      disabled={disabled}
+      initialValues={initialValues}
+      onSubmit={handleFinish}
+      onSubmitFailed={onFinishFailed}
+      onValuesChange={onValuesChange}
+      scrollToFirstError={scrollToFirstError}
+      validateTrigger={validateTrigger}
+      className={className}
+      style={{ ...style, ...compactStyle, width: '100%' }}
+      onKeyDown={fieldNavigation.handleKeyDown}
+    >
+      {FormContent}
+    </Form>
+  );
+
+  return (
+    <RootContextProvider value={rootContextValue}>
+      <LayoutContextProvider value={layoutContextValue}>
+        {cardContainer
+          ? (() => {
+              const cc = typeof cardContainer === 'object' ? cardContainer : {};
+              return (
+                <Card
+                  title={cc.title}
+                  extra={cc.extra}
+                  bordered={cc.bordered}
+                  style={cc.style}
+                  className={cc.className}
+                  bodyStyle={cc.bodyStyle}
+                >
+                  {FormComponent}
+                </Card>
+              );
+            })()
+          : FormComponent}
+      </LayoutContextProvider>
+    </RootContextProvider>
+  );
+};
+
+// ===== 受控模式：接收外部 form prop =====
+// eslint-disable-next-line react/display-name
+const ProFormControlled = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
+  const fullState = props.form as UseProFormReturn;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { form: _form, ...rest } = props;
+  const {
+    formStore,
+    arcoForm,
+    instance,
+    setComponentRef,
+    fieldNavigation,
+    virtualState,
+    virtualContainerRef,
+    isDraftState,
+    isPreviewState,
+    setIsDraftState,
+    setIsPreviewState,
+  } = fullState;
+
+  const Provider = useMemo(() => {
+    const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+      <ProFormContext.Provider value={{ formStore, instance, arcoForm }}>{children}</ProFormContext.Provider>
+    );
+    return P;
+  }, [formStore, instance, arcoForm]);
+
+  useImperativeHandle(ref, () => instance, [instance]);
+
+  return (
+    <Provider>
+      <ProFormRenderer
+        {...rest}
+        formStore={formStore}
+        arcoForm={arcoForm}
+        instance={instance}
+        setComponentRef={setComponentRef}
+        fieldNavigation={fieldNavigation}
+        virtualState={virtualState}
+        virtualContainerRef={virtualContainerRef}
+        isDraftState={isDraftState}
+        isPreviewState={isPreviewState}
+        setIsDraftState={setIsDraftState}
+        setIsPreviewState={setIsPreviewState}
+      />
+    </Provider>
+  );
+});
+
+// ===== 独立模式：内部创建一次 useProForm =====
+// eslint-disable-next-line react/display-name
+const ProFormStandalone = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
+  const fullState = useProForm(props);
+  const {
+    formStore,
+    arcoForm,
+    instance,
+    setComponentRef,
+    fieldNavigation,
+    virtualState,
+    virtualContainerRef,
+    isDraftState,
+    isPreviewState,
+    setIsDraftState,
+    setIsPreviewState,
+  } = fullState;
+
+  const Provider = useMemo(() => {
+    const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+      <ProFormContext.Provider value={{ formStore, instance, arcoForm }}>{children}</ProFormContext.Provider>
+    );
+    return P;
+  }, [formStore, instance, arcoForm]);
+
+  useImperativeHandle(ref, () => instance, [instance]);
+
+  return (
+    <Provider>
+      <ProFormRenderer
+        {...(props as ProFormProps)}
+        formStore={formStore}
+        arcoForm={arcoForm}
+        instance={instance}
+        setComponentRef={setComponentRef}
+        fieldNavigation={fieldNavigation}
+        virtualState={virtualState}
+        virtualContainerRef={virtualContainerRef}
+        isDraftState={isDraftState}
+        isPreviewState={isPreviewState}
+        setIsDraftState={setIsDraftState}
+        setIsPreviewState={setIsPreviewState}
+      />
+    </Provider>
+  );
+});
+
+// ===== 公开 API：调度层 =====
+export const ProForm = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
+  if (props.form) {
+    return <ProFormControlled {...props} ref={ref} />;
+  }
+  return <ProFormStandalone {...props} ref={ref} />;
+});
 
 ProForm.displayName = 'ProForm';

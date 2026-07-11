@@ -1,9 +1,9 @@
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { ColProps } from '@arco-design/web-react/lib/Grid';
 import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
 import { FormStore } from './core';
 import { ArcoFormInstance } from './hooks/useArcoForm';
-import { UseFieldNavigationReturn } from '@lania-pro-components/shared';
+import { UseFieldNavigationReturn, VirtualScrollState } from '@lania-pro-components/shared';
 
 /**
  * 验证规则类型
@@ -371,6 +371,14 @@ export interface DraftConfig {
  * ProForm 组件属性
  */
 export interface ProFormProps<TValues = Record<string, unknown>> {
+  /**
+   * 表单状态对象（由 useProForm 返回）。
+   *
+   * 传入后 ProForm 复用该状态，不再内部调用 useProForm 创建新实例。
+   * form.instance 是唯一的。
+   */
+  form?: UseProFormReturn<TValues>;
+
   /** 表单字段配置数组 */
   schemas?: Array<ProFormSchema<TValues>>;
   /** 表单布局模式 */
@@ -766,12 +774,12 @@ export interface UseProFormReturn<TValues = Record<string, unknown>> {
   options: UseProFormOptions<TValues>;
   bindingProps: ProFormProps<TValues>;
   formStore: FormStore;
-  /** Provider 组件，用于包裹子组件 */
-  Provider: React.FC<{ children: React.ReactNode }>;
   /** 键盘导航功能 */
   fieldNavigation: UseFieldNavigationReturn;
-  /** 注入 scrollToField 实现（内部使用，虚拟滚动时由 ProForm 组件调用） */
-  setScrollToFieldImpl: (fn: ((name: string) => void) | null) => void;
+  /** 虚拟滚动状态（ProForm 内部使用） */
+  virtualState: VirtualScrollState<ProFormSchema<TValues>>;
+  /** 虚拟滚动容器 ref（ProForm 内部使用） */
+  virtualContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export type GetComponentRefFn = <R = unknown>(name: string) => R | undefined;

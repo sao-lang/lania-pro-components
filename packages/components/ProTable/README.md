@@ -7,33 +7,13 @@ Schema 驱动的企业级表格组件，基于 DataStore + TableRenderer + Query
 ```tsx
 import { ProTable, useProTable } from '@lania-pro-components/components';
 
-// Schema 驱动
+// 方式 A：独立使用（简单场景）
 <ProTable
   columns={[
     { title: '姓名', dataIndex: 'name', valueType: 'text' },
     { title: '年龄', dataIndex: 'age', valueType: 'number' },
     { title: '状态', dataIndex: 'status', valueType: 'enum', valueEnum: { 1: { text: '启用' }, 0: { text: '禁用' } } },
     { title: '创建时间', dataIndex: 'createTime', valueType: 'dateTime' },
-    {
-      title: '操作',
-      valueType: 'opr',
-      oprTools: [
-        {
-          key: 'edit',
-          text: '编辑',
-          onClick: (record) => {
-            /* ... */
-          },
-        },
-        {
-          key: 'delete',
-          text: '删除',
-          onClick: (record) => {
-            /* ... */
-          },
-        },
-      ],
-    },
   ]}
   request={async (params) => {
     const res = await fetchList(params);
@@ -41,11 +21,20 @@ import { ProTable, useProTable } from '@lania-pro-components/components';
   }}
 />;
 
-// useProTable 编程式控制
-const { instance, bindingProps } = useProTable({ columns, request });
-<ProTable {...bindingProps} />;
-instance.reload();
-instance.clearSelection();
+// 方式 B：配合 useProTable（推荐，避免重复实例）
+const table = useProTable({
+  columns: [
+    { title: '姓名', dataIndex: 'name', valueType: 'text' },
+    { title: '操作', valueType: 'opr', oprTools: [{ key: 'edit', text: '编辑', onClick: (record) => {} }] },
+  ],
+  request: async (params) => {
+    const res = await fetchList(params);
+    return { data: res.list, total: res.total };
+  },
+});
+<ProTable table={table} />;
+table.instance.reload();
+table.instance.clearSelection();
 ```
 
 ---
