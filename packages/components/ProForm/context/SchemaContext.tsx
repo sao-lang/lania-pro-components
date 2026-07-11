@@ -15,18 +15,18 @@ import type { FieldBehavior, FieldReaction, FieldLifecycle, ReadonlyRenderConfig
 
 /**
  * SchemaContext 值类型
- * 字段静态配置，来自用户定义的 Schema
+ * 已解析的字段静态配置（函数模式的值已被解析为具体值），来自用户定义的 Schema
  */
 export interface SchemaContextValue {
   /** 字段名称 */
   name: string | string[];
-  /** 字段标签 */
+  /** 字段标签（已解析） */
   label?: string;
-  /** 使用的组件名称 */
+  /** 使用的组件名称（已解析） */
   component: string;
-  /** 组件属性 */
+  /** 组件属性（已解析） */
   componentProps?: Record<string, unknown>;
-  /** 验证规则 */
+  /** 验证规则（已解析） */
   rules?: ValidationRule[];
   /** 依赖的字段名列表 */
   dependencies?: string[];
@@ -38,28 +38,38 @@ export interface SchemaContextValue {
   lifecycle?: FieldLifecycle;
   /** 初始值 */
   initialValue?: unknown;
-  /** 标签提示信息 */
+  /** Grid 列数（已解析） */
+  col?: number;
+  /** 标签列配置（已解析） */
+  labelCol?: unknown;
+  /** 内容列配置（已解析） */
+  wrapperCol?: unknown;
+  /** 标签提示信息（已解析） */
   tooltip?: string;
-  /** 表单项额外提示信息 */
+  /** 表单项额外提示信息（已解析） */
   extra?: React.ReactNode;
-  /** 占位符文本 */
-  placeholder?: string;
-  /** 选项数据 */
+  /** 占位符文本（已解析） */
+  placeholder?: string | string[];
+  /** 选项数据（已解析） */
   options?: Array<{ label: string; value: unknown; [key: string]: unknown }>;
-  /** 日期/时间格式化字符串 */
+  /** 日期/时间格式化字符串（已解析） */
   format?: string;
-  /** 前缀文本 */
+  /** 日期值格式（已解析） */
+  valueFormat?: string;
+  /** 前缀文本（已解析） */
   prefix?: string;
-  /** 后缀文本 */
+  /** 后缀文本（已解析） */
   suffix?: string;
   /** 是否必填（支持函数形式实现条件必填） */
   required?: boolean | ((values: Record<string, unknown>) => boolean);
-  /** 只读/预览渲染模式 */
+  /** 只读/预览渲染模式（已解析） */
   readonlyMode?: ReadonlyRenderConfig['mode'];
-  /** 只读/预览渲染配置 */
+  /** 只读/预览渲染配置（已解析） */
   readonlyConfig?: ReadonlyRenderConfig;
-  /** 只读/预览时使用的渲染器名称 */
+  /** 只读/预览时使用的渲染器名称（已解析） */
   readonlyComponent?: string;
+  /** 必填项错误提示（已解析） */
+  requiredMessage?: string;
   /** 子字段配置 */
   children?: Omit<SchemaContextValue, 'children'>[];
   /** 原始 schema 配置 */

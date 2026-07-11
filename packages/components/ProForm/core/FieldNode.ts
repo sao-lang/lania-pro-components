@@ -14,9 +14,10 @@
  */
 
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI } from '../types';
+import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI, ResolvedSchema } from '../types';
 import { computed, watch, ref, type ComputedRef } from '@lania-pro-components/utils';
 import { executeRule, executeRules } from '@lania-pro-components/utils';
+import { resolveSchemaValue } from '../utils/resolveSchemaValue';
 
 /**
  * 计算行为值
@@ -61,10 +62,12 @@ export class FieldNode implements FieldNodeAPI {
   // 计算属性 - 自动追踪依赖
   private _computedBehavior: ComputedRef<ComputedFieldBehavior>;
   private _computedRequired: ComputedRef<boolean>;
+  private _resolvedSchema: ComputedRef<ResolvedSchema>;
 
   private store: FormStoreAPI;
   private onChangeCallbacks: Set<(value: unknown) => void> = new Set();
   private onStatusChangeCallbacks: Set<(status: FieldStatus, oldStatus: FieldStatus) => void> = new Set();
+  private onResolvedSchemaChangeCallbacks: Set<(resolved: ResolvedSchema) => void> = new Set();
   private valueWatchCleanup?: () => void;
 
   constructor(schema: ProFormSchema, store: FormStoreAPI) {
@@ -99,6 +102,41 @@ export class FieldNode implements FieldNodeAPI {
       const values = store.getValues();
       return typeof schema.required === 'function' ? schema.required(values) : (schema.required ?? false);
     });
+
+    // 已解析 Schema（自动解析所有函数模式字段，响应式追踪 form values 变化）
+    this._resolvedSchema = computed(() => {
+      const values = store.getValues();
+      return {
+        label: resolveSchemaValue(schema.label, values),
+        component: resolveSchemaValue(schema.component, values, 'Input')!,
+        componentProps: resolveSchemaValue(schema.componentProps as never, values),
+        requiredMessage: resolveSchemaValue(schema.requiredMessage as never, values),
+        rules: resolveSchemaValue(schema.rules as never, values),
+        col: resolveSchemaValue(schema.col as never, values),
+        labelCol: resolveSchemaValue(schema.labelCol as never, values),
+        wrapperCol: resolveSchemaValue(schema.wrapperCol as never, values),
+        tooltip: resolveSchemaValue(schema.tooltip as never, values),
+        extra: resolveSchemaValue(schema.extra as never, values),
+        placeholder: resolveSchemaValue(schema.placeholder as never, values),
+        options: resolveSchemaValue(schema.options as never, values),
+        format: resolveSchemaValue(schema.format as never, values),
+        valueFormat: resolveSchemaValue(schema.valueFormat as never, values),
+        prefix: resolveSchemaValue(schema.prefix as never, values),
+        suffix: resolveSchemaValue(schema.suffix as never, values),
+        readonlyMode: resolveSchemaValue(schema.readonlyMode as never, values),
+        readonlyConfig: resolveSchemaValue(schema.readonlyConfig as never, values),
+        readonlyComponent: resolveSchemaValue(schema.readonlyComponent as never, values),
+      } as ResolvedSchema;
+    });
+
+    // 监听已解析 Schema 变化，通知订阅者
+    watch(
+      () => this._resolvedSchema.value,
+      (newResolved, _oldResolved) => {
+        this.onResolvedSchemaChangeCallbacks.forEach((cb) => cb(newResolved));
+      },
+      { immediate: false },
+    );
 
     // 监听计算行为变化，自动更新状态
     watch(
@@ -179,6 +217,14 @@ export class FieldNode implements FieldNodeAPI {
    */
   get computedRequired(): boolean {
     return this._computedRequired.value;
+  }
+
+  /**
+   * 获取已解析的 Schema（响应式）
+   * 所有函数模式字段已被解析为具体值，随表单值变化自动更新
+   */
+  get resolvedSchema(): ResolvedSchema {
+    return this._resolvedSchema.value;
   }
 
   /**
@@ -285,6 +331,19 @@ export class FieldNode implements FieldNodeAPI {
   }
 
   /**
+   * 订阅已解析 Schema 变化
+   * 当任意表单字段值变化导致 resolvedSchema 重新计算时触发
+   */
+  subscribeToResolvedSchemaChange(callback: (resolved: ResolvedSchema) => void): () => void {
+    this.onResolvedSchemaChangeCallbacks.add(callback);
+    // 立即推送当前值
+    callback(this._resolvedSchema.value);
+    return () => {
+      this.onResolvedSchemaChangeCallbacks.delete(callback);
+    };
+  }
+
+  /**
    * 根据行为计算状态
    * 优先级: hidden > readonly > disabled > edit
    */
@@ -339,22 +398,25 @@ export class FieldNode implements FieldNodeAPI {
   async validate(): Promise<string | undefined> {
     if (this._status.value === 'hidden') return undefined;
 
+    const values = this.store.getValues();
+    const resolved = this._resolvedSchema.value;
     const displayName = Array.isArray(this.name) ? this.name[0] : this.name;
-    const label = (this.schema.label as string) || displayName;
+    const label = resolved.label || displayName;
     const { value } = this._value;
 
     // required 检查
     if (this._computedRequired.value) {
-      const error = await executeRule({ required: true, message: `${label} 不能为空` }, value, {}, label);
+      const requiredMsg = resolved.requiredMessage || `${label} 不能为空`;
+      const error = await executeRule({ required: true, message: requiredMsg }, value, values, label);
       if (error) {
         this.setError(error);
         return error;
       }
     }
 
-    // rules 数组
-    if (this.schema.rules && this.schema.rules.length > 0) {
-      const error = await executeRules(this.schema.rules, value, {}, label);
+    // rules 数组（已由 resolved schema 解析函数模式）
+    if (resolved.rules && resolved.rules.length > 0) {
+      const error = await executeRules(resolved.rules, value, values, label);
       if (error) {
         this.setError(error);
         return error;
@@ -377,6 +439,7 @@ export class FieldNode implements FieldNodeAPI {
     // 清理回调
     this.onChangeCallbacks.clear();
     this.onStatusChangeCallbacks.clear();
+    this.onResolvedSchemaChangeCallbacks.clear();
   }
 }
 

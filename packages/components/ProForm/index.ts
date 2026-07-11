@@ -49,11 +49,15 @@ export type {
   FormStatus,
   FieldStatus,
   ComputedFieldBehavior,
+  ResolvedSchema,
   ButtonConfig,
   ProFormPerformanceConfig,
   LazyLoadConfig,
   BatchUpdateConfig,
 } from './types';
+
+// 工具函数
+export { resolveSchemaValue, resolveSchemaFields } from './utils/resolveSchemaValue';
 
 // 核心组件
 export { ProForm } from './ProForm';

@@ -11,10 +11,15 @@ import {
 interface FieldNavigationOptions {
   schemas: Array<{
     name: string | string[];
-    keyboardNavigation?: {
-      onFocus?: (name: string) => void;
-      onBlur?: (name: string) => void;
-    };
+    keyboardNavigation?:
+      | {
+          onFocus?: (name: string) => void;
+          onBlur?: (name: string) => void;
+        }
+      | ((values: Record<string, unknown>) => {
+          onFocus?: (name: string) => void;
+          onBlur?: (name: string) => void;
+        });
   }>;
   getRef: (name: string) => unknown;
   keyboardNavigation?: KeyboardNavigationConfig;
@@ -64,17 +69,24 @@ export const useFieldNavigation = ({
   return useFieldNavigationShared({
     // field.setFocus/removeFocus 始终执行（默认行为），
     // schema.keyboardNavigation.onFocus ?? props.onFocus 择一执行（自定义行为）
-    items: schemas.map((schema) => ({
-      id: schema.name,
-      onFocus: (name: string) => {
-        formStore.getField(name)?.setFocus();
-        (schema.keyboardNavigation?.onFocus ?? onFocus)?.(name);
-      },
-      onBlur: (name: string) => {
-        formStore.getField(name)?.removeFocus();
-        (schema.keyboardNavigation?.onBlur ?? onBlur)?.(name);
-      },
-    })),
+    items: schemas.map((schema) => {
+      const values = formStore.getValues();
+      const resolvedKbNav =
+        typeof schema.keyboardNavigation === 'function'
+          ? schema.keyboardNavigation(values)
+          : schema.keyboardNavigation;
+      return {
+        id: schema.name,
+        onFocus: (name: string) => {
+          formStore.getField(name)?.setFocus();
+          (resolvedKbNav?.onFocus ?? onFocus)?.(name);
+        },
+        onBlur: (name: string) => {
+          formStore.getField(name)?.removeFocus();
+          (resolvedKbNav?.onBlur ?? onBlur)?.(name);
+        },
+      };
+    }),
     getElement,
     config: keyboardNavigation,
   });

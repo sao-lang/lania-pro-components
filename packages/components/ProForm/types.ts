@@ -242,49 +242,125 @@ export interface ReadonlyRenderConfig {
 }
 
 /**
+ * 函数模式辅助类型：静态值 T 或根据表单值动态计算的函数
+ */
+type SchemaFunctionValue<T, TValues = Record<string, unknown>> = T | ((values: TValues) => T);
+
+/**
  * ProForm Schema 定义
+ *
+ * 支持函数模式的字段（标注了 "支持函数模式"）可以传入静态值或函数，
+ * 函数接收当前所有表单字段的值，返回动态计算的结果，用于实现字段间联动。
  */
 export interface ProFormSchema<TValues = Record<string, unknown>> {
   /** 字段名称 */
   name: string | string[];
-  /** 字段标签 */
-  label?: string;
-  /** 组件类型 */
-  component?: string;
-  /** 组件属性 */
-  componentProps?: Record<string, unknown>;
+  /**
+   * 字段标签（支持函数模式）
+   * @example
+   * label: '用户名'
+   * label: (v) => v.type === 'edit' ? '编辑用户名' : '新增用户名'
+   */
+  label?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 组件类型（支持函数模式）
+   * @example
+   * component: 'Input'
+   * component: (v) => v.amount > 10000 ? 'InputNumber' : 'Input'
+   */
+  component?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 组件属性（支持函数模式）
+   * @example
+   * componentProps: { max: 100 }
+   * componentProps: (v) => ({ max: v.amount, disabled: v.readonly })
+   */
+  componentProps?: SchemaFunctionValue<Record<string, unknown>, TValues>;
   /** 是否必填（支持函数形式实现条件必填） */
   required?: boolean | ((values: Record<string, unknown>) => boolean);
-  /** 必填项错误提示 */
-  requiredMessage?: string;
-  /** 验证规则 */
-  rules?: ValidationRule[];
+  /**
+   * 必填项错误提示（支持函数模式）
+   * @example
+   * requiredMessage: '此项必填'
+   * requiredMessage: (v) => `请填写${v.type === 'edit' ? '修改' : '新增'}信息`
+   */
+  requiredMessage?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 验证规则（支持函数模式）
+   * @example
+   * rules: [{ required: true }]
+   * rules: (v) => v.withPhone ? [{ required: true, pattern: /^\d{11}$/ }] : []
+   */
+  rules?: SchemaFunctionValue<ValidationRule[], TValues>;
   /** 自定义验证函数 */
   validate?: (value: unknown, values: Record<string, unknown>) => string | undefined | Promise<string | undefined>;
   /** 初始值 */
   initialValue?: unknown;
-  /** 在 Grid 布局中占用的列数 */
-  col?: number;
-  /** 标签列配置 */
-  labelCol?: ColProps;
-  /** 内容列配置 */
-  wrapperCol?: ColProps;
-  /** 标签提示信息 */
-  tooltip?: string;
-  /** 表单项额外提示信息 */
-  extra?: ReactNode;
-  /** 占位符文本 */
-  placeholder?: string;
-  /** 选项数据 */
-  options?: Array<{ label: string; value: unknown; [key: string]: unknown }>;
-  /** 日期/时间格式化字符串 */
-  format?: string;
-  /** 日期值格式（提交时的格式） */
-  valueFormat?: string;
-  /** 前缀文本 */
-  prefix?: string;
-  /** 后缀文本 */
-  suffix?: string;
+  /**
+   * 在 Grid 布局中占用的列数（支持函数模式）
+   * @example
+   * col: 12
+   * col: (v) => v.expanded ? 24 : 12
+   */
+  col?: SchemaFunctionValue<number, TValues>;
+  /**
+   * 标签列配置（支持函数模式）
+   * @example
+   * labelCol: { span: 6 }
+   * labelCol: (v) => v.compact ? { span: 4 } : { span: 6 }
+   */
+  labelCol?: SchemaFunctionValue<ColProps, TValues>;
+  /**
+   * 内容列配置（支持函数模式）
+   */
+  wrapperCol?: SchemaFunctionValue<ColProps, TValues>;
+  /**
+   * 标签提示信息（支持函数模式）
+   * @example
+   * tooltip: '请输入用户名'
+   * tooltip: (v) => v.type === 'phone' ? '请输入11位手机号' : '请输入用户名'
+   */
+  tooltip?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 表单项额外提示信息（支持函数模式）
+   */
+  extra?: SchemaFunctionValue<ReactNode, TValues>;
+  /**
+   * 占位符文本（支持函数模式）
+   * @example
+   * placeholder: '请输入'
+   * placeholder: (v) => v.mode === 'search' ? '搜索关键词' : '请输入内容'
+   */
+  placeholder?: SchemaFunctionValue<string | string[], TValues>;
+  /**
+   * 选项数据（支持函数模式，实现级联选择）
+   * @example
+   * options: [{ label: 'A', value: 1 }]
+   * options: (v) => optionsMap[v.category] || []
+   */
+  options?: SchemaFunctionValue<Array<{ label: string; value: unknown; [key: string]: unknown }>, TValues>;
+  /**
+   * 日期/时间格式化字符串（支持函数模式）
+   */
+  format?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 日期值格式（提交时的格式，支持函数模式）
+   */
+  valueFormat?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 前缀文本（支持函数模式）
+   * @example
+   * prefix: '¥'
+   * prefix: (v) => v.currency === 'usd' ? '$' : '¥'
+   */
+  prefix?: SchemaFunctionValue<string, TValues>;
+  /**
+   * 后缀文本（支持函数模式）
+   * @example
+   * suffix: '元'
+   * suffix: (v) => v.unit === 'yuan' ? '元' : '美元'
+   */
+  suffix?: SchemaFunctionValue<string, TValues>;
   /** 值转换函数（接收整个表单值，可跨字段计算） */
   transform?: {
     input?: (values: Record<string, unknown>) => unknown;
@@ -298,23 +374,34 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   reactions?: FieldReaction[];
   /** 字段生命周期 */
   lifecycle?: FieldLifecycle;
-  /** 只读/预览渲染模式 */
-  readonlyMode?: ReadonlyRenderConfig['mode'];
-  /** 只读/预览渲染配置 */
-  readonlyConfig?: ReadonlyRenderConfig;
-  /** 只读/预览时使用的渲染器名称 */
-  readonlyComponent?: string;
+  /**
+   * 只读/预览渲染模式（支持函数模式）
+   */
+  readonlyMode?: SchemaFunctionValue<ReadonlyRenderConfig['mode'], TValues>;
+  /**
+   * 只读/预览渲染配置（支持函数模式）
+   */
+  readonlyConfig?: SchemaFunctionValue<ReadonlyRenderConfig, TValues>;
+  /**
+   * 只读/预览时使用的渲染器名称（支持函数模式）
+   */
+  readonlyComponent?: SchemaFunctionValue<string, TValues>;
   /** 子字段配置 */
   children?: Array<ProFormSchema<TValues>>;
   /** 字段值变化回调 */
   onFieldChange?: (value: unknown, allValues: TValues) => void;
-  /** 字段级键盘导航配置（覆盖全局 keyboardNavigation） */
-  keyboardNavigation?: KeyboardNavigationConfig & {
-    /** 字段级 focus 回调（优先于全局 onFieldFocus） */
-    onFocus?: (name: string) => void;
-    /** 字段级 blur 回调（优先于全局 onFieldBlur） */
-    onBlur?: (name: string) => void;
-  };
+  /**
+   * 字段级键盘导航配置（支持函数模式）
+   */
+  keyboardNavigation?: SchemaFunctionValue<
+    KeyboardNavigationConfig & {
+      /** 字段级 focus 回调（优先于全局 onFieldFocus） */
+      onFocus?: (name: string) => void;
+      /** 字段级 blur 回调（优先于全局 onFieldBlur） */
+      onBlur?: (name: string) => void;
+    },
+    TValues
+  >;
 }
 
 /**
@@ -467,8 +554,6 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
   className?: string;
   /** 自定义样式 */
   style?: React.CSSProperties;
-  /** 表单实例引用 */
-  formRef?: React.Ref<ProFormInstance<TValues>>;
   /** 验证失败时是否自动滚动到第一个错误字段 */
   scrollToFirstError?: boolean;
   /** 验证触发时机 */
@@ -530,11 +615,39 @@ export interface ComputedFieldBehavior {
 /**
  * FieldNode API（字段运行时实例接口）
  */
+/**
+ * 已解析的 Schema（函数模式字段被解析为具体值后的结果）
+ * 用于 FieldNode.resolvedSchema 的返回类型
+ */
+export interface ResolvedSchema {
+  label?: string;
+  component: string;
+  componentProps?: Record<string, unknown>;
+  requiredMessage?: string;
+  rules?: ValidationRule[];
+  col?: number;
+  labelCol?: ColProps;
+  wrapperCol?: ColProps;
+  tooltip?: string;
+  extra?: ReactNode;
+  placeholder?: string | string[];
+  options?: Array<{ label: string; value: unknown; [key: string]: unknown }>;
+  format?: string;
+  valueFormat?: string;
+  prefix?: string;
+  suffix?: string;
+  readonlyMode?: ReadonlyRenderConfig['mode'];
+  readonlyConfig?: ReadonlyRenderConfig;
+  readonlyComponent?: string;
+}
+
 export interface FieldNodeAPI {
   /** 字段名称 */
   name: string | string[];
-  /** 字段 Schema */
+  /** 字段 Schema（原始定义，可能包含函数） */
   schema: ProFormSchema;
+  /** 已解析的 Schema（所有函数模式字段已被解析为具体值，响应式） */
+  resolvedSchema: ResolvedSchema;
   /** 当前值 */
   value: unknown;
   /** 错误信息 */
@@ -565,6 +678,11 @@ export interface FieldNodeAPI {
   subscribeToValueChange: (callback: (value: unknown) => void) => () => void;
   /** 订阅状态变化 */
   subscribeToStatusChange: (callback: (status: FieldStatus, oldStatus: FieldStatus) => void) => () => void;
+  /**
+   * 订阅已解析 Schema 变化
+   * 当任意表单字段值变化导致 resolvedSchema 重新计算时触发
+   */
+  subscribeToResolvedSchemaChange: (callback: (resolved: ResolvedSchema) => void) => () => void;
   /** 验证字段 */
   validate: () => Promise<string | undefined>;
 }
@@ -764,6 +882,8 @@ export interface UseProFormOptions<TValues = Record<string, unknown>> extends Om
   initialValues?: Partial<TValues>;
   onValuesChange?: (changedValues: Partial<TValues>, allValues: TValues) => void;
   onFieldsChange?: (changedFields: unknown, allFields: unknown) => void;
+  /** Arco Form 实例引用 */
+  formRef?: React.Ref<unknown>;
 }
 
 /**

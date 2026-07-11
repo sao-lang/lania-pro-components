@@ -18,8 +18,7 @@ export const useDraft = (options: UseDraftOptions): UseDraftReturn => {
   const { formStore, ...rest } = options;
   const store: DraftStoreLike | null = formStore
     ? {
-        subscribeToValueChange: (callback: () => void) =>
-          formStore.subscribeToValueChange((_changedField, _value, _allValues) => callback()),
+        subscribeToValueChange: (callback: () => void) => formStore.subscribeToValueChange(() => callback()),
         getValues: formStore.getValues.bind(formStore),
       }
     : null;

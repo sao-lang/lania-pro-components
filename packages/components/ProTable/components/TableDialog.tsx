@@ -27,7 +27,7 @@ import { createRoot } from 'react-dom/client';
 import { Modal, Button } from '@arco-design/web-react';
 import { IconFullscreen, IconFullscreenExit } from '@arco-design/web-react/icon';
 import type { OpenDialogConfig, ConfirmDialogConfig, DialogReturnProps, ProTableActionType } from '../types';
-import { ProTable } from '../index';
+import { ProTable } from '../ProTable';
 
 /**
  * 弹窗容器引用

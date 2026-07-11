@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { Form } from '@arco-design/web-react';
-import type { ProFormSchema, FieldStatus, FieldNodeAPI } from '../types';
+import type { ProFormSchema, FieldStatus, FieldNodeAPI, ResolvedSchema } from '../types';
 import { getComponent, parseQuickComponent, getReadonlyRenderer, getRendererByMode } from '../registry';
 import {
   useRootContext,
@@ -70,9 +72,12 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return value;
   }, [isRangePickerArray, rangePickerNames, value, rootContext.instance]);
 
+  const [resolvedSchema, setResolvedSchema] = useState<ResolvedSchema>(fieldNode.resolvedSchema);
+
   useEffect(() => {
     setValueState(fieldNode.value);
     setStatusState(fieldNode.status);
+    setResolvedSchema(fieldNode.resolvedSchema);
 
     const unsubscribeValue = fieldNode.subscribeToValueChange((newValue) => {
       setValueState(newValue);
@@ -83,9 +88,14 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       setStatusState(newStatus);
     });
 
+    const unsubscribeResolved = fieldNode.subscribeToResolvedSchemaChange((resolved) => {
+      setResolvedSchema(resolved);
+    });
+
     return () => {
       unsubscribeValue();
       unsubscribeStatus();
+      unsubscribeResolved();
     };
   }, [fieldNode, arcoForm, fieldName]);
 
@@ -97,7 +107,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
 
   const handleChange = useCallback(
     (newValue: unknown, ...rest: unknown[]) => {
-      const { onChange: originalOnChange } = fieldNode.schema.componentProps || {};
+      const { onChange: originalOnChange } = resolvedSchema.componentProps || {};
       if (typeof originalOnChange === 'function') {
         (originalOnChange as (value: unknown, ...args: unknown[]) => void)(newValue, ...rest);
       }
@@ -123,13 +133,13 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         rootContext.onValuesChange?.({ [fieldName]: newValue }, rootContext.instance.getFieldsValue());
       }
     },
-    [fieldNode, arcoForm, rootContext, onFieldChange, isRangePickerArray, rangePickerNames, fieldName],
+    [fieldNode, arcoForm, rootContext, onFieldChange, isRangePickerArray, rangePickerNames, fieldName, resolvedSchema],
   );
 
   const fieldContextValue = useMemo(
     () => ({
       name: fieldName,
-      label: fieldNode.schema.label,
+      label: resolvedSchema.label,
       value,
       values: rootContext.instance.getFieldsValue(),
       status,
@@ -161,14 +171,14 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       },
       fieldNode,
     }),
-    [fieldNode, value, status, focused, error, rootContext, arcoForm, fieldName],
+    [fieldNode, value, status, focused, error, rootContext, arcoForm, fieldName, resolvedSchema.label],
   );
 
   if (status === 'hidden') {
     return null;
   }
 
-  const parsedQuickComponent = parseQuickComponent(fieldNode.schema.component || 'Input');
+  const parsedQuickComponent = parseQuickComponent(resolvedSchema.component);
 
   const displayValue = useMemo(() => {
     if (isRangePickerArray && rangePickerNames) {
@@ -185,16 +195,16 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
 
   const renderReadonlyContent = useMemo(() => {
     const readonlyComponentName =
-      fieldNode.schema.readonlyComponent ||
-      (parsedQuickComponent.type === 'normal' ? parsedQuickComponent.name : fieldNode.schema.component);
+      resolvedSchema.readonlyComponent ||
+      (parsedQuickComponent.type === 'normal' ? parsedQuickComponent.name : resolvedSchema.component);
 
     const readonlyConfig = {
-      mode: fieldNode.schema.readonlyMode,
-      format: fieldNode.schema.format,
+      mode: resolvedSchema.readonlyMode,
+      format: resolvedSchema.format,
       emptyText: '--',
-      prefix: parsedQuickComponent.type === 'prefix' ? parsedQuickComponent.prefix : fieldNode.schema.prefix,
-      suffix: parsedQuickComponent.type === 'unit' ? parsedQuickComponent.suffix : fieldNode.schema.suffix,
-      ...fieldNode.schema.readonlyConfig,
+      prefix: parsedQuickComponent.type === 'prefix' ? parsedQuickComponent.prefix : resolvedSchema.prefix,
+      suffix: parsedQuickComponent.type === 'unit' ? parsedQuickComponent.suffix : resolvedSchema.suffix,
+      ...resolvedSchema.readonlyConfig,
     };
 
     const renderer =
@@ -202,8 +212,8 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         ? getRendererByMode(readonlyConfig.mode)
         : getReadonlyRenderer(readonlyComponentName || 'Input');
 
-    return <>{renderer(displayValue, fieldNode.schema.options, readonlyConfig, fieldNode.schema.componentProps)}</>;
-  }, [fieldNode.schema, parsedQuickComponent, displayValue]);
+    return <>{renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps)}</>;
+  }, [resolvedSchema, parsedQuickComponent, displayValue]);
 
   const renderComponent = () => {
     if (status === 'preview' || status === 'readonly') {
@@ -228,15 +238,15 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     } else if (parsedQuickComponent.type === 'quick') {
       ComponentToRender = getComponent(parsedQuickComponent.name);
     } else {
-      ComponentToRender = getComponent(fieldNode.schema.component || 'Input');
+      ComponentToRender = getComponent(resolvedSchema.component);
     }
 
     if (!ComponentToRender) {
-      console.warn(`Component "${fieldNode.schema.component}" not found`);
+      console.warn(`Component "${resolvedSchema.component}" not found`);
       return null;
     }
 
-    const { style: userStyle, ...restComponentProps } = fieldNode.schema.componentProps || {};
+    const { style: userStyle, ...restComponentProps } = resolvedSchema.componentProps || {};
     const componentValue = getComponentValue();
 
     return (
@@ -246,8 +256,8 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
             componentRef.current = el;
           }
         }}
-        placeholder={fieldNode.schema.placeholder}
-        options={fieldNode.schema.options}
+        placeholder={resolvedSchema.placeholder}
+        options={resolvedSchema.options}
         disabled={status === 'disabled'}
         {...additionalProps}
         {...restComponentProps}
@@ -257,7 +267,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         onBlur={handleBlur}
         value={componentValue}
         name={fieldName}
-        label={fieldNode.schema.label}
+        label={resolvedSchema.label}
         focused={focused}
         error={error}
         required={fieldNode.computedRequired}
@@ -272,11 +282,11 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     if (fieldNode.computedRequired) {
       rules.push({
         required: true,
-        message: `请输入${fieldNode.schema.label || (Array.isArray(fieldNode.name) ? fieldNode.name.join('.') : fieldNode.name)}`,
+        message: `请输入${resolvedSchema.label || (Array.isArray(fieldNode.name) ? fieldNode.name.join('.') : fieldNode.name)}`,
       });
     }
     return rules;
-  }, [fieldNode.computedRequired, fieldNode.schema.label, fieldNode.name]);
+  }, [fieldNode.computedRequired, resolvedSchema.label, fieldNode.name]);
 
   const getValidateStatus = (): 'success' | 'warning' | 'error' | 'validating' | undefined => {
     if (error) {
@@ -310,13 +320,13 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       >
         <FormItem
           field={fieldName}
-          label={fieldNode.schema.label}
-          labelCol={fieldNode.schema.labelCol || layoutContext.labelCol}
-          wrapperCol={fieldNode.schema.wrapperCol || layoutContext.wrapperCol}
+          label={resolvedSchema.label}
+          labelCol={resolvedSchema.labelCol || layoutContext.labelCol}
+          wrapperCol={resolvedSchema.wrapperCol || layoutContext.wrapperCol}
           rules={finalRules}
           initialValue={fieldNode.schema.initialValue}
-          tooltip={fieldNode.schema.tooltip}
-          extra={fieldNode.schema.extra}
+          tooltip={resolvedSchema.tooltip}
+          extra={resolvedSchema.extra}
           validateStatus={getValidateStatus()}
           help={error}
         >
@@ -352,42 +362,49 @@ export const FormField: React.FC<FormFieldProps> = ({
     };
   }, [schema.name, formStore]);
 
+  const resolvedSchema = fieldNode.resolvedSchema;
+
   const schemaContextValue = useMemo(
     () => ({
       name: schema.name,
-      label: schema.label,
-      component: schema.component || 'Input',
-      componentProps: schema.componentProps,
-      rules: schema.rules,
+      label: resolvedSchema.label,
+      component: resolvedSchema.component,
+      componentProps: resolvedSchema.componentProps,
+      rules: resolvedSchema.rules,
       dependencies: schema.dependencies,
       behavior: schema.behavior,
       reactions: schema.reactions,
       lifecycle: schema.lifecycle,
       initialValue: schema.initialValue,
-      tooltip: schema.tooltip,
-      extra: schema.extra,
-      placeholder: schema.placeholder,
-      options: schema.options,
-      format: schema.format,
-      prefix: schema.prefix,
-      suffix: schema.suffix,
+      col: resolvedSchema.col,
+      labelCol: resolvedSchema.labelCol,
+      wrapperCol: resolvedSchema.wrapperCol,
+      tooltip: resolvedSchema.tooltip,
+      extra: resolvedSchema.extra,
+      placeholder: resolvedSchema.placeholder,
+      options: resolvedSchema.options,
+      format: resolvedSchema.format,
+      valueFormat: resolvedSchema.valueFormat,
+      prefix: resolvedSchema.prefix,
+      suffix: resolvedSchema.suffix,
       required: schema.required,
-      readonlyMode: schema.readonlyMode,
-      readonlyConfig: schema.readonlyConfig,
-      readonlyComponent: schema.readonlyComponent,
+      requiredMessage: resolvedSchema.requiredMessage,
+      readonlyMode: resolvedSchema.readonlyMode,
+      readonlyConfig: resolvedSchema.readonlyConfig,
+      readonlyComponent: resolvedSchema.readonlyComponent,
       rawSchema: schema,
     }),
-    [schema],
+    [schema, resolvedSchema],
   );
 
   const layoutContextValue = useMemo(
     () => ({
       ...layoutContext,
-      col: schema.col,
-      labelCol: schema.labelCol || layoutContext.labelCol,
-      wrapperCol: schema.wrapperCol || layoutContext.wrapperCol,
+      col: resolvedSchema.col ?? layoutContext.col,
+      labelCol: resolvedSchema.labelCol || layoutContext.labelCol,
+      wrapperCol: resolvedSchema.wrapperCol || layoutContext.wrapperCol,
     }),
-    [layoutContext, schema],
+    [layoutContext, resolvedSchema.col, resolvedSchema.labelCol, resolvedSchema.wrapperCol],
   );
 
   return (

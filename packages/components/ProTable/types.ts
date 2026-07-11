@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import type { TableProps, TableColumnProps, PaginationProps, ButtonProps } from '@arco-design/web-react';
 import type { ProFormSchema, ProFormInstance, ProFormProps } from '../ProForm/types';
-import type { ProTableInstance } from './hooks/useProTable';
 
 /**
  * 操作按钮配置
@@ -815,7 +814,7 @@ export interface ProTableActionType<T = Record<string, unknown>> {
   /** 清空选中 */
   clearSelected: () => void;
   /** 设置选中行 */
-  setSelectedRows: (rows: T[]) => void;
+  setSelectedRows: (keys: (string | number)[], rows: T[]) => void;
   /** 设置选中行 keys */
   setSelectedRowKeys: (keys: (string | number)[]) => void;
   /** 获取选中行 */
@@ -851,6 +850,15 @@ export interface ProTableActionType<T = Record<string, unknown>> {
    * @param params 请求参数
    */
   debouncedFetchData: (params?: Record<string, unknown>) => void;
+  /**
+   * 请求数据
+   * @param params 请求参数
+   */
+  fetchData: (params?: Record<string, unknown>) => void;
+  /** 获取当前展开的行 keys */
+  getExpandedRowKeys: () => (string | number)[];
+  /** 设置展开的行 keys */
+  setExpandedRowKeys: (keys: (string | number)[]) => void;
   /**
    * 打开弹窗
    * @param config 弹窗配置
@@ -989,7 +997,7 @@ export interface ProTableRowSelectionConfig<T = Record<string, unknown>> {
  */
 export interface ProTableInstance<T = Record<string, unknown>> {
   /** 表格操作 */
-  action: ProTableActionType;
+  action: ProTableActionType<T>;
   /** 表单实例 */
   form: ProFormInstance | undefined;
   /** 当前数据 */
@@ -1004,6 +1012,11 @@ export interface ProTableInstance<T = Record<string, unknown>> {
   pagination: { current: number; pageSize: number; total: number };
   /** 查询参数 */
   params: Record<string, unknown>;
+  /**
+   * 请求数据
+   * @param params 可选查询参数，传入后将合并到现有查询条件
+   */
+  fetchData: (params?: Record<string, unknown>) => void;
 }
 
 /**

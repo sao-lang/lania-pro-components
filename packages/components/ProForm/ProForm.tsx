@@ -18,7 +18,7 @@
  */
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions, FieldStatus } from './types';
+import type { ProFormProps, ProFormInstance, ProFormSchema, FieldStatus } from './types';
 import { useProForm, ProFormContext } from './useProForm';
 import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
@@ -31,6 +31,7 @@ import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-compone
 import type { DraftConfig } from './types';
 import type { ArcoFormInstance } from './hooks/useArcoForm';
 import type { FormStore } from './core/FormStore';
+import { createSchemaProcessor } from './utils/SchemaProcessor';
 
 const { Row, Col } = Grid;
 
@@ -98,7 +99,6 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     gutter = 16,
     className,
     style,
-    formRef,
     scrollToFirstError,
     validateTrigger,
     labelColProps,
@@ -145,7 +145,7 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
 
   const {
     containerRef: virtualContainerRef,
-    virtualState,
+    state: virtualState,
     scrollToIndex,
   } = useVirtualScroll(schemas, {
     itemHeight: props.performance?.virtualScroll?.itemHeight || 60,
@@ -228,79 +228,10 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     formStore,
   ]);
 
-  const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
-    const { autoLabel, autoPlaceholder, autoAllowClear, autoRules, autoDefaultValue, autoRangePickerName } = options;
-    const processed: ProFormSchema = { ...schema };
-    if (autoLabel && !processed.label) {
-      const name = Array.isArray(schema.name) ? schema.name.join('.') : schema.name;
-      processed.label = name.replace(/([A-Z])/g, ' $1').trim();
-    }
-    if (autoPlaceholder && !processed.placeholder) {
-      processed.placeholder = processed.label ? `请输入${processed.label}` : '请输入';
-    }
-    if (autoAllowClear && processed.componentProps) {
-      processed.componentProps = { ...processed.componentProps, allowClear: true };
-    } else if (autoAllowClear && !processed.componentProps) {
-      processed.componentProps = { allowClear: true };
-    }
-    if (autoRules && !processed.rules && processed.required) {
-      processed.rules = [{ required: true, message: `${processed.label || schema.name} 不能为空` }];
-    }
-    if (autoDefaultValue && processed.initialValue === undefined) {
-      const comp = processed.component || 'Input';
-      if (comp === 'Input' || comp === 'TextArea') processed.initialValue = '';
-      else if (comp === 'Select' || comp === 'Cascader') processed.initialValue = undefined;
-      else if (comp === 'Checkbox' || comp === 'Switch') processed.initialValue = false;
-      else if (comp === 'InputNumber') processed.initialValue = undefined;
-      else if (comp === 'DatePicker' || comp === 'TimePicker') processed.initialValue = undefined;
-    }
-    if (autoRangePickerName && processed.component?.toLowerCase().includes('rangepicker')) {
-      const baseName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
-      processed.name = [`${baseName}_start`, `${baseName}_end`];
-      (processed as ProFormSchema & { _rangePickerNames?: [string, string] })._rangePickerNames = [
-        `${baseName}_start`,
-        `${baseName}_end`,
-      ];
-    }
-    return processed;
-  }, []);
-
-  const processedSchemas = useMemo(() => {
-    if (!schemaProcessOptions || Object.keys(schemaProcessOptions).length === 0) return schemas;
-    return schemas.map((s) => processSchema(s, schemaProcessOptions));
-  }, [schemas, schemaProcessOptions, processSchema]);
-
   const mergedSchemas = useMemo(() => {
-    return processedSchemas.map((schema) => {
-      const merged: ProFormSchema = { ...schema };
-      const fieldName = Array.isArray(schema.name) ? schema.name[0] : schema.name;
-      if (merged.initialValue === undefined && initialValues && fieldName in initialValues) {
-        merged.initialValue = initialValues[fieldName as keyof typeof initialValues];
-      }
-      if (transform) {
-        if (!merged.transform) merged.transform = transform;
-        else
-          merged.transform = {
-            input: merged.transform.input ?? transform.input,
-            output: merged.transform.output ?? transform.output,
-          };
-      }
-      if (!merged.lifecycle && lifecycle) merged.lifecycle = lifecycle;
-      if (!merged.valueFormat && valueFormat) merged.valueFormat = valueFormat;
-      if (!merged.format && dateFormat) merged.format = dateFormat;
-      if (keyboardNavigation || schema.keyboardNavigation) {
-        merged.keyboardNavigation = { ...keyboardNavigation, ...schema.keyboardNavigation };
-      }
-      return merged;
-    });
-  }, [processedSchemas, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
-
-  // 同步 formRef
-  useEffect(() => {
-    if (formRef && typeof formRef === 'function') formRef(instance);
-    else if (formRef && typeof formRef === 'object' && formRef !== null)
-      (formRef as React.MutableRefObject<ProFormInstance>).current = instance;
-  }, [instance, formRef]);
+    if (!schemaProcessOptions || Object.keys(schemaProcessOptions).length === 0) return schemas;
+    return schemas.map((s) => createSchemaProcessor(schemaProcessOptions).processSchema(s, props));
+  }, [schemas, schemaProcessOptions, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
 
   // 同步 draft 状态
   useEffect(() => {
@@ -320,10 +251,10 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
 
   // 初始化表单值
   useEffect(() => {
-    if (initialValues && arcoForm && formStore) {
+    if (initialValues) {
       const timer = setTimeout(() => {
-        formStore.setValues(initialValues);
-        arcoForm.setFieldsValue(initialValues);
+        formStore?.setValues(initialValues);
+        arcoForm?.setFieldsValue(initialValues);
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -620,7 +551,8 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
       let rowAcc = 0;
       for (let i = 0; i < schemasToRender.length; i++) {
         const s = schemasToRender[i];
-        const colSpan = s.col || baseSpan;
+        const rawCol = s.col;
+        const colSpan = (typeof rawCol === 'function' ? rawCol(formStore.getValues()) : rawCol) ?? baseSpan;
         if (rowAcc + colSpan > 24) rowAcc = 0;
         items.push(
           <Col key={Array.isArray(s.name) ? s.name[0] : s.name || i} span={colSpan} {...colProps}>

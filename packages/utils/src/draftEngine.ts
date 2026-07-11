@@ -99,8 +99,9 @@ export const localStorageStrategy: DraftStorage = {
     } catch {
       try {
         localStorage.removeItem(key);
-      } catch {
+      } catch (e) {
         /* ignore */
+        console.error(e);
       }
       return null;
     }
@@ -109,7 +110,8 @@ export const localStorageStrategy: DraftStorage = {
   remove(key: string): void {
     try {
       localStorage.removeItem(key);
-    } catch {
+    } catch (e) {
+      console.error(e);
       /* ignore */
     }
   },

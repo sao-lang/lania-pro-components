@@ -7,6 +7,7 @@
 
 import type { FieldNodeAPI, FormStoreAPI, ValidationResult } from '../types';
 import { executeRule, executeRules } from '@lania-pro-components/utils';
+import { resolveSchemaValue } from '../utils/resolveSchemaValue';
 
 /**
  * 验证引擎
@@ -24,18 +25,20 @@ export class ValidationEngine {
   async validateField(field: FieldNodeAPI): Promise<string | undefined> {
     const { schema, value } = field;
     const values = this.formStore.getValues();
-    const label = schema.label as string | undefined;
+    const label = resolveSchemaValue(schema.label as never, values) as string | undefined;
 
     // 1. required 快捷检查（支持函数形式的条件必填）
     const resolvedRequired = typeof schema.required === 'function' ? schema.required(values) : schema.required;
     if (resolvedRequired) {
-      const error = await executeRule({ required: true, message: schema.requiredMessage }, value, values, label);
+      const requiredMessage = resolveSchemaValue<string>(schema.requiredMessage as never, values);
+      const error = await executeRule({ required: true, message: requiredMessage }, value, values, label);
       if (error) return error;
     }
 
-    // 2. rules 数组
-    if (schema.rules && schema.rules.length > 0) {
-      const error = await executeRules(schema.rules, value, values, label);
+    // 2. rules 数组（支持函数模式）
+    const resolvedRules = resolveSchemaValue<import('../types').ValidationRule[]>(schema.rules as never, values);
+    if (resolvedRules && resolvedRules.length > 0) {
+      const error = await executeRules(resolvedRules, value, values, label);
       if (error) return error;
     }
 

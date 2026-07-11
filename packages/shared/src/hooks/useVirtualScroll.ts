@@ -56,9 +56,7 @@ export interface VirtualScrollState<T = unknown> {
 export interface UseVirtualScrollReturn<T = unknown> {
   /** 容器 ref */
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** 虚拟滚动状态（ProForm 风格） */
-  virtualState: VirtualScrollState<T>;
-  /** 虚拟滚动状态（ProTable 风格，与 virtualState 同引用） */
+  /** 虚拟滚动状态 */
   state: VirtualScrollState<T>;
   /** React 合成事件 onScroll 回调 */
   onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
@@ -233,7 +231,6 @@ export function useVirtualScroll<T = unknown>(items: T[], config?: VirtualScroll
 
   return {
     containerRef,
-    virtualState,
     state: virtualState,
     onScroll,
     scrollToIndex,
@@ -435,7 +432,6 @@ export function useDynamicVirtualScroll<T = unknown>(
 
   return {
     containerRef,
-    virtualState,
     state: virtualState,
     onScroll,
     scrollToIndex,

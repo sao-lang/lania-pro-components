@@ -24,7 +24,8 @@ import { useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import type { DataStoreImpl } from '../store/DataStore';
 import { createDataStore } from '../store/DataStore';
 import type { EditableTableInstance } from '../editable/types';
-import type { ProTableProps, ProColumnType } from '../types';
+import type { ProTableProps, ProColumnType, ProTableInstance, ProTableActionType } from '../types';
+import type { ProFormInstance } from '../../ProForm/types';
 import { useRequest } from './useRequest';
 import { useEditableTable } from '../editable';
 import { useCache } from '@lania-pro-components/shared';
@@ -41,61 +42,6 @@ export const useProTableContext = <T extends Record<string, unknown> = Record<st
   const context = useContext(ProTableContext);
   return context as ProTableContextValue<T> | null;
 };
-
-/**
- * 表格实例 — useProTable 返回的唯一状态 + 操作接口。
- *
- * 状态直接以属性形式访问（如 instance.dataSource），
- * 操作方法直接调用（如 instance.reload()）。
- */
-export interface ProTableInstance<T = Record<string, unknown>> {
-  // === 状态（直接属性访问）===
-  dataSource: T[];
-  loading: boolean;
-  pagination: { current: number; pageSize: number; total: number };
-  selectedRowKeys: (string | number)[];
-  selectedRows: T[];
-  query: Record<string, unknown>;
-  error?: Error;
-  isPolling: boolean;
-  pollingInterval?: number;
-
-  // === 操作方法 ===
-  reload: () => Promise<void>;
-  refresh: () => Promise<void>;
-  reset: () => Promise<void>;
-  setPagination: (pagination: { current?: number; pageSize?: number }) => void;
-  setQueryParams: (params: Record<string, unknown>) => void;
-  getSorter: () => { field?: string; direction?: 'ascend' | 'descend' } | null;
-  clearSorter: () => void;
-  setSelectedRows: (keys: (string | number)[], rows: T[]) => void;
-  clearSelection: () => void;
-  setDataSource: (data: T[]) => void;
-  /** 执行数据请求（可用于手动触发） */
-  fetchData: () => Promise<void>;
-  /** 开始轮询 */
-  startPolling: () => void;
-  /** 停止轮询 */
-  stopPolling: () => void;
-  /** 开始编辑指定行 */
-  startEditable: (rowKey: string | number) => boolean;
-  /** 取消编辑指定行 */
-  cancelEditable: (rowKey: string | number) => Promise<boolean>;
-  /** 保存编辑行 */
-  saveEditable: (rowKey: string | number) => Promise<boolean>;
-  /** 删除编辑行 */
-  deleteEditable?: (rowKey: string | number) => Promise<boolean>;
-  /** 滚动到指定行（仅虚拟滚动开启时有效） */
-  scrollToIndex?: (index: number) => void;
-  /** 滚动到顶部 */
-  scrollToTop?: () => void;
-  /** 滚动到底部 */
-  scrollToBottom?: () => void;
-  expandAll: () => void;
-  collapseAll: () => void;
-  expandRow: (rowKey: string | number) => void;
-  collapseRow: (rowKey: string | number) => void;
-}
 
 export interface UseProTableOptions<T = Record<string, unknown>> {
   /** 表格 store */
@@ -183,6 +129,8 @@ export interface UseProTableReturn<T = Record<string, unknown>> {
   bindingProps: ProTableProps<T>;
   /** DataStore 实例（供 ProTable 内部 Context 使用） */
   store: DataStoreImpl<T>;
+  /** 设置 Form 实例（由 ProTable 内部调用，填充 instance.form 和 action.getFormInstance） */
+  setFormInstance: (form: ProFormInstance | undefined) => void;
 }
 
 /**
@@ -194,8 +142,6 @@ export const useProTable = <T extends Record<string, unknown>>(
 ): UseProTableReturn<T> => {
   const {
     store: propStore,
-    expandedRowKeys,
-    setExpandedRowKeys,
     getRowKey: propGetRowKey,
     dataSource: propDataSource,
     columns,
@@ -222,20 +168,11 @@ export const useProTable = <T extends Record<string, unknown>>(
     debounceTime,
     polling,
     manual,
-    dragSort: _dragOpt,
-    virtualScroll: _virtOpt,
-    virtualScrollConfig: _virtCfg,
     cache,
     cacheKey,
-    viewMode: _viewMode,
-    onViewModeChange: _onViewChange,
+    expandedRowKeys,
+    setExpandedRowKeys,
   } = options;
-
-  void _dragOpt;
-  void _virtOpt;
-  void _virtCfg;
-  void _viewMode;
-  void _onViewChange;
 
   const defaultStoreRef = useRef<DataStoreImpl<T>>(createDataStore<T>());
   const store = propStore ?? defaultStoreRef.current;
@@ -258,7 +195,8 @@ export const useProTable = <T extends Record<string, unknown>>(
   });
 
   // ===== useRequest（数据请求）=====
-  const { fetchData, startPolling, stopPolling } = useRequest<T>({
+  // fetchData 通过 store.onReload(fetchData) 内部注册，外部调 store.reload() 就会触发
+  const { startPolling, stopPolling } = useRequest<T>({
     store,
     request: request as import('../types').ProTableRequest<T>,
     manual,
@@ -284,120 +222,176 @@ export const useProTable = <T extends Record<string, unknown>>(
   const dataSource = propDataSource !== undefined ? propDataSource : store.dataSource;
   const loading = propLoading !== undefined ? propLoading : store.loading;
 
-  // ===== 方法定义 =====
-  const reload = useCallback(async () => {
-    store.reload();
-  }, [store]);
+  // ===== Form 实例引用（由 ProTable 内部设置）=====
+  const formInstanceRef = useRef<ProFormInstance | undefined>(undefined);
 
-  const refresh = useCallback(async () => {
-    store.reload();
-  }, [store]);
+  // ===== 展开行 keys（由外部受控或内部管理）=====
+  const expandedRowKeysRef = useRef<(string | number)[]>(expandedRowKeys ?? []);
 
-  const reset = useCallback(async () => {
-    store.reset();
-    store.reload();
-  }, [store]);
-
-  const setPagination = useCallback(
-    (pagination: { current?: number; pageSize?: number }) => {
-      if (pagination.current !== undefined) store.setPage(pagination.current);
-      if (pagination.pageSize !== undefined) store.setPageSize(pagination.pageSize);
-    },
-    [store],
-  );
-
-  const setQueryParams = useCallback((params: Record<string, unknown>) => store.setQuery(params), [store]);
-
-  const getSorter = useCallback(
-    () => (store.sorter.field ? { field: store.sorter.field, direction: store.sorter.order } : null),
-    [store.sorter],
-  );
-
-  const clearSorter = useCallback(() => store.setSorter(undefined, undefined), [store]);
-
-  const setSelectedRowsCallback = useCallback(
-    (keys: (string | number)[], rows: T[]) => store.setSelectedRows(keys, rows),
-    [store],
-  );
-
-  const clearSelection = useCallback(() => store.clearSelected(), [store]);
-
-  const setDataSource = useCallback(
-    (data: T[]) => {
-      store.setDataSource(data);
-      store.setTotal(data.length);
-    },
-    [store],
-  );
-
-  const expandAll = useCallback(() => {
-    if (setExpandedRowKeys) {
-      setExpandedRowKeys(dataSource.map((r) => getRowKey(r)));
-    }
-  }, [dataSource, getRowKey, setExpandedRowKeys]);
-
-  const collapseAll = useCallback(() => {
-    setExpandedRowKeys?.([]);
-  }, [setExpandedRowKeys]);
-
-  const expandRow = useCallback(
-    (key: string | number) => {
-      if (setExpandedRowKeys && expandedRowKeys && !expandedRowKeys.includes(key)) {
-        setExpandedRowKeys([...expandedRowKeys, key]);
+  // ===== 请求数据底层函数（fetchData / debouncedFetchData 共用）=====
+  const requestDataFn = useCallback(
+    (params?: Record<string, unknown>) => {
+      if (params) {
+        const { pageSize, current, ...queryParams } = params;
+        // 分离分页参数：pageSize/current 设置到分页，其余合并到查询条件
+        if (pageSize !== undefined) {
+          store.setPageSize(pageSize as number);
+        }
+        if (current !== undefined) {
+          store.setPage(current as number);
+        } else {
+          // 传入其他查询参数时默认重置到第 1 页
+          store.setPage(1);
+        }
+        store.setQuery({ ...store.query, ...queryParams });
       }
+      store.reload();
     },
-    [expandedRowKeys, setExpandedRowKeys],
+    [store],
   );
 
-  const collapseRow = useCallback(
-    (key: string | number) => {
-      if (setExpandedRowKeys && expandedRowKeys) {
-        setExpandedRowKeys(expandedRowKeys.filter((k) => k !== key));
-      }
+  // ===== 防抖函数（用于 debouncedFetchData）=====
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const debouncedFetchDataFn = useCallback(
+    (params?: Record<string, unknown>) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => requestDataFn(params), 300);
     },
-    [expandedRowKeys, setExpandedRowKeys],
+    [requestDataFn],
   );
 
-  // ===== 构建 instance =====
-  const instance: ProTableInstance<T> = {
-    // 状态
-    dataSource,
-    loading,
-    pagination: {
-      current: store.pagination.current,
-      pageSize: store.pagination.pageSize,
-      total: store.total,
-    },
-    selectedRowKeys: store.selectedRowKeys,
-    selectedRows: store.selectedRows,
-    query: store.query,
-    error: store.error,
-    isPolling: store.isPolling,
-    pollingInterval: store.pollingInterval,
+  // ===== 构建 action（严格对齐 ProTableActionType）=====
+  const action = useMemo<ProTableActionType<T>>(
+    () => ({
+      // --- 数据操作 ---
+      reload: (resetPageIndex?: boolean) => {
+        if (resetPageIndex) store.setPage(1);
+        store.reload();
+      },
+      fetchData: (params?: Record<string, unknown>) => requestDataFn(params),
+      reloadAndRest: () => {
+        store.reset();
+        store.clearSelected();
+        store.reload();
+      },
+      reset: () => {
+        store.reset();
+        store.reload();
+      },
 
-    // 操作
-    reload,
-    refresh,
-    reset,
-    setPagination,
-    setQueryParams,
-    getSorter,
-    clearSorter,
-    setSelectedRows: setSelectedRowsCallback,
-    clearSelection,
-    setDataSource,
-    fetchData,
-    startPolling,
-    stopPolling,
-    startEditable,
-    cancelEditable,
-    saveEditable,
-    deleteEditable,
-    expandAll,
-    collapseAll,
-    expandRow,
-    collapseRow,
-  };
+      // --- 选中操作 ---
+      clearSelected: () => store.clearSelected(),
+      setSelectedRows: (keys, rows) => store.setSelectedRows(keys, rows),
+      setSelectedRowKeys: (keys) => store.setSelectedRows(keys, store.selectedRows),
+      getSelectedRows: () => store.selectedRows,
+      getSelectedRowKeys: () => store.selectedRowKeys,
+
+      // --- 分页操作 ---
+      getPagination: () => ({
+        current: store.pagination.current,
+        pageSize: store.pagination.pageSize,
+        total: store.total,
+      }),
+      setPagination: (p) => {
+        if (p.current !== undefined) store.setPage(p.current);
+        if (p.pageSize !== undefined) store.setPageSize(p.pageSize);
+      },
+
+      // --- 查询参数 ---
+      getParams: () => store.query,
+      setParams: (params) => store.setQuery(params),
+
+      // --- 表单实例 ---
+      getFormInstance: () => formInstanceRef.current,
+
+      // --- 展开行 ---
+      getExpandedRowKeys: () => expandedRowKeysRef.current,
+      setExpandedRowKeys: (keys) => {
+        expandedRowKeysRef.current = keys;
+        setExpandedRowKeys?.(keys);
+      },
+
+      // --- 可编辑表格 ---
+      startEditable,
+      cancelEditable,
+      saveEditable,
+      deleteEditable,
+
+      // --- 轮询 ---
+      startPolling,
+      stopPolling,
+      getPollingStatus: () => ({
+        isPolling: store.isPolling,
+        interval: store.pollingInterval,
+      }),
+
+      // --- 防抖请求 ---
+      debouncedFetchData: (params) => debouncedFetchDataFn(params),
+
+      // --- 弹窗（需与 ProDialog 集成）---
+      openDialog: () => {
+        throw new Error('openDialog is not implemented. Use ProTable with dialog integration.');
+      },
+      confirm: () => {
+        throw new Error('confirm is not implemented. Use ProTable with dialog integration.');
+      },
+
+      // --- 可选：虚拟滚动 / 拖拽排序 / 缓存 ---
+      scrollToIndex: undefined,
+      scrollToTop: undefined,
+      scrollToBottom: undefined,
+      resetDragSort: undefined,
+      clearCache: undefined,
+    }),
+    [
+      store,
+      requestDataFn,
+      startEditable,
+      cancelEditable,
+      saveEditable,
+      deleteEditable,
+      startPolling,
+      stopPolling,
+      debouncedFetchDataFn,
+    ],
+  );
+
+  // ===== 构建 instance（严格对齐 ProTableInstance，用 useMemo 稳定引用）=====
+  const instance = useMemo<ProTableInstance<T>>(
+    () => ({
+      action,
+      form: formInstanceRef.current,
+      dataSource,
+      loading,
+      selectedRows: store.selectedRows,
+      selectedRowKeys: store.selectedRowKeys,
+      pagination: {
+        current: store.pagination.current,
+        pageSize: store.pagination.pageSize,
+        total: store.total,
+      },
+      params: store.query,
+      fetchData: (params?: Record<string, unknown>) => requestDataFn(params),
+    }),
+    [
+      action,
+      formInstanceRef.current,
+      dataSource,
+      loading,
+      store.selectedRows,
+      store.selectedRowKeys,
+      store.pagination.current,
+      store.pagination.pageSize,
+      store.total,
+      store.query,
+      requestDataFn,
+    ],
+  );
+
+  // ===== 暴露 formRef 设置接口供 ProTable 内部使用 =====
+  const setFormInstance = useCallback((form: ProFormInstance | undefined) => {
+    formInstanceRef.current = form;
+  }, []);
 
   // ===== bindingProps =====
   const bindingProps = useMemo<ProTableProps<T>>(
@@ -467,7 +461,7 @@ export const useProTable = <T extends Record<string, unknown>>(
     ],
   );
 
-  return { instance, bindingProps, store };
+  return { instance, bindingProps, store, setFormInstance };
 };
 
 export default useProTable;

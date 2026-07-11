@@ -116,6 +116,9 @@ export function useLazyField(config: LazyFieldConfig = {}): {
     }
 
     if (delay > 0) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       timeoutRef.current = setTimeout(() => {
         load();
       }, delay);
@@ -223,7 +226,9 @@ export function useGroupLazyLoad(
     }
 
     const nextCount = Math.min(loadedCount + groupSize, totalCount);
-
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
     timeoutRef.current = setTimeout(() => {
       setLoadedCount(nextCount);
       if (nextCount >= totalCount) {
