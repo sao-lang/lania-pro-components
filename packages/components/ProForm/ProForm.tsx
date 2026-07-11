@@ -18,7 +18,7 @@
  */
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions } from './types';
+import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions, FieldStatus } from './types';
 import { useProForm, ProFormContext } from './useProForm';
 import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
@@ -177,7 +177,54 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     (instance as unknown as Record<string, unknown>).getFocusedField = () => fieldNavigation.focusedField;
     instance.scrollToField = scrollToField;
     instance.getRef = getRef as ProFormInstance['getRef'];
-  }, [instance, fieldNavigation, scrollToField, getRef]);
+
+    instance.isDraft = () => isDraftState;
+    instance.setDraft = (v: boolean) => {
+      setIsDraftState(v);
+      onDraftChange?.(v);
+    };
+    instance.isPreview = () => isPreviewState;
+    instance.setPreview = (v: boolean) => {
+      setIsPreviewState(v);
+      onPreviewChange?.(v);
+    };
+
+    instance.getFieldStatus = (name: string) => {
+      const field = formStore.getField(name);
+      return field?.status || 'edit';
+    };
+    instance.setFieldStatus = (name: string, status: FieldStatus) => {
+      const field = formStore.getField(name);
+      if (field) {
+        field.setStatus(status);
+      }
+    };
+    instance.getFieldStatusMap = () => {
+      const map: Record<string, FieldStatus> = {};
+      formStore.getAllFields().forEach((field, name) => {
+        map[name] = field.status;
+      });
+      return map;
+    };
+    instance.setFieldStatusMap = (statusMap) => {
+      Object.entries(statusMap).forEach(([name, status]) => {
+        const field = formStore.getField(name);
+        if (field) {
+          field.setStatus(status);
+        }
+      });
+    };
+  }, [
+    instance,
+    fieldNavigation,
+    scrollToField,
+    getRef,
+    isDraftState,
+    isPreviewState,
+    onDraftChange,
+    onPreviewChange,
+    formStore,
+  ]);
 
   const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
     const { autoLabel, autoPlaceholder, autoAllowClear, autoRules, autoDefaultValue, autoRangePickerName } = options;

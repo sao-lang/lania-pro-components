@@ -56,7 +56,7 @@ export const ProFormList: FC<ProFormListProps> = ({
   cardProps,
 }) => {
   const { onValuesChange, arcoForm } = useRootContext();
-  const { formStore: store } = useProFormContext();
+  const { store } = useProFormContext();
 
   const listValue = useMemo(() => {
     const value = store?.getValue(name);

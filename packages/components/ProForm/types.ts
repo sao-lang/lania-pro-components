@@ -650,7 +650,7 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   /** 获取全部字段状态 */
   getFieldStatusMap: () => Record<string, FieldStatus>;
   /** 批量设置字段状态 */
-  setFieldStatusMap: () => Record<string, FieldStatus>;
+  setFieldStatusMap: (statusMap: Record<string, FieldStatus>) => void;
   /** 判断是否为草稿模式 */
   isDraft: () => boolean;
   /** 设置草稿模式 */

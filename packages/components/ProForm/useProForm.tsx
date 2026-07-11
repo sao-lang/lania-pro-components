@@ -1,12 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import type {
-  ProFormInstance,
-  ProFormSchema,
-  FieldStatus,
-  ProFormProps,
-  UseProFormOptions,
-  UseProFormReturn,
-} from './types';
+import type { ProFormInstance, ProFormSchema, ProFormProps, UseProFormOptions, UseProFormReturn } from './types';
 import { createFormStore } from './core/FormStore';
 import { useArcoForm } from './hooks/useArcoForm';
 import { createProProvider } from '@lania-pro-components/shared';
@@ -38,7 +31,6 @@ const noop = () => {};
 function useFormStore() {
   const formStore = useMemo(() => createFormStore(), []);
   const arcoForm = useArcoForm(formStore);
-
   const validate = useCallback(async (): Promise<Record<string, unknown>> => {
     const errors = await formStore.validateAllFields();
     const errorFields: Record<string, { error?: { message?: string } }> = {};
@@ -250,10 +242,6 @@ export const useProForm = <TValues = Record<string, unknown>,>(
 
   const { formStore, arcoForm, baseInstance } = useFormStore();
 
-  const [fieldStatusMap, setFieldStatusMap] = useState<Record<string, FieldStatus>>({});
-  const [isDraftState, setIsDraftState] = useState(draft || false);
-  const [isPreviewState, setIsPreviewState] = useState(preview || false);
-
   const getRef = useCallback(() => undefined, []);
 
   const setSchemas = useCallback((newSchemas: ProFormSchema<TValues>[]) => {
@@ -281,19 +269,17 @@ export const useProForm = <TValues = Record<string, unknown>,>(
         focusPrevField: noop,
         getFocusedField: () => undefined,
         scrollToField: noop,
-        getFieldStatus: (name: string): FieldStatus => fieldStatusMap[name] || 'edit',
-        setFieldStatus: (name: string, status: FieldStatus) => {
-          setFieldStatusMap((prev) => ({ ...prev, [name]: status }));
-        },
-        isDraft: () => isDraftState,
-        setDraft: (v: boolean) => setIsDraftState(v),
-        isPreview: () => isPreviewState,
-        setPreview: (v: boolean) => setIsPreviewState(v),
+        getFieldStatus: () => 'edit',
+        setFieldStatus: noop,
+        isDraft: () => false,
+        setDraft: noop,
+        isPreview: () => false,
+        setPreview: noop,
         getFieldFocused: (name: string): boolean => formStore.getField(name)?.focused || false,
-        getFieldStatusMap: () => fieldStatusMap,
-        setFieldStatusMap: setFieldStatusMap as ProFormInstance['setFieldStatusMap'],
+        getFieldStatusMap: () => ({}),
+        setFieldStatusMap: noop as ProFormInstance['setFieldStatusMap'],
       }) as ProFormInstance<TValues>,
-    [baseInstance, setSchemas, setProps, getRef, fieldStatusMap, isDraftState, isPreviewState, formStore],
+    [baseInstance, setSchemas, setProps, getRef, formStore],
   );
 
   /** 组合 bindingProps */
@@ -308,8 +294,8 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       size,
       disabled,
       readonly,
-      draft: isDraftState,
-      preview: isPreviewState,
+      draft,
+      preview,
       initialValues,
       onFinish,
       onFinishFailed,
@@ -361,8 +347,8 @@ export const useProForm = <TValues = Record<string, unknown>,>(
       size,
       disabled,
       readonly,
-      isDraftState,
-      isPreviewState,
+      draft,
+      preview,
       initialValues,
       onFinish,
       onFinishFailed,
