@@ -45,7 +45,7 @@ ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 │  用户定义：有什么字段、用什么组件、行为规则、联动规则                    │
 │                                                                         │
 │  ProFormSchema  { name, component, behavior, reactions, ... }            │
-│  FieldBehavior  { visible, disabled, readonly }                         │
+│  BehaviorDecl   FieldStatus \| ((values) => FieldStatus) \| undefined    │
 │  FieldReaction  { dependencies, run }                                   │
 │  ProFormProps   { schemas, transform, lifecycle, validateMessages, ... } │
 │                                                                         │
@@ -56,7 +56,7 @@ ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 │  FieldNode     单字段运行时：值/状态/错误/行为计算/校验                 │
 │                                                                         │
 │  核心机制：基于 computed() 自动追踪依赖                                 │
-│  behavior 函数以 values 为输入 → computed → watch → setStatus           │
+│  behavior 声明或函数 → 合并表单级约束 → _effectiveStatus → setStatus    │
 │                                                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  第3层: 表单组件 UI 层 — React 渲染                                     │
@@ -69,31 +69,53 @@ ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 行为→状态→渲染 管道
+### 1.2 behavior → effectiveStatus → 渲染 管道
 
 这是 ProForm 最核心的数据流：
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Step 1: Schema 声明行为 (声明式)                                       │
+│  Step 1: Schema 声明行为意图 (声明式)                                   │
 │                                                                         │
-│  { behavior: { visible: (v) => v.type === 'company',                    │
-│                disabled: (v) => v.status === 'approved',                │
-│                readonly: (v) => v.role !== 'admin' } }                  │
-│  { required: (v) => v.type === 'personal' }    ← schema 顶层            │
+│  // behavior 直接声明期望的最终状态，可以是静态值或函数                  │
+│  { behavior: 'readonly' }                                               │
+│  { behavior: (v) => v.status === 'done' ? 'readonly' : 'edit' }        │
+│  { behavior: 'hidden' }          ← 绝对隐藏，不受表单级覆盖             │
+│                                                                         │
+│  // 表单级约束（优先级高于字段级）                                      │
+│  <ProForm preview readonly disabled />                                  │
+│                                                                         │
+│  // 合并规则:                                                           │
+│  //   字段声明 hidden → hidden（绝对隐藏）                              │
+│  //   表单级 preview  → readonly                                        │
+│  //   表单级 readonly → readonly                                        │
+│  //   表单级 disabled → disabled                                        │
+│  //   字段自身声明    → 字段声明的值                                     │
+│  //   兜底            → edit                                            │
 └─────────────────────────────────────────────────────────────────────────┘
                             ↓ FieldNode 构造时创建 computed()
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Step 2: FieldNode 解析行为 → 计算状态 (响应式)                         │
+│  Step 2: FieldNode 计算有效状态 _effectiveStatus (响应式)               │
 │                                                                         │
-│  _computedBehavior = computed(() => {                                   │
-│    const values = store.getValues();   ← 自动追踪所有字段值              │
-│    return {                                                             │
-│      visible: computeBehaviorValue(behavior.visible, values, true),     │
-│      disabled: computeBehaviorValue(behavior.disabled, values, false),  │
-│      readonly: computeBehaviorValue(behavior.readonly, values, false),  │
-│    };                                                                   │
+│  _effectiveStatus = computed<FieldStatus>(() => {                       │
+│    const values = store.getValues();          ← 自动追踪字段值          │
+│    const form = store.getFormConstraints();   ← 自动追踪表单级约束      │
+│                                                                         │
+│    let fieldWanted: FieldStatus | undefined;                            │
+│    const behavior = schema.behavior as BehaviorDecl;                    │
+│    if (behavior === undefined) fieldWanted = undefined;                 │
+│    else if (typeof behavior === 'function') fieldWanted = behavior(v);  │
+│    else fieldWanted = behavior;                                         │
+│                                                                         │
+│    // 合并                                                              │
+│    if (fieldWanted === 'hidden') return 'hidden';                       │
+│    if (form.preview)  return 'readonly';                                │
+│    if (form.readonly) return 'readonly';                                │
+│    if (form.disabled) return 'disabled';                                │
+│    return fieldWanted ?? 'edit';                                        │
 │  });                                                                    │
+│                                                                         │
+│  // watch(_effectiveStatus) → setStatus() 自动同步                      │
 │                                                                         │
 │  _computedRequired = computed(() => {                                   │
 │    const values = store.getValues();                                    │
@@ -102,18 +124,18 @@ ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 │      : schema.required ?? false;                                        │
 │  });                                                                    │
 └─────────────────────────────────────────────────────────────────────────┘
-                            ↓ watch(computedBehavior.value) 触发
+                            ↓ watch(_effectiveStatus.value) 自动同步
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Step 3: updateStatusFromBehavior() — 行为 → 状态转换                   │
+│  Step 3: setStatus() — 同步到 _status（响应式）                          │
 │                                                                         │
-│  const { visible, disabled, readonly } = this._computedBehavior.value;  │
+│  _effectiveStatus 变化 → watch 触发 → this.setStatus(newStatus)         │
+│    → onStatusChangeCallbacks → FormField 重渲染                         │
 │                                                                         │
-│  if (!visible)      → setStatus('hidden')     — 不可见，return null     │
-│  else if (readonly) → setStatus('readonly')   — 只读渲染器              │
-│  else if (disabled) → setStatus('disabled')   — 禁用但可见              │
-│  else               → setStatus('edit')       — 正常编辑态              │
-│                                                                         │
-│  优先级: hidden > readonly > disabled > edit                            │
+│  有效状态映射：                                                          │
+│  'hidden'   — 不可见，return null                                       │
+│  'readonly' — 只读渲染器                                                │
+│  'disabled' — 禁用但可见                                                │
+│  'edit'     — 正常编辑态                                                │
 └─────────────────────────────────────────────────────────────────────────┘
                             ↓ setStatus() 触发 onStatusChangeCallbacks
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -121,30 +143,40 @@ ProForm 将表单抽象为三个层级，每层职责明确、单向依赖：
 │                                                                         │
 │  status === 'hidden'   → return null                                    │
 │  status === 'readonly' → renderReadonlyContent()   — 只读展示           │
-│  status === 'disabled' → renderComponent({ disabled: true })            │
-│  status === 'edit'     → renderComponent({})                            │
+│  status === 'disabled' → renderComponent({ status: 'disabled' })        │
+│  status === 'edit'     → renderComponent({ status: 'edit' })            │
+│                                                                         │
+│  自定义表单控件收到: { value, onChange, status, values, schema,         │
+│                        field, form, ...restComponentProps }             │
+│  只读渲染器收到:      { value, options, config, componentProps,         │
+│                        meta: { status, values } }                       │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.3 行为状态分层图
+### 1.3 状态分层图
 
 ```
  Schema 声明             运行时计算（FieldNode）         UI 渲染（FormField）
 ────────────────────  ────────────────────────────  ───────────────────────────
 required: boolean|fn  →  _computedRequired         →  Form.Item 红星标 + rules
-                       （独立于 behavior 计算）
-behavior.visible: fn  →  _computedBehavior         →  status === 'hidden' → null
-behavior.readonly: fn →  visible/disabled/readonly →  status === 'readonly' → 只读渲染器
-behavior.disabled: fn →  (响应式 boolean)          →  status === 'disabled' → 禁用组件
-                                                      status === 'edit' → 正常组件
+                       （独立于状态计算）
+behavior: 'hidden'    →                            →  status === 'hidden' → null
+behavior: 'readonly'  →  _effectiveStatus          →  status === 'readonly' → 只读渲染器
+ 或 fn 返回 status    →  (合并表单级约束后)        →  status === 'disabled' → 禁用组件
+behavior: 'disabled'  →                            →  status === 'edit' → 正常组件
+behavior: undefined   →  继承表单级约束
+表单级 preview         →  readonly
+表单级 readonly        →  readonly
+表单级 disabled        →  disabled
 ```
 
 设计原则：
 
-- **单向数据流**：Schema → FieldNode(computed) → Status → UI，没有反向回路
-- **声明式行为**：行为函数以 `values` 为唯一入参，纯函数
+- **单向数据流**：Schema + 表单级约束 → FieldNode(computed) → Status → UI，没有反向回路
+- **声明式意图**：behavior 直接声明想要的最终状态(FieldStatus)，不再拆成三个散装 boolean
+- **全局优先**：表单级约束（preview/readonly/disabled）优先级高于字段级，只有 'hidden' 是绝对隐藏
 - **响应式自动传播**：computed 自动追踪依赖，值变化自动标记 dirty，无需手动触发
-- **required 分离**：必填属于数据校验语义，不在 FieldBehavior 中，独立计算
+- **required 分离**：必填属于数据校验语义，独立计算
 
 ### 1.4 全链路串联图
 
@@ -167,7 +199,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
           │   ├── formStore.getField(name) → 已存在则复用
           │   └── createFieldNode(schema, formStore)
           │         ├── _value = ref(schema.initialValue ?? store.getValue(name))
-          │         ├── _computedBehavior = computed(...) → 见 1.2
+          │         ├── _effectiveStatus = computed(...) → 合并 behavior + 表单级约束
           │         ├── _computedRequired = computed(...)
           │         └── setupStoreValueWatch()
           │               └── watch(store.getValue(name)) → 同步 _value
@@ -178,7 +210,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
           │   ├── 注册 reactions → state.reactions[name]
           │   ├── setupFieldValueWatch()
           │   │   ├── watch(state.values[name]) → runReactions(name)
-          │   │   └── watch(state.values[dep]) × N → updateComputedBehavior()
+          │   │   └── watch(state.values[dep]) × N → 依赖变化自动触发 computed 重算
           │   └── lifecycle.onInit(field, form)
           │
           ├── useEffect → subscribeToValueChange / subscribeToStatusChange
@@ -186,7 +218,7 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
           └── Context Provider 包装
               ├── SchemaContext → schema 配置
               ├── LayoutContext → 布局配置
-              └── FieldContext → value/status/computedBehavior/...
+              └── FieldContext → value/status/...
                     ├── status === 'hidden'  → return null
                     ├── status === 'readonly' → 只读渲染器（readonlyRegistry）
                     ├── status === 'disabled' → 禁用组件
@@ -200,14 +232,14 @@ behavior.disabled: fn →  (响应式 boolean)          →  status === 'disable
     └── store.setValue(name, transformed)
           ├── batchUpdate { state.values[name] = value }
           │   └── Proxy.set → Dep.notify()
-          │       ├──→ _computedBehavior 标记 dirty
-          │       │     → 重算 → watch → updateStatusFromBehavior → setStatus
+          │       ├──→ _effectiveStatus 标记 dirty
+          │       │     → 重算 → watch → setStatus
           │       │       → onStatusChangeCallbacks → FormField 重渲染
           │       ├──→ watch(values[name]) → runReactions(name)
           │       │     → 遍历所有 fields.reactions
           │       │       → 匹配 dependencies → reaction.run(field, form)
           │       └──→ watch(values[dep])（其他字段依赖）
-          │             → field.updateComputedBehavior → 同上链路
+          │             → 自动触发 _effectiveStatus 重算
           └── 响应式传播全部自动，无需手动触发
     ├── arcoForm.setFieldValue(name, value) ← 同步 Arco Form
     └── rootContext.onValuesChange({ [name]: value }, allValues)
@@ -277,7 +309,7 @@ interface ProFormSchema<TValues = Record<string, unknown>> {
     output?: (values: Record<string, unknown>) => unknown;
   };
   dependencies?: string[];           // 依赖字段
-  behavior?: FieldBehavior;          // 字段行为
+  behavior?: BehaviorDecl;           // 字段行为声明（状态枚举或返回状态的函数）
   reactions?: FieldReaction[];       // 联动规则
   lifecycle?: FieldLifecycle;        // 生命周期
   readonlyMode?: ReadonlyRenderConfig['mode'];
@@ -307,22 +339,30 @@ interface ValidationRule {
 }
 ```
 
-### 3.3 FieldBehavior
+### 3.3 BehaviorDecl
 
 ```typescript
-interface FieldBehavior {
-  visible?: boolean | ((values) => boolean); // 是否可见
-  disabled?: boolean | ((values) => boolean); // 是否禁用
-  readonly?: boolean | ((values) => boolean); // 是否只读
-}
+/**
+ * 字段行为声明
+ *
+ * 直接声明字段期望的最终状态，而不是拆成三个散装 boolean。
+ * 可以是静态值或接收所有表单值返回状态的函数（用于联动）。
+ *
+ * @example
+ * behavior: 'readonly'
+ * behavior: (v) => v.status === 'done' ? 'readonly' : 'edit'
+ * behavior: 'hidden'  // 绝对隐藏，不受表单级覆盖
+ */
+type BehaviorDecl = FieldStatus | ((values: Record<string, unknown>) => FieldStatus) | undefined;
 ```
 
 ### 3.4 核心类型
 
 | 类型                       | 说明                                                          |
 | -------------------------- | ------------------------------------------------------------- |
-| `FormStatus`               | `'draft' \| 'readonly' \| 'preview' \| 'disabled' \| 'edit'`  |
-| `FieldStatus`              | `'edit' \| 'readonly' \| 'disabled' \| 'hidden' \| 'preview'` |
+| `FormStatus`               | `'edit' \| 'preview' \| 'readonly' \| 'disabled'`             |
+| `FieldStatus`              | `'edit' \| 'readonly' \| 'disabled' \| 'hidden'`              |
+| `BehaviorDecl`             | `FieldStatus \| ((values) => FieldStatus) \| undefined`       |
 | `LayoutMode`               | `'horizontal' \| 'vertical' \| 'inline' \| 'compact'`         |
 | `ProFormInstance`          | 表单实例 API                                                  |
 | `FieldNodeAPI`             | 字段运行时接口                                                |
@@ -436,7 +476,7 @@ registerField(field)
     │
     ├── 3. setupFieldValueWatch(field, fieldName)
     │     ├── watch(state.values[fieldName]) → 值变化时 runReactions
-    │     └── watch(state.values[dep]) × N → 依赖变化时 field.updateComputedBehavior
+    │     └── watch(state.values[dep]) × N → 依赖变化自动触发 _effectiveStatus 重算
     │
     └── 4. 触发 lifecycle.onInit(field, form)
 ```
@@ -456,7 +496,7 @@ private setupFieldValueWatch(field: FieldNodeAPI, fieldName: string): void {
     field.schema.dependencies.forEach((depName) => {
       watch(
         () => this.state.values[depName],
-        () => field.updateComputedBehavior(this.getValues()),
+        () => { /* _effectiveStatus 自动重算 */ },
       );
     });
   }
@@ -483,7 +523,7 @@ class FieldNode implements FieldNodeAPI {
   private _focused = ref<boolean>(false); // 焦点状态
 
   // 计算属性（自动追踪 store 中所有值的变化）
-  private _computedBehavior: ComputedRef<ComputedFieldBehavior>;
+  private _effectiveStatus: ComputedRef<FieldStatus>;
 
   private store: FormStoreAPI;
   private onChangeCallbacks: Set<(value) => void>;
@@ -491,32 +531,49 @@ class FieldNode implements FieldNodeAPI {
 }
 ```
 
-**状态优先级与流转**：
+**状态合并规则**（_effectiveStatus）：
 
 ```
-状态计算逻辑（updateStatusFromBehavior）：
-  visible=false        → 'hidden'
-  readonly=true        → 'readonly'
-  disabled=true        → 'disabled'
-  以上都不满足           → 'edit'
+// 1. 解析 schema.behavior（FieldStatus | fn | undefined）
+// 2. 读 formConstraints（store.getFormConstraints()）
+// 3. 合并：全局优先级高于字段级，'hidden' 绝对不受覆盖
 
-优先级：hidden > readonly > disabled > edit
+_effectiveStatus:
+  schema.behavior === 'hidden'         → 'hidden'
+  formConstraints.preview === true     → 'readonly'
+  formConstraints.readonly === true    → 'readonly'
+  formConstraints.disabled === true    → 'disabled'
+  schema.behavior 有值                 → 字段自身声明
+  兜底                                 → 'edit'
+
+优先级：hidden > preview > readonly > disabled > 字段声明 > edit
 ```
 
-**计算行为机制**：
+**计算状态机制**：
 
 FieldNode 在构造时创建两个独立的计算属性：
 
 ```typescript
-// 行为计算（仅包含 UI 交互状态）
-this._computedBehavior = computed(() => {
+// 有效状态计算（合并 schema.behavior + 表单级约束）
+this._effectiveStatus = computed<FieldStatus>(() => {
   const values = store.getValues();
-  const behavior = schema.behavior || {};
-  return {
-    visible: computeBehaviorValue(behavior.visible, values, true),
-    disabled: computeBehaviorValue(behavior.disabled, values, false),
-    readonly: computeBehaviorValue(behavior.readonly, values, false),
-  };
+  const formConstraints = store.getFormConstraints();
+
+  let fieldWanted: FieldStatus | undefined;
+  const behavior = schema.behavior as BehaviorDecl;
+  if (behavior === undefined) {
+    fieldWanted = undefined;
+  } else if (typeof behavior === 'function') {
+    fieldWanted = behavior(values);
+  } else {
+    fieldWanted = behavior;
+  }
+
+  if (fieldWanted === 'hidden') return 'hidden';
+  if (formConstraints.preview)  return 'readonly';
+  if (formConstraints.readonly) return 'readonly';
+  if (formConstraints.disabled) return 'disabled';
+  return fieldWanted ?? 'edit';
 });
 
 // 必填标识独立计算（由 schema.required 解析，支持函数形式的条件必填）
@@ -525,12 +582,12 @@ this._computedRequired = computed(() => {
   return typeof schema.required === 'function' ? schema.required(values) : (schema.required ?? false);
 });
 
-// watch 计算行为变化 → 自动更新状态
+// watch 有效状态变化 → 自动同步到 _status
 watch(
-  () => this._computedBehavior.value,
-  (newBehavior, oldBehavior) => {
-    if (JSON.stringify(newBehavior) !== JSON.stringify(oldBehavior)) {
-      this.updateStatusFromBehavior();
+  () => this._effectiveStatus.value,
+  (newStatus, oldStatus) => {
+    if (newStatus !== oldStatus && newStatus !== this._status.value) {
+      this.setStatus(newStatus);
     }
   },
   { immediate: true },
@@ -667,7 +724,7 @@ Context 层负责在 React 组件树中传递状态，避免 prop drilling。共
 | **RootContext**       | `RootContext.tsx`       | 全局状态（表单状态、实例、布局、尺寸、回调） | 整个表单            |
 | **LayoutContext**     | `LayoutContext.tsx`     | 布局配置（列数、间距、标签对齐、折叠状态）   | 整个表单 / 单个字段 |
 | **SchemaContext**     | `SchemaContext.tsx`     | 字段静态配置（来自 ProFormSchema）           | 单个字段            |
-| **FieldContext**      | `FieldContext.tsx`      | 字段运行时状态（值、状态、行为、方法）       | 单个字段            |
+| **FieldContext**      | `FieldContext.tsx`      | 字段运行时状态（值、状态、方法）            | 单个字段            |
 | **ExtensionContext**  | `ExtensionContext.tsx`  | 扩展机制（权限、审计、国际化）               | 整个表单            |
 | **FormConfigContext** | `FormConfigContext.tsx` | 表单全局配置                                 | 整个表单            |
 
@@ -675,7 +732,7 @@ Context 层负责在 React 组件树中传递状态，避免 prop drilling。共
 
 ```typescript
 interface RootContextValue {
-  formState: FormState; // 表单状态（draft/readonly/disabled/preview/submitting/status）
+  formState: FormState; // 表单状态（readonly/disabled/preview/submitting/status）
   instance: ProFormInstance; // 表单实例
   arcoForm: ArcoFormInstance; // Arco Form 实例
   layout: 'horizontal' | 'vertical' | 'inline';
@@ -690,17 +747,18 @@ interface RootContextValue {
 **FormState 计算逻辑**（`createFormState`）：
 
 ```typescript
-function createFormState(draft, readonly, disabled, preview, submitting): FormState {
+function createFormState(preview, readonly, disabled, submitting): FormState {
   let status: FormStatus = 'edit';
-  if (draft) status = 'draft';
-  else if (preview) status = 'preview';
+  if (preview)       status = 'preview';
   else if (readonly) status = 'readonly';
   else if (disabled) status = 'disabled';
-  return { draft, readonly, disabled, preview, submitting, status };
+  return { readonly, disabled, preview, submitting, status };
 }
 ```
 
-优先级：`draft > preview > readonly > disabled > edit`
+优先级：`preview > readonly > disabled > edit`
+
+注意：`draft` 已从状态中移除，仅作为草稿持久化配置（`DraftConfig`）存在，只在 `status === 'edit'` 时生效。
 
 ### 13.3 LayoutContext — 布局配置上下文
 
@@ -766,11 +824,6 @@ interface FieldContextValue {
   // 状态
   status: FieldStatus;
   focused?: boolean;
-  computedBehavior: {
-    visible: boolean;
-    disabled: boolean;
-    readonly: boolean;
-  };
   /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
   required: boolean;
   formState: FormState;
@@ -1138,8 +1191,15 @@ type ReadonlyRenderer = (
   options: Array<{ label; value }> | undefined,
   config: ReadonlyRenderConfig,
   componentProps?: Record<string, unknown>,
+  meta?: { status: FieldStatus; values: Record<string, unknown> },
 ) => React.ReactNode;
 ```
+
+第5个参数 `meta` 携带字段上下文信息：
+- `meta.status` — 当前字段的有效状态（edit / readonly / disabled / hidden）
+- `meta.values` — 全表单的当前值，可用于跨字段联动显示
+
+渲染器可以根据 `meta.status` 展示不同的样式（如 disabled 态用灰色文字）。
 
 **内置渲染器**：
 
@@ -1797,9 +1857,9 @@ export const performanceMonitor = new PerformanceMonitor(process.env.NODE_ENV ==
     │           └── reaction.run(field, form) → 可修改其他字段
     │
     ├── 7. watch(state.values[dep]) 触发（如果有依赖）
-    │     └── field.updateComputedBehavior(getValues())
-    │           └── computedBehavior 重新计算 → watch 触发
-    │                 └── updateStatusFromBehavior() → setStatus()
+    │     └── _effectiveStatus 自动重算
+    │           └── _effectiveStatus 重算 → watch 触发
+    │                 └── setStatus()
     │                       └── onStatusChangeCallbacks → FormField setStatusState
     │                       └── lifecycle.onStatusChange
     │
@@ -1851,11 +1911,11 @@ export const performanceMonitor = new PerformanceMonitor(process.env.NODE_ENV ==
     │                             └── fieldB.setValue(...) / fieldB.setStatus(...)
     │
     └── watch(state.values["A"]) 触发（依赖 A 的字段）
-          └── fieldB.updateComputedBehavior(getValues())
-                └── computedBehavior 重新计算
+          └── _effectiveStatus 自动重算
+                └── _effectiveStatus 重算
                       └── 如果 behavior 是函数，以新 values 重新执行
-                      └── watch(computedBehavior) 触发
-                            └── updateStatusFromBehavior()
+                      └── watch(_effectiveStatus) 触发
+                            └── setStatus()
                                   └── fieldB.setStatus(newStatus)
 ```
 
@@ -1940,7 +2000,7 @@ ProForm 通过 `index.ts` 统一导出所有能力：
 
 | 分类           | 导出内容                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **类型**       | `ProFormSchema`, `ProFormProps`, `ProFormInstance`, `FieldNodeAPI`, `FormStoreAPI`, `FieldBehavior`, `FieldReaction`, `FieldLifecycle`, `ReadonlyRenderConfig`, `ReadonlyRenderer`, `QuickComponentConfig`, `ComponentRegistry`, `ReadonlyRegistry`, `LayoutMode`, `FormStatus`, `FieldStatus`, `ComputedFieldBehavior`, `ButtonConfig`, `ProFormPerformanceConfig`, `LazyLoadConfig`, `BatchUpdateConfig` |
+| **类型**       | `ProFormSchema`, `ProFormProps`, `ProFormInstance`, `FieldNodeAPI`, `FormStoreAPI`, `BehaviorDecl`, `FieldReaction`, `FieldLifecycle`, `ReadonlyRenderConfig`, `ReadonlyRenderer`, `QuickComponentConfig`, `ComponentRegistry`, `ReadonlyRegistry`, `LayoutMode`, `FormStatus`, `FieldStatus`, `ButtonConfig`, `ProFormPerformanceConfig`, `LazyLoadConfig`, `BatchUpdateConfig` |
 | **组件**       | `ProForm`, `FormField`, `ProFormList`, `ProFormSteps`                                                                                                                                                                                                                                                                                                                                                      |
 | **Hooks**      | `useProForm`, `useProFormContext`, `useArcoForm`, `useVirtualScroll`, `useDynamicVirtualScroll`, `useLazyField`, `useGroupLazyLoad`, `usePriorityLoad`                                                                                                                                                                                                                                                     |
 | **Context**    | `RootContext`, `useRootContext`, `SchemaContext`, `useSchemaContext`, `FieldContext`, `useFieldContext`, `LayoutContext`, `useLayoutContext`, `ProFormContext`, `ProFormProvider`                                                                                                                                                                                                                          |

@@ -4,46 +4,28 @@
  * 每个表单字段对应一个 FieldNode 实例，管理字段的运行时状态：
  * - 字段值（响应式，通过 ref 包装）
  * - 字段错误
- * - 字段状态（edit / readonly / disabled / hidden / preview）
- * - 计算行为（visible / display / required 等，通过 computed 自动追踪依赖）
+ * - 字段状态（edit / readonly / disabled / hidden）
+ * - 字段有效状态（通过 computed 自动合并 schema.behavior 与表单级约束）
  * - 值变化/状态变化订阅
  * - 字段生命周期（onInit / onValueChange / onFocus 等）
+ *
+ * 状态合并规则：
+ *   schema.behavior === 'hidden' → hidden（绝对隐藏）
+ *   formConstraints.preview      → readonly
+ *   formConstraints.readonly     → readonly
+ *   formConstraints.disabled     → disabled
+ *   schema.behavior 有值         → 字段自身声明
+ *   兜底                         → edit
  *
  * 使用 @lania-pro-components/utils 的响应式系统（reactive/ref/computed/watch）
  * 实现字段级别的响应式状态管理。
  */
 
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI, ResolvedSchema } from '../types';
+import type { FieldNodeAPI, ProFormSchema, FieldStatus, FormStoreAPI, ResolvedSchema, BehaviorDecl } from '../types';
 import { computed, watch, ref, type ComputedRef } from '@lania-pro-components/utils';
 import { executeRule, executeRules } from '@lania-pro-components/utils';
 import { resolveSchemaValue } from '../utils/resolveSchemaValue';
-
-/**
- * 计算行为值
- */
-function computeBehaviorValue(
-  value: boolean | ((values: Record<string, unknown>) => boolean) | undefined,
-  values: Record<string, unknown>,
-  defaultValue: boolean,
-): boolean {
-  if (value === undefined) {
-    return defaultValue;
-  }
-  if (typeof value === 'function') {
-    return value(values);
-  }
-  return value;
-}
-
-/**
- * 计算后的行为类型
- */
-export interface ComputedFieldBehavior {
-  visible: boolean;
-  disabled: boolean;
-  readonly: boolean;
-}
 
 /**
  * FieldNode 实现
@@ -60,7 +42,7 @@ export class FieldNode implements FieldNodeAPI {
   private _focused = ref<boolean>(false);
 
   // 计算属性 - 自动追踪依赖
-  private _computedBehavior: ComputedRef<ComputedFieldBehavior>;
+  private _effectiveStatus: ComputedRef<FieldStatus>;
   private _computedRequired: ComputedRef<boolean>;
   private _resolvedSchema: ComputedRef<ResolvedSchema>;
 
@@ -85,17 +67,41 @@ export class FieldNode implements FieldNodeAPI {
       this._value.value = schema.initialValue;
     }
 
-    // 创建计算属性 - 自动追踪 store 中的值变化
-    this._computedBehavior = computed(() => {
+    // ===== 计算属性：有效状态（合并 schema.behavior + 表单级约束） =====
+    this._effectiveStatus = computed<FieldStatus>(() => {
       const values = store.getValues();
-      const behavior = schema.behavior || {};
+      const formConstraints = store.getFormConstraints();
 
-      return {
-        visible: computeBehaviorValue(behavior.visible, values, true),
-        disabled: computeBehaviorValue(behavior.disabled, values, false),
-        readonly: computeBehaviorValue(behavior.readonly, values, false),
-      };
+      // 1. 解析 schema.behavior
+      let fieldWanted: FieldStatus | undefined;
+      const behavior = schema.behavior as BehaviorDecl;
+      if (behavior === undefined) {
+        fieldWanted = undefined;
+      } else if (typeof behavior === 'function') {
+        fieldWanted = behavior(values);
+      } else {
+        fieldWanted = behavior;
+      }
+
+      // 2. 合并：全局优先级高于字段级
+      //    hidden 是绝对隐藏，不受表单级覆盖
+      if (fieldWanted === 'hidden') return 'hidden';
+      if (formConstraints.preview)  return 'readonly';
+      if (formConstraints.readonly) return 'readonly';
+      if (formConstraints.disabled) return 'disabled';
+      return fieldWanted ?? 'edit';
     });
+
+    // 同步 _effectiveStatus → _status
+    watch(
+      () => this._effectiveStatus.value,
+      (newStatus, oldStatus) => {
+        if (newStatus !== oldStatus && newStatus !== this._status.value) {
+          this.setStatus(newStatus);
+        }
+      },
+      { immediate: true },
+    );
 
     // 必填标识独立计算（schema.required 支持函数形式的条件必填）
     this._computedRequired = computed(() => {
@@ -136,17 +142,6 @@ export class FieldNode implements FieldNodeAPI {
         this.onResolvedSchemaChangeCallbacks.forEach((cb) => cb(newResolved));
       },
       { immediate: false },
-    );
-
-    // 监听计算行为变化，自动更新状态
-    watch(
-      () => this._computedBehavior.value,
-      (newBehavior, oldBehavior) => {
-        if (JSON.stringify(newBehavior) !== JSON.stringify(oldBehavior)) {
-          this.updateStatusFromBehavior();
-        }
-      },
-      { immediate: true },
     );
 
     // 监听 store 中对应字段的值变化
@@ -202,13 +197,6 @@ export class FieldNode implements FieldNodeAPI {
    */
   get status(): FieldStatus {
     return this._status.value;
-  }
-
-  /**
-   * 获取计算行为（响应式）
-   */
-  get computedBehavior(): ComputedFieldBehavior {
-    return this._computedBehavior.value;
   }
 
   /**
@@ -301,16 +289,6 @@ export class FieldNode implements FieldNodeAPI {
   }
 
   /**
-   * 更新计算行为
-   * 现在由 computed 自动处理，此方法用于手动触发或兼容旧代码
-   */
-  updateComputedBehavior(_values: Record<string, unknown>): void {
-    // computed 会自动追踪依赖，无需手动更新
-    // 但我们需要根据新的计算行为更新状态
-    this.updateStatusFromBehavior();
-  }
-
-  /**
    * 订阅值变化
    */
   subscribeToValueChange(callback: (value: unknown) => void): () => void {
@@ -341,24 +319,6 @@ export class FieldNode implements FieldNodeAPI {
     return () => {
       this.onResolvedSchemaChangeCallbacks.delete(callback);
     };
-  }
-
-  /**
-   * 根据行为计算状态
-   * 优先级: hidden > readonly > disabled > edit
-   */
-  private updateStatusFromBehavior(): void {
-    const { visible, disabled, readonly } = this._computedBehavior.value;
-
-    if (!visible) {
-      this.setStatus('hidden');
-    } else if (readonly) {
-      this.setStatus('readonly');
-    } else if (disabled) {
-      this.setStatus('disabled');
-    } else {
-      this.setStatus('edit');
-    }
   }
 
   /**

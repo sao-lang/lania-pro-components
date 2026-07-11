@@ -17,8 +17,6 @@ import type { ArcoFormInstance } from '../hooks/useArcoForm';
  * 表单全局状态
  */
 export interface FormState {
-  /** 是否为草稿模式 */
-  draft: boolean;
   /** 是否为只读模式 */
   readonly: boolean;
   /** 是否为禁用模式 */
@@ -62,7 +60,6 @@ export interface RootContextValue {
  */
 const defaultRootContext: RootContextValue = {
   formState: {
-    draft: false,
     readonly: false,
     disabled: false,
     preview: false,
@@ -107,17 +104,14 @@ export const useRootContext = (): RootContextValue => {
  * 创建表单状态
  */
 export function createFormState(
-  draft: boolean,
+  preview: boolean,
   readonly: boolean,
   disabled: boolean,
-  preview: boolean,
   submitting: boolean,
 ): FormState {
   let status: FormStatus = 'edit';
 
-  if (draft) {
-    status = 'draft';
-  } else if (preview) {
+  if (preview) {
     status = 'preview';
   } else if (readonly) {
     status = 'readonly';
@@ -126,7 +120,6 @@ export function createFormState(
   }
 
   return {
-    draft,
     readonly,
     disabled,
     preview,

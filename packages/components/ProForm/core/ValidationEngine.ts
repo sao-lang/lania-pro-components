@@ -59,7 +59,7 @@ export class ValidationEngine {
     const fields = this.formStore.getAllFields();
 
     for (const [name, field] of fields) {
-      if (!field.computedBehavior.visible || field.computedBehavior.disabled) continue;
+      if (field.status === 'hidden' || field.status === 'disabled') continue;
       const error = await this.validateField(field);
       if (error) errors[name] = error;
     }
@@ -76,7 +76,7 @@ export class ValidationEngine {
     for (const name of fieldNames) {
       const field = this.formStore.getField(name);
       if (!field) continue;
-      if (!field.computedBehavior.visible || field.computedBehavior.disabled) continue;
+      if (field.status === 'hidden' || field.status === 'disabled') continue;
       const error = await this.validateField(field);
       if (error) errors[name] = error;
     }

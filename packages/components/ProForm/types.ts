@@ -47,29 +47,39 @@ export type ButtonPosition = 'left' | 'center' | 'right';
 /**
  * 表单状态
  */
-export type FormStatus = 'draft' | 'readonly' | 'preview' | 'disabled' | 'edit';
+export type FormStatus = 'edit' | 'preview' | 'readonly' | 'disabled';
 
 /**
- * 字段状态
+ * 字段最终状态
+ *
+ * 由 schema.behavior 与表单级约束合并计算后的最终状态：
+ * - edit: 正常编辑态
+ * - readonly: 只读态（不可修改值）
+ * - disabled: 禁用态（不可交互）
+ * - hidden: 隐藏态（不渲染）
  */
-export type FieldStatus = 'edit' | 'readonly' | 'disabled' | 'hidden' | 'preview';
+export type FieldStatus = 'edit' | 'readonly' | 'disabled' | 'hidden';
 
 /**
- * 字段行为配置
+ * 字段行为声明
  *
- * 控制字段的 UI 交互状态，仅包含纯 UI 层面的行为：
- * - visible: 是否渲染显示
- * - disabled: 是否禁用（显示但不可交互）
- * - readonly: 是否只读（显示但不可修改值）
+ * 在 schema 中声明字段期望的最终状态。
+ * 可以是静态值，也可以是接收全部表单值返回状态的函数（用于联动）。
  *
- * 注意：required（必填）属于数据校验语义，已移至 schema 顶层，
- * 并由 boolean 扩展为支持函数形式。
+ * @example
+ * // 静态：字段始终只读
+ * behavior: 'readonly'
+ *
+ * // 函数：根据其他字段的值动态决定
+ * behavior: (v) => v.type === 'detail' ? 'readonly' : 'edit'
+ *
+ * // 不声明：由表单级约束决定
+ * behavior: undefined
+ *
+ * 注意：字段声明 'hidden' 为绝对隐藏，不受表单级约束覆盖。
+ * 其他值遵循「全局优先级高于字段级」的合并规则。
  */
-export interface FieldBehavior {
-  visible?: boolean | ((values: Record<string, unknown>) => boolean);
-  disabled?: boolean | ((values: Record<string, unknown>) => boolean);
-  readonly?: boolean | ((values: Record<string, unknown>) => boolean);
-}
+export type BehaviorDecl = FieldStatus | ((values: Record<string, unknown>) => FieldStatus) | undefined;
 
 /**
  * @deprecated 请从 @lania-pro-components/shared 导入 VirtualScrollConfig
@@ -368,8 +378,25 @@ export interface ProFormSchema<TValues = Record<string, unknown>> {
   };
   /** 依赖的字段名列表 */
   dependencies?: string[];
-  /** 字段行为配置 */
-  behavior?: FieldBehavior;
+  /**
+   * 字段行为声明
+   *
+   * 声明字段期望的最终状态。可以是 FieldStatus 静态值或返回 FieldStatus 的函数。
+   * 最终状态由字段声明与表单级约束（preview/readonly/disabled）合并计算。
+   *
+   * 合并规则：
+   *   字段声明 hidden → hidden（绝对隐藏，不受表单级覆盖）
+   *   表单级 preview  → readonly
+   *   表单级 readonly → readonly
+   *   表单级 disabled → disabled
+   *   字段自身声明    → 字段声明的值
+   *   兜底            → edit
+   *
+   * @example
+   * behavior: 'readonly'
+   * behavior: (v) => v.status === 'done' ? 'readonly' : 'edit'
+   */
+  behavior?: BehaviorDecl;
   /** 字段联动规则 */
   reactions?: FieldReaction[];
   /** 字段生命周期 */
@@ -604,15 +631,6 @@ export interface ProFormProps<TValues = Record<string, unknown>> {
 }
 
 /**
- * 计算后的行为类型
- */
-export interface ComputedFieldBehavior {
-  visible: boolean;
-  disabled: boolean;
-  readonly: boolean;
-}
-
-/**
  * FieldNode API（字段运行时实例接口）
  */
 /**
@@ -654,8 +672,6 @@ export interface FieldNodeAPI {
   error?: string;
   /** 当前状态 */
   status: FieldStatus;
-  /** 计算后的行为 */
-  computedBehavior: ComputedFieldBehavior;
   /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
   computedRequired: boolean;
   /** 焦点状态 */
@@ -672,8 +688,6 @@ export interface FieldNodeAPI {
   setFocus: () => void;
   /** 移除焦点 */
   removeFocus: () => void;
-  /** 更新计算行为 */
-  updateComputedBehavior: (values: Record<string, unknown>) => void;
   /** 订阅值变化（回调参数为组件值，即经过 transform.input 转换后的值） */
   subscribeToValueChange: (callback: (value: unknown) => void) => () => void;
   /** 订阅状态变化 */
@@ -721,6 +735,10 @@ export interface FormStoreAPI {
   reset: () => void;
   /** 重置指定字段到初始值 */
   resetField: (name: string) => void;
+  /** 设置表单级约束（preview/readonly/disabled） */
+  setFormConstraints: (constraints: { preview?: boolean; readonly?: boolean; disabled?: boolean }) => void;
+  /** 获取表单级约束 */
+  getFormConstraints: () => { preview: boolean; readonly: boolean; disabled: boolean };
 }
 
 /**
@@ -810,12 +828,19 @@ export interface QuickComponentConfig {
 
 /**
  * 只读渲染器类型
+ *
+ * @param value    字段展示值
+ * @param options  选项列表（用于 Select/Radio/Checkbox 等将 value 映射为 label）
+ * @param config   只读渲染配置（format/emptyText/mode 等）
+ * @param componentProps  组件原始 props
+ * @param meta     字段上下文元信息（status、全表单值等）
  */
 export type ReadonlyRenderer = (
   value: unknown,
   options: Array<{ label: string; value: unknown; [key: string]: unknown }> | undefined,
   config: ReadonlyRenderConfig,
   componentProps?: Record<string, unknown>,
+  meta?: { status: FieldStatus; values: Record<string, unknown> },
 ) => React.ReactNode;
 
 /**

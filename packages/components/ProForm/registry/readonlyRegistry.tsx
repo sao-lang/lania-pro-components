@@ -240,7 +240,7 @@ function withAffix(content: ReactNode, config: ReadonlyRenderConfig): ReactNode 
 /**
  * 文本渲染器
  */
-export const textRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const textRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const rendered = inlineRenderText(value, {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     maxLength: config.maxLength,
@@ -254,7 +254,7 @@ export const textRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 多行文本渲染器
  */
-export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const rendered = inlineRenderText(value, {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     preserveNewlines: true,
@@ -267,7 +267,7 @@ export const textareaRenderer: ReadonlyRenderer = (value, _options, config = {})
 /**
  * 选项渲染器
  */
-export const optionRenderer: ReadonlyRenderer = (value, options, config = {}) => {
+export const optionRenderer: ReadonlyRenderer = (value, options, config = {}, _componentProps, _meta) => {
   const rendered = inlineRenderOption(value, (options ?? []) as OptionItem[], {
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
     separator: config.separator,
@@ -280,19 +280,14 @@ export const optionRenderer: ReadonlyRenderer = (value, options, config = {}) =>
 /**
  * 多选框渲染器
  */
-export const checkboxRenderer: ReadonlyRenderer = (value, options, config = {}) => {
+export const checkboxRenderer: ReadonlyRenderer = (value, options, config = {}, _componentProps, _meta) => {
   return optionRenderer(value, options, { ...config, mode: 'tag' });
 };
 
 /**
  * Switch 渲染器
  */
-export const switchRenderer: ReadonlyRenderer = (
-  value,
-  _options,
-  _config = {},
-  componentProps?: Record<string, unknown>,
-) => {
+export const switchRenderer: ReadonlyRenderer = (value, _options, _config = {}, componentProps, _meta) => {
   const { checkedText, uncheckedText, trueText, falseText } = (componentProps ?? {}) as Record<
     string,
     string | undefined
@@ -307,7 +302,7 @@ export const switchRenderer: ReadonlyRenderer = (
 /**
  * 日期渲染器
  */
-export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const rendered = inlineRenderDate(value, {
     format: config.format || 'YYYY-MM-DD',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
@@ -318,7 +313,7 @@ export const dateRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 时间渲染器
  */
-export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const formatted = inlineRenderDate(value, {
     format: config.format || 'HH:mm:ss',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
@@ -329,7 +324,7 @@ export const timeRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 日期时间渲染器
  */
-export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const formatted = inlineRenderDate(value, {
     format: config.format || 'YYYY-MM-DD HH:mm:ss',
     emptyText: config.emptyText || DEFAULT_EMPTY_TEXT,
@@ -340,7 +335,7 @@ export const dateTimeRenderer: ReadonlyRenderer = (value, _options, config = {})
 /**
  * 数字渲染器
  */
-export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const rendered = inlineRenderNumber(value, {
     precision: config.precision ?? 2,
     thousandsSeparator: config.thousands !== false,
@@ -352,7 +347,7 @@ export const numberRenderer: ReadonlyRenderer = (value, _options, config = {}) =
 /**
  * 百分比渲染器
  */
-export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const num = Number(value);
   if (isNaN(num)) return <span>{String(value)}</span>;
   const rendered = inlineRenderPercent(value, {
@@ -365,7 +360,7 @@ export const percentageRenderer: ReadonlyRenderer = (value, _options, config = {
 /**
  * 货币渲染器
  */
-export const currencyRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const currencyRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const num = Number(value);
   if (isNaN(num)) return <span>{String(value)}</span>;
   const rendered = inlineRenderMoney(value, {
@@ -380,7 +375,7 @@ export const currencyRenderer: ReadonlyRenderer = (value, _options, config = {})
 /**
  * JSON 渲染器
  */
-export const jsonRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const jsonRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -399,7 +394,7 @@ export const jsonRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 图片渲染器
  */
-export const imageRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const imageRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -475,7 +470,7 @@ export const imageRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
 /**
  * 视频渲染器
  */
-export const videoRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const videoRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -567,7 +562,7 @@ export const videoRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
 /**
  * 文件渲染器
  */
-export const fileRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const fileRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -612,7 +607,7 @@ export const fileRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 链接渲染器
  */
-export const linkRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const linkRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -635,7 +630,7 @@ export const linkRenderer: ReadonlyRenderer = (value, _options, config = {}) => 
 /**
  * 电话脱敏渲染器
  */
-export const phoneRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const phoneRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -652,7 +647,7 @@ export const phoneRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
 /**
  * 邮箱脱敏渲染器
  */
-export const emailRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const emailRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -674,7 +669,7 @@ export const emailRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
 /**
  * 身份证脱敏渲染器
  */
-export const idCardRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const idCardRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -693,7 +688,7 @@ export const idCardRenderer: ReadonlyRenderer = (value, _options, config = {}) =
 /**
  * 是/否渲染器
  */
-export const yesNoRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const yesNoRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -717,7 +712,7 @@ export const yesNoRenderer: ReadonlyRenderer = (value, _options, config = {}) =>
 /**
  * 男/女渲染器
  */
-export const maleFemaleRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const maleFemaleRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -741,7 +736,7 @@ export const maleFemaleRenderer: ReadonlyRenderer = (value, _options, config = {
 /**
  * 启用/禁用渲染器
  */
-export const enableDisableRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const enableDisableRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -767,7 +762,7 @@ export const enableDisableRenderer: ReadonlyRenderer = (value, _options, config 
 /**
  * 开启/关闭渲染器
  */
-export const openCloseRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const openCloseRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;
@@ -793,7 +788,7 @@ export const openCloseRenderer: ReadonlyRenderer = (value, _options, config = {}
 /**
  * 状态渲染器
  */
-export const statusRenderer: ReadonlyRenderer = (value, _options, config = {}) => {
+export const statusRenderer: ReadonlyRenderer = (value, _options, config = {}, _componentProps, _meta) => {
   const empty = formatEmpty(value, config.emptyText);
   if (empty !== null) {
     return <span>{withAffix(empty, config)}</span>;

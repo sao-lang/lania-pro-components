@@ -11,7 +11,7 @@
  * 子组件通过 useSchemaContext() 获取这些配置。
  */
 import React, { createContext, useContext, ReactNode } from 'react';
-import type { FieldBehavior, FieldReaction, FieldLifecycle, ReadonlyRenderConfig, ValidationRule } from '../types';
+import type { BehaviorDecl, FieldReaction, FieldLifecycle, ReadonlyRenderConfig, ValidationRule } from '../types';
 
 /**
  * SchemaContext 值类型
@@ -30,8 +30,8 @@ export interface SchemaContextValue {
   rules?: ValidationRule[];
   /** 依赖的字段名列表 */
   dependencies?: string[];
-  /** 字段行为配置 */
-  behavior?: FieldBehavior;
+  /** 字段行为声明 */
+  behavior?: BehaviorDecl;
   /** 字段联动规则 */
   reactions?: FieldReaction[];
   /** 字段生命周期 */

@@ -5,7 +5,6 @@
  * - value / values: 当前值
  * - status: 字段状态
  * - focused: 焦点状态
- * - computedBehavior: 计算后的行为
  * - error: 错误信息
  *
  * 子组件可通过 useFieldContext() 获取这些信息，
@@ -31,11 +30,6 @@ export interface FieldContextValue {
   // 状态
   status: FieldStatus;
   focused?: boolean;
-  computedBehavior: {
-    visible: boolean;
-    disabled: boolean;
-    readonly: boolean;
-  };
   /** 计算后的必填标识（由 schema.required 解析，支持函数形式） */
   required: boolean;
   formState: FormState;
@@ -62,14 +56,8 @@ const defaultFieldContext: FieldContextValue = {
   values: {},
   status: 'edit',
   focused: false,
-  computedBehavior: {
-    visible: true,
-    disabled: false,
-    readonly: false,
-  },
   required: false,
   formState: {
-    draft: false,
     readonly: false,
     disabled: false,
     preview: false,

@@ -19,12 +19,18 @@ import React, { FC, useState, useCallback } from 'react';
 import { Input, InputNumber, Select, Radio, Button, Image, DatePicker, TimePicker } from '@arco-design/web-react';
 import { IconEye, IconEyeInvisible } from '@arco-design/web-react/icon';
 import { registerComponent } from '../registry/componentRegistry';
+import type { FieldStatus, ResolvedSchema, FieldNodeAPI, ProFormInstance } from '../types';
 
 interface QuickInputWithSuffixProps {
   value?: string;
   onChange?: (value: string) => void;
   suffix?: string;
   prefix?: string;
+  status?: FieldStatus;
+  values?: Record<string, unknown>;
+  schema?: ResolvedSchema;
+  field?: FieldNodeAPI;
+  form?: ProFormInstance;
   [key: string]: unknown;
 }
 
@@ -33,6 +39,11 @@ const QuickInputWithSuffix: FC<QuickInputWithSuffixProps> = ({
   onChange,
   suffix,
   prefix,
+  status,
+  values: _values,
+  schema: _schema,
+  field: _field,
+  form: _form,
   style,
   ...restProps
 }) => {
@@ -43,6 +54,7 @@ const QuickInputWithSuffix: FC<QuickInputWithSuffixProps> = ({
       onChange={onChange}
       prefix={prefix}
       suffix={suffix}
+      disabled={status === 'disabled'}
       style={{ width: '100%', ...(style as Record<string, unknown>) }}
     />
   );
@@ -53,6 +65,11 @@ interface QuickInputNumberWithSuffixProps {
   onChange?: (value: number) => void;
   suffix?: string;
   prefix?: string;
+  status?: FieldStatus;
+  values?: Record<string, unknown>;
+  schema?: ResolvedSchema;
+  field?: FieldNodeAPI;
+  form?: ProFormInstance;
   [key: string]: unknown;
 }
 
@@ -61,6 +78,11 @@ const QuickInputNumberWithSuffix: FC<QuickInputNumberWithSuffixProps> = ({
   onChange,
   suffix,
   prefix,
+  status,
+  values: _values,
+  schema: _schema,
+  field: _field,
+  form: _form,
   style,
   ...restProps
 }) => {
@@ -71,6 +93,7 @@ const QuickInputNumberWithSuffix: FC<QuickInputNumberWithSuffixProps> = ({
       onChange={onChange}
       prefix={prefix}
       suffix={suffix}
+      disabled={status === 'disabled'}
       style={{ width: '100%', ...(style as Record<string, unknown>) }}
     />
   );

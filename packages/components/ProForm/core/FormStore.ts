@@ -45,12 +45,28 @@ interface FormState {
 }
 
 /**
+ * 表单级约束
+ */
+interface FormConstraints {
+  preview: boolean;
+  readonly: boolean;
+  disabled: boolean;
+}
+
+/**
  * FormStore 实现
  * 基于 Proxy 响应式系统的表单状态管理
  */
 export class FormStore implements FormStoreAPI {
   // 响应式状态
   private state: FormState;
+
+  // 表单级约束（响应式，用于 FieldNode._effectiveStatus 计算）
+  private formConstraints = reactive<FormConstraints>({
+    preview: false,
+    readonly: false,
+    disabled: false,
+  });
 
   // 监听器（非响应式）
   private valueListeners: Set<ValueChangeListener> = new Set();
@@ -68,6 +84,22 @@ export class FormStore implements FormStoreAPI {
       touched: {},
       reactions: {},
     });
+  }
+
+  /**
+   * 设置表单级约束
+   */
+  setFormConstraints(constraints: { preview?: boolean; readonly?: boolean; disabled?: boolean }): void {
+    if (constraints.preview !== undefined) this.formConstraints.preview = constraints.preview;
+    if (constraints.readonly !== undefined) this.formConstraints.readonly = constraints.readonly;
+    if (constraints.disabled !== undefined) this.formConstraints.disabled = constraints.disabled;
+  }
+
+  /**
+   * 获取表单级约束
+   */
+  getFormConstraints(): { preview: boolean; readonly: boolean; disabled: boolean } {
+    return { ...this.formConstraints };
   }
 
   /**
@@ -204,8 +236,7 @@ export class FormStore implements FormStoreAPI {
         const depCleanup = watch(
           () => this.state.values[depName],
           () => {
-            // 依赖变化时，更新当前字段的计算行为
-            field.updateComputedBehavior(this.getValues());
+            // 依赖字段值变化时，FieldNode._effectiveStatus 的 computed 会自动追踪并重算
           },
         );
 

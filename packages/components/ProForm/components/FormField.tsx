@@ -117,7 +117,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       arcoForm.setFieldValue(fieldName, newValue);
     });
 
-    // 订阅 status 变化（hidden / disabled / readonly / preview / edit）
+    // 订阅 status 变化
     const unsubscribeStatus = fieldNode.subscribeToStatusChange((newStatus) => {
       setStatusState(newStatus);
     });
@@ -199,7 +199,6 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       values: rootContext.instance.getFieldsValue(),
       status,
       focused,
-      computedBehavior: fieldNode.computedBehavior,
       required: fieldNode.computedRequired,
       formState: rootContext.formState,
       error,
@@ -275,7 +274,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
         ? getRendererByMode(readonlyConfig.mode)
         : getReadonlyRenderer(readonlyComponentName || 'Input');
 
-    return <>{renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps)}</>;
+    return <>{renderer(displayValue, resolvedSchema.options, readonlyConfig, resolvedSchema.componentProps, { status, values: rootContext.instance.getFieldsValue() })}</>;
   }, [resolvedSchema, parsedQuickComponent, displayValue]);
 
   // ========== 编辑态组件渲染 ==========
@@ -290,7 +289,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
    * 2. 直接按组件名称查找
    */
   const renderComponent = () => {
-    if (status === 'preview' || status === 'readonly') {
+    if (status === 'readonly') {
       return renderReadonlyContent;
     }
 
@@ -330,23 +329,18 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
             componentRef.current = el;
           }
         }}
-        placeholder={resolvedSchema.placeholder}
-        options={resolvedSchema.options}
-        disabled={status === 'disabled'}
+        value={componentValue}
+        onChange={handleChange}
+        status={status}
+        values={rootContext.instance.getFieldsValue()}
+        schema={resolvedSchema}
+        field={fieldNode}
+        form={rootContext.instance}
         {...additionalProps}
         {...restComponentProps}
         style={{ width: '100%', ...(userStyle as Record<string, unknown>) }}
-        onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        value={componentValue}
-        name={fieldName}
-        label={resolvedSchema.label}
-        focused={focused}
-        error={error}
-        required={fieldNode.computedRequired}
-        visible={fieldNode.computedBehavior.visible}
-        readonly={fieldNode.computedBehavior.readonly}
       />
     );
   };
@@ -394,12 +388,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   // ========== 渲染 ==========
   return (
     <FieldContextProvider value={fieldContextValue}>
-      <div
-        data-field-name={fieldName}
-        style={{
-          display: fieldNode.computedBehavior.visible ? undefined : 'none',
-        }}
-      >
+      <div data-field-name={fieldName}>
         {/*
          * Arco Form.Item：
          * - field: 字段名，用于 ArcoForm 的值绑定和校验

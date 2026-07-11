@@ -303,9 +303,18 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
   };
 
   const formState = useMemo(
-    () => createFormState(isDraftState, readonly, disabled, isPreviewState, submitLoading),
-    [isDraftState, readonly, disabled, isPreviewState, submitLoading],
+    () => createFormState(isPreviewState, readonly, disabled, submitLoading),
+    [isPreviewState, readonly, disabled, submitLoading],
   );
+
+  // 同步表单级约束到 store（供 FieldNode._effectiveStatus 计算）
+  useEffect(() => {
+    formStore.setFormConstraints({
+      preview: isPreviewState,
+      readonly,
+      disabled,
+    });
+  }, [isPreviewState, readonly, disabled, formStore]);
 
   const rootContextValue = useMemo(
     () => ({
