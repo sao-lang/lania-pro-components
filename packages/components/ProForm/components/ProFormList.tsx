@@ -56,30 +56,30 @@ export const ProFormList: FC<ProFormListProps> = ({
   cardProps,
 }) => {
   const { onValuesChange, arcoForm } = useRootContext();
-  const { formStore } = useProFormContext();
+  const { formStore: store } = useProFormContext();
 
   const listValue = useMemo(() => {
-    const value = formStore?.getValue(name);
+    const value = store?.getValue(name);
     return Array.isArray(value) ? value : initialValue;
-  }, [formStore, name, initialValue]);
+  }, [store, name, initialValue]);
 
   const handleAdd = useCallback(() => {
-    const currentValue = (formStore?.getValue(name) as unknown[]) || [];
+    const currentValue = (store?.getValue(name) as unknown[]) || [];
     const newValue = [...currentValue, {}];
-    formStore?.setValue(name, newValue);
-    onValuesChange?.({ [name]: newValue }, formStore?.getValues() || {});
+    store?.setValue(name, newValue);
+    onValuesChange?.({ [name]: newValue }, store?.getValues() || {});
     onAdd?.(newValue.length - 1);
-  }, [formStore, name, onAdd, onValuesChange]);
+  }, [store, name, onAdd, onValuesChange]);
 
   const handleRemove = useCallback(
     (index: number) => {
-      const currentValue = (formStore?.getValue(name) as unknown[]) || [];
+      const currentValue = (store?.getValue(name) as unknown[]) || [];
       const newValue = currentValue.filter((_, i: number) => i !== index);
-      formStore?.setValue(name, newValue);
-      onValuesChange?.({ [name]: newValue }, formStore?.getValues() || {});
+      store?.setValue(name, newValue);
+      onValuesChange?.({ [name]: newValue }, store?.getValues() || {});
       onRemove?.(index);
     },
-    [formStore, name, onRemove, onValuesChange],
+    [store, name, onRemove, onValuesChange],
   );
 
   const getItemTitle = useCallback(
@@ -100,10 +100,10 @@ export const ProFormList: FC<ProFormListProps> = ({
 
     const itemContent = (
       <div style={{ position: 'relative' }}>
-        {formStore &&
+        {store &&
           arcoForm &&
           itemSchemas.map((schema, childIndex) => (
-            <FormField key={childIndex} schema={schema} formStore={formStore} arcoForm={arcoForm} />
+            <FormField key={childIndex} schema={schema} formStore={store} arcoForm={arcoForm} />
           ))}
         {showRemoveButton && !readonly && (
           <Button

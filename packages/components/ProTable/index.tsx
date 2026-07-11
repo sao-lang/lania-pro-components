@@ -37,18 +37,17 @@
  */
 import React, { useImperativeHandle, forwardRef, useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { Card } from '@arco-design/web-react';
-import type { ProTableProps, ProTableActionType, ProTableRequest, ProTableNEventHandlers } from './types';
+import type { ProTableProps, ProTableActionType, ProTableNEventHandlers } from './types';
 import type { ProFormInstance } from '../ProForm/types';
 import type { ProQueryFormInstance } from '../ProQueryForm';
 import { RootProvider, DataProvider, ColumnProvider } from './context';
-import { createDataStore } from './store/DataStore';
-import { useRequest } from './hooks/useRequest';
 import { QueryForm, TableRenderer, Toolbar, Pagination, BatchOperation } from './components';
 import { openDialog, confirm } from './components/TableDialog';
-import type { UseProTableReturn } from './hooks/useProTable';
+import { useProTable, ProTableContext } from './hooks/useProTable';
+import type { ProTableInstance, ProTableContextValue } from './hooks/useProTable';
+import type { DataStoreImpl } from './store/DataStore';
 import { useDragSort } from './hooks';
-import { useVirtualScroll, useCache } from '@lania-pro-components/shared';
-import { useEditableTable } from './editable';
+import { useVirtualScroll } from '@lania-pro-components/shared';
 import { CardView, ViewModeSwitch, SearchSchemaSelector } from './components';
 
 /**
@@ -66,13 +65,12 @@ const ProTableStandalone = forwardRef<
   ProTableActionType<Record<string, unknown>>,
   ProTableProps<Record<string, unknown>>
 >(<T extends Record<string, unknown>>(props: ProTableProps<T>, ref: React.Ref<ProTableActionType<T>>) => {
+  // ===== 状态层：委托 useProTable 管理全部状态 =====
+  const { instance, bindingProps, store } = useProTable<T>({ ...props });
+  const mergedProps = { ...props, ...bindingProps } as ProTableProps<T>;
+
   const {
     columns,
-    dataSource: propDataSource,
-    request,
-    params: propParams,
-    defaultPageSize = 20,
-    rowKey = 'id',
     search,
     toolbar,
     batchOperation,
@@ -87,34 +85,19 @@ const ProTableStandalone = forwardRef<
     cardContainer,
     onColumnsStateChange,
     onDensityChange,
-    beforeRequest,
-    afterRequest,
-    onRequestError,
-    postData,
-    manual = false,
-    debounceTime = 300,
-    polling,
     searchSchema: searchSchemaConfig,
-    editable: editableConfig,
-    defaultExpandAllRows,
-    defaultExpandedRowKeys,
-    // 第三批功能配置
     virtualScroll,
     virtualScrollConfig,
     dragSort,
     cardMode,
     viewMode: propViewMode,
     onViewModeChange,
-    cache,
-    cacheKey,
-    // ActionButton 事件处理器
     onCreate,
     onEdit,
     onView,
     onDelete,
     onExport,
     onImport,
-    // 未使用的 props
     onDataSourceChange,
     headerTitle,
     dialogConfig,
@@ -122,42 +105,30 @@ const ProTableStandalone = forwardRef<
     showSkeleton,
     responsive,
     breakpoints,
+    groupColumns,
     tableSummary,
     stickyHeader,
-    groupColumns,
     cellMerge,
-  } = props;
+  } = mergedProps;
+
+  const rowKeyStr = mergedProps.rowKey || 'id';
 
   const formRef = useRef<ProFormInstance | null>(null);
   const queryFormRef = useRef<ProQueryFormInstance>(null);
-
-  // 展开行状态
-  const [expandedRowKeys, setExpandedRowKeys] = useState<(string | number)[]>(defaultExpandedRowKeys || []);
 
   // 视图模式状态（表格/卡片）
   const [viewMode, setViewMode] = useState<'table' | 'card'>(propViewMode || 'table');
 
   // 组合事件处理器
   const eventHandlers: ProTableNEventHandlers<T> = useMemo(
-    () => ({
-      onCreate,
-      onEdit,
-      onView,
-      onDelete,
-      onExport,
-      onImport,
-    }),
+    () => ({ onCreate, onEdit, onView, onDelete, onExport, onImport }),
     [onCreate, onEdit, onView, onDelete, onExport, onImport],
   );
 
-  // 同步外部 viewMode 变化
   useEffect(() => {
-    if (propViewMode && propViewMode !== viewMode) {
-      setViewMode(propViewMode);
-    }
+    if (propViewMode && propViewMode !== viewMode) setViewMode(propViewMode);
   }, [propViewMode]);
 
-  // 视图模式变化回调
   const handleViewModeChange = useCallback(
     (mode: 'table' | 'card') => {
       setViewMode(mode);
@@ -166,83 +137,28 @@ const ProTableStandalone = forwardRef<
     [onViewModeChange],
   );
 
-  // 创建 DataStore
-  const store = useMemo(
-    () =>
-      createDataStore<T>({
-        initialData: propDataSource || [],
-        initialQuery: propParams || {},
-        initialPagination: {
-          current: 1,
-          pageSize: defaultPageSize,
-        },
-      }),
-    [propDataSource, propParams, defaultPageSize],
-  );
-
-  // 使用缓存 Hook
-  const cacheHookResult = useCache<{
-    data: T[];
-    total: number;
-  }>({
-    maxAge: typeof cache === 'object' ? cache.maxAge : undefined,
-    maxSize: typeof cache === 'object' ? cache.maxSize : undefined,
-  });
-
-  // 使用请求 Hook
-  const { fetchData, startPolling, stopPolling } = useRequest<T>({
-    store,
-    request: request as ProTableRequest<T>,
-    manual,
-    debounceTime,
-    polling,
-    beforeRequest,
-    afterRequest,
-    onRequestError,
-    postData,
-    cache: cache ? cacheHookResult : undefined,
-    cacheKey,
-    cacheEnabled: !!cache,
-  });
-
-  // 获取行 key 的函数
+  // 获取行 key
   const getRowKey = useCallback(
-    (record: T): string | number => {
-      if (typeof rowKey === 'function') {
-        return rowKey(record);
-      }
-      return (record as Record<string, unknown>)[rowKey] as string | number;
-    },
-    [rowKey],
+    (record: T): string | number =>
+      typeof rowKeyStr === 'function'
+        ? (rowKeyStr as (r: T) => string | number)(record)
+        : ((record as Record<string, unknown>)[rowKeyStr as string] as string | number),
+    [rowKeyStr],
   );
 
-  // 使用可编辑表格 Hook
-  const {
-    instance: editableInstance,
-    startEditable,
-    cancelEditable,
-    saveEditable,
-    deleteEditable,
-  } = useEditableTable<Record<string, unknown>>({
-    config: editableConfig as unknown as import('./editable/types').EditableConfig<Record<string, unknown>>,
-    getRowKey: (record: Record<string, unknown>) => getRowKey(record as T),
-    dataSource: store.dataSource,
-  });
-
-  // 使用拖拽排序 Hook
+  // ===== 渲染层：拖拽排序 + 虚拟滚动 =====
   const {
     sortedDataSource: dragSortedDataSource,
     getDragRowProps,
     getDragHandleProps,
     resetSort: resetDragSort,
   } = useDragSort<T>({
-    dataSource: store.dataSource,
+    dataSource: instance.dataSource,
     config: typeof dragSort === 'object' ? dragSort : undefined,
     enabled: !!dragSort,
     getRowKey,
   });
 
-  // 使用虚拟滚动 Hook
   const {
     state: virtualScrollState,
     containerRef: virtualScrollContainerRef,
@@ -257,106 +173,36 @@ const ProTableStandalone = forwardRef<
     containerHeight: 400,
   });
 
-  // 默认展开所有行
-  useEffect(() => {
-    if (defaultExpandAllRows && store.dataSource.length > 0) {
-      const allKeys = store.dataSource.map((record: T) => getRowKey(record));
-      setExpandedRowKeys(allKeys);
-    }
-  }, [defaultExpandAllRows, store.dataSource, getRowKey]);
-
-  // 构建 action 对象
+  // 构建 action 对象（基于 instance 暴露给 ref）
   const action = useMemo<ProTableActionType<T>>(
     () => ({
-      // 重新加载
-      reload: (resetPageIndex?: boolean) => {
-        if (resetPageIndex) {
-          store.setPage(1);
-        }
-        store.reload();
+      ...instance,
+      clearSelected: () => instance.clearSelection(),
+      getSelectedRows: () => instance.selectedRows,
+      getSelectedRowKeys: () => instance.selectedRowKeys,
+      setSelectedRows: (rows: T[]) => {
+        const keys = rows.map((r) => getRowKey(r));
+        instance.setSelectedRows(keys, rows);
       },
-
-      // 刷新并重置
       reloadAndRest: () => {
-        store.reset();
-        store.reload();
+        instance.reset();
       },
-
-      // 重置
       reset: () => {
         formRef.current?.resetFields();
-        store.reset();
-        store.reload();
+        instance.reset();
       },
-
-      // 清空选择
-      clearSelected: () => {
-        store.clearSelected();
-      },
-
-      // 设置选中行
-      setSelectedRows: (rows: T[]) => {
-        const keys = rows.map((row) => getRowKey(row));
-        store.setSelectedRows(keys, rows);
-      },
-
-      // 设置选中行 keys
       setSelectedRowKeys: (keys: (string | number)[]) => {
-        const rows = store.dataSource.filter((row: T) => keys.includes(getRowKey(row)));
-        store.setSelectedRows(keys, rows);
+        const rows = instance.dataSource.filter((r: T) => keys.includes(getRowKey(r)));
+        instance.setSelectedRows(keys, rows);
       },
-
-      // 获取选中行
-      getSelectedRows: () => store.selectedRows,
-
-      // 获取选中行 keys
-      getSelectedRowKeys: () => store.selectedRowKeys,
-
-      // 编辑相关
-      startEditable,
-      cancelEditable,
-      saveEditable,
-      deleteEditable,
-
-      // 分页相关
-      getPagination: () => ({
-        current: store.pagination.current,
-        pageSize: store.pagination.pageSize,
-        total: store.total,
-      }),
-
-      setPagination: ({ current, pageSize }) => {
-        if (current !== undefined) {
-          store.setPage(current);
-        }
-        if (pageSize !== undefined) {
-          store.setPageSize(pageSize);
-        }
-      },
-
-      // 参数相关
-      getParams: () => store.query,
-
-      setParams: (params) => {
-        store.setQuery(params);
-      },
-
-      // 表单实例
+      getPagination: () => instance.pagination,
+      getParams: () => instance.query,
+      setParams: (params: Record<string, unknown>) => instance.setQueryParams(params),
       getFormInstance: () => formRef.current ?? undefined,
-
-      // 轮询相关
-      startPolling,
-      stopPolling,
-      getPollingStatus: () => ({
-        isPolling: store.isPolling,
-        interval: store.pollingInterval,
-      }),
-
-      // 防抖请求
+      getPollingStatus: () => ({ isPolling: instance.isPolling, interval: instance.pollingInterval }),
       debouncedFetchData: () => {
-        fetchData();
+        instance.fetchData();
       },
-
       openDialog: ((config: Parameters<typeof openDialog>[0]) => {
         const defaultOpenConfig = dialogConfig?.open || {};
         return openDialog({ ...defaultOpenConfig, ...config } as unknown as Parameters<typeof openDialog>[0]);
@@ -365,33 +211,20 @@ const ProTableStandalone = forwardRef<
         const defaultConfirmConfig = dialogConfig?.confirm || {};
         return confirm({ ...defaultConfirmConfig, ...config });
       },
-
-      // 第三批功能：虚拟滚动
       scrollToIndex,
       scrollToTop: scrollToTopVirtual,
       scrollToBottom: scrollToBottomVirtual,
-
-      // 第三批功能：拖拽排序
       resetDragSort,
-
-      // 第三批功能：缓存
-      clearCache: cacheHookResult.clearCache,
     }),
     [
-      store,
+      instance,
+      formRef,
       getRowKey,
-      fetchData,
-      startPolling,
-      stopPolling,
-      startEditable,
-      cancelEditable,
-      saveEditable,
-      deleteEditable,
+      dialogConfig,
       scrollToIndex,
       scrollToTopVirtual,
       scrollToBottomVirtual,
       resetDragSort,
-      cacheHookResult.clearCache,
     ],
   );
 
@@ -545,204 +378,95 @@ const ProTableStandalone = forwardRef<
     </>
   );
 
+  // ProTableContext 值
+  const contextValue = useMemo<ProTableContextValue>(
+    () => ({
+      instance: instance as ProTableInstance<Record<string, unknown>>,
+      bindingProps: bindingProps as ProTableProps<Record<string, unknown>>,
+      store: store as DataStoreImpl<Record<string, unknown>>,
+    }),
+    [instance, bindingProps, store],
+  );
+
   return (
-    <RootProvider props={props}>
-      <DataProvider store={store} formRef={formRef} action={action} onDataSourceChange={onDataSourceChange}>
-        <ColumnProvider
-          initialColumns={columns}
-          onColumnsStateChange={onColumnsStateChange}
-          onDensityChange={onDensityChange}
-          persistenceKey={columnsStatePersistenceKey}
-          responsive={responsive}
-          breakpoints={breakpoints}
-          groupColumns={groupColumns}
-        >
-          {cardContainer ? (
-            <Card
-              title={typeof cardContainer === 'object' ? cardContainer.title : undefined}
-              extra={typeof cardContainer === 'object' ? cardContainer.extra : undefined}
-              bordered={typeof cardContainer === 'object' ? cardContainer.bordered : true}
-              style={typeof cardContainer === 'object' ? cardContainer.style : undefined}
-              className={typeof cardContainer === 'object' ? cardContainer.className : undefined}
-              bodyStyle={typeof cardContainer === 'object' ? cardContainer.bodyStyle : undefined}
-            >
-              {tableContent}
-            </Card>
-          ) : (
-            <div className={containerClassName} style={containerStyle}>
-              {tableContent}
-            </div>
-          )}
-        </ColumnProvider>
-      </DataProvider>
-    </RootProvider>
+    <ProTableContext.Provider value={contextValue}>
+      <RootProvider props={props}>
+        <DataProvider store={store} formRef={formRef} action={action} onDataSourceChange={onDataSourceChange}>
+          <ColumnProvider
+            initialColumns={columns}
+            onColumnsStateChange={onColumnsStateChange}
+            onDensityChange={onDensityChange}
+            persistenceKey={columnsStatePersistenceKey}
+            responsive={responsive}
+            breakpoints={breakpoints}
+            groupColumns={groupColumns}
+          >
+            {cardContainer ? (
+              <Card
+                title={typeof cardContainer === 'object' ? cardContainer.title : undefined}
+                extra={typeof cardContainer === 'object' ? cardContainer.extra : undefined}
+                bordered={typeof cardContainer === 'object' ? cardContainer.bordered : true}
+                style={typeof cardContainer === 'object' ? cardContainer.style : undefined}
+                className={typeof cardContainer === 'object' ? cardContainer.className : undefined}
+                bodyStyle={typeof cardContainer === 'object' ? cardContainer.bodyStyle : undefined}
+              >
+                {tableContent}
+              </Card>
+            ) : (
+              <div className={containerClassName} style={containerStyle}>
+                {tableContent}
+              </div>
+            )}
+          </ColumnProvider>
+        </DataProvider>
+      </RootProvider>
+    </ProTableContext.Provider>
   );
 });
 
 ProTableStandalone.displayName = 'ProTableStandalone';
 
-// ===== 受控模式：接收外部 table prop，复用其 store/instance =====
+/**
+ * ProTableControlled — 受控模式。
+ *
+ * 接收外部 useProTable() 返回的 table 对象，
+ * 将 bindingProps（数据层配置）合并到外部 props 后，委托给 ProTableStandalone 渲染。
+ * 避免在多个位置重复创建 DataStore / useRequest / useEditableTable / useDragSort。
+ *
+ * UI 配置来源优先级：table.bindingProps > 外部 props
+ */
 const ProTableControlled = forwardRef<
   ProTableActionType<Record<string, unknown>>,
   ProTableProps<Record<string, unknown>>
 >(<T extends Record<string, unknown>>(props: ProTableProps<T>, ref: React.Ref<ProTableActionType<T>>) => {
-  const fullState = props.table as UseProTableReturn<T>;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { table: _table, ...rest } = props;
-  const bindingProps = fullState.bindingProps;
+  const instance = props.table as ProTableInstance<T>;
+  const { table: _omit, ...rest } = props;
+  void _omit;
 
-  // 合并 bindingProps（数据层）与 rest（UI 层），bindingProps 优先
-  const mergedProps = { ...rest, ...bindingProps } as unknown as ProTableProps<T>;
-  const {
-    columns,
-    request,
-    toolbar,
-    search,
-    batchOperation,
-    pagination: propPagination,
-    pageSizeOptions = [20, 50, 100],
-    className,
-    style,
-    containerClassName,
-    containerStyle,
-    emptyRender,
-    errorRender,
-    cardContainer,
-    headerTitle,
-    dialogConfig,
-    showSkeleton,
-    onCreate,
-    onEdit,
-    onView,
-    onDelete,
-    onExport,
-    onImport,
-    virtualScroll,
-    virtualScrollConfig,
-    cardMode,
-    viewMode: propViewMode,
-    onViewModeChange,
-    defaultExpandAllRows,
-    defaultExpandedRowKeys,
-    rowKey,
-    dataSource: _ds,
-  } = mergedProps;
+  // 将 instance 的状态作为 props 传入，useProTable 会通过 dataSource/loading/pagination 接管
+  const mergedProps = {
+    ...rest,
+    dataSource: instance.dataSource,
+    loading: instance.loading,
+    pagination: instance.pagination,
+  } as unknown as ProTableProps<Record<string, unknown>>;
 
-  const store = fullState.store;
-  const instance = fullState.instance;
-  const getRowKey = useCallback(
-    (record: T): string | number =>
-      typeof rowKey === 'function'
-        ? rowKey(record)
-        : ((record as Record<string, unknown>)[(rowKey as string) || 'id'] as string | number),
-    [rowKey],
-  );
-
-  const [viewMode, setViewMode] = useState<'table' | 'card'>(propViewMode || 'table');
-  const [expandedRowKeys, setExpandedRowKeys] = useState<(string | number)[]>(defaultExpandedRowKeys || []);
-  const queryFormRef = useRef(null);
-  const formRef = useRef<ProFormInstance | null>(null);
-
-  useEffect(() => {
-    if (propViewMode && propViewMode !== viewMode) setViewMode(propViewMode);
-  }, [propViewMode]);
-
-  useEffect(() => {
-    if (defaultExpandAllRows && store.dataSource.length > 0) {
-      setExpandedRowKeys(store.dataSource.map((r: T) => getRowKey(r)));
-    }
-  }, [defaultExpandAllRows, store.dataSource, getRowKey]);
-
-  useImperativeHandle(ref, () => instance as unknown as ProTableActionType<T>, [instance]);
-
-  const eventHandlers = useMemo(() => ({ onCreate, onEdit, onView, onDelete, onExport, onImport }), []);
-
-  const action = useMemo<ProTableActionType<T>>(
-    () =>
-      ({
-        ...instance,
-        openDialog: (config: Parameters<typeof openDialog>[0]) => openDialog(config),
-        confirm: (config: Parameters<typeof confirm>[0]) => confirm(config),
-      }) as unknown as ProTableActionType<T>,
-    [instance],
-  );
-
-  const renderError = (err: Error) => {
-    if (errorRender) return errorRender(err, () => action.reload());
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <div style={{ color: '#f53f3f', marginBottom: 16 }}>加载失败: {err.message}</div>
-        <button onClick={() => action.reload()}>重试</button>
-      </div>
-    );
-  };
-
-  const tableContent = (
-    <>
-      {headerTitle && (
-        <div className='pro-table-header-title' style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-          {headerTitle}
-        </div>
-      )}
-      {search && <QueryForm formRef={formRef} ref={queryFormRef} />}
-      {toolbar && <Toolbar extraRender={null} handlers={eventHandlers} refreshTable={() => action.reload()} />}
-      {batchOperation && <BatchOperation />}
-      {store.error ? (
-        renderError(store.error)
-      ) : (
-        <TableRenderer
-          className={className}
-          style={style}
-          emptyRender={emptyRender}
-          dataSource={store.dataSource}
-          handlers={eventHandlers}
-          refreshTable={() => action.reload()}
-          showSkeleton={showSkeleton}
-        />
-      )}
-      {propPagination !== false && viewMode === 'table' && <Pagination pageSizeOptions={pageSizeOptions} />}
-    </>
-  );
-
-  return (
-    <RootProvider props={mergedProps}>
-      <DataProvider store={store} formRef={formRef} action={action}>
-        <ColumnProvider initialColumns={columns}>
-          {cardContainer ? (
-            <Card
-              title={
-                typeof cardContainer === 'object'
-                  ? ((cardContainer as Record<string, unknown>).title as string)
-                  : undefined
-              }
-              bordered={
-                typeof cardContainer !== 'boolean'
-                  ? ((cardContainer as Record<string, unknown>).bordered as boolean)
-                  : true
-              }
-            >
-              {tableContent}
-            </Card>
-          ) : (
-            <div className={containerClassName} style={containerStyle}>
-              {tableContent}
-            </div>
-          )}
-        </ColumnProvider>
-      </DataProvider>
-    </RootProvider>
-  );
+  return <ProTableStandalone {...mergedProps} ref={ref as React.Ref<ProTableActionType<Record<string, unknown>>>} />;
 });
+
+ProTableControlled.displayName = 'ProTableControlled';
 
 // ===== 调度层 =====
 const ProTableComponent = forwardRef<
   ProTableActionType<Record<string, unknown>>,
   ProTableProps<Record<string, unknown>>
 >(<T extends Record<string, unknown>>(props: ProTableProps<T>, ref: React.Ref<ProTableActionType<T>>) => {
+  const commonRef = ref as React.Ref<ProTableActionType<Record<string, unknown>>>;
+  const extendedProps = props as unknown as ProTableProps<Record<string, unknown>>;
   if (props.table) {
-    return <ProTableControlled {...props} ref={ref} />;
+    return <ProTableControlled {...extendedProps} ref={commonRef} />;
   }
-  return <ProTableStandalone {...props} ref={ref} />;
+  return <ProTableStandalone {...extendedProps} ref={commonRef} />;
 });
 
 ProTableComponent.displayName = 'ProTable';

@@ -10,6 +10,18 @@ import type {
 import { instanceRegistry as dialogInstanceRegistry } from './instanceRegistry';
 import { ProDialog } from './ProDialog';
 
+/**
+ * useProDialog — 编程式弹窗控制 Hook。
+ *
+ * 内部使用 createImperativeInstance 命令式渲染 ProDialog 组件，
+ * 通过 forwardRef 回调捕获 ProDialogInstance，而非自行创建 Modal/Drawer。
+ * 避免与 ProDialog.tsx 的重复渲染逻辑（约 300 行 InternalDialog 代码）。
+ *
+ * @example
+ * const dialog = useProDialog({ title: '编辑', schemas, formProps });
+ * dialog.open({ data: { name: '张三' } });
+ * dialog.close();
+ */
 export function useProDialog<
   TValues extends Record<string, unknown> = Record<string, unknown>,
   T extends Record<string, unknown> = Record<string, unknown>,

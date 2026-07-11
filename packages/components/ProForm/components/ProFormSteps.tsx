@@ -55,7 +55,7 @@ const ProFormStepsComponent = () => {
       ref,
     ) => {
       const [innerCurrent, setInnerCurrent] = useState(defaultCurrent);
-      const { formStore } = useProFormContext();
+      const { store } = useProFormContext();
 
       const isControlled = typeof controlledCurrent !== 'undefined';
       const current = isControlled ? controlledCurrent : innerCurrent;
@@ -77,14 +77,13 @@ const ProFormStepsComponent = () => {
       }, [current, setCurrent, onStepChange]);
 
       const handleNext = useCallback(async () => {
-        if (validateOnNext && formStore) {
-          // 验证当前步骤的所有字段
+        if (validateOnNext && store) {
           const currentStepSchemas = steps[current]?.schemas || [];
           const fieldNames = currentStepSchemas.map((s) => s.name);
           let hasError = false;
 
           for (const fieldName of fieldNames) {
-            const field = formStore.getField(fieldName);
+            const field = store.getField(fieldName);
             if (field) {
               const error = await field.validate();
               if (error) {
@@ -100,7 +99,7 @@ const ProFormStepsComponent = () => {
         const next = Math.min(steps.length - 1, current + 1);
         onStepChange?.(current, next);
         setCurrent(next);
-      }, [current, steps, setCurrent, validateOnNext, formStore, onStepChange]);
+      }, [current, steps, setCurrent, validateOnNext, store, onStepChange]);
 
       const handleGoTo = useCallback(
         (index: number) => {

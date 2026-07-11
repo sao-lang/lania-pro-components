@@ -12,7 +12,7 @@ const columns = [
 ];
 
 export const Demo2 = () => {
-  const { bindingProps, Provider } = useProTable({
+  const { instance, bindingProps } = useProTable({
     columns,
     request: async ({ current, pageSize, params }) => {
       console.log('请求参数:', { current, pageSize, params });
@@ -26,11 +26,7 @@ export const Demo2 = () => {
     },
   });
 
-  return (
-    <Provider>
-      <ProTable {...bindingProps} />
-    </Provider>
-  );
+  return <ProTable {...bindingProps} />;
 };
 
 export default Demo2;

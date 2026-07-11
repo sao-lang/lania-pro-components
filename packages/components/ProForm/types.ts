@@ -3,7 +3,6 @@ import { ColProps } from '@arco-design/web-react/lib/Grid';
 import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
 import { FormStore } from './core';
 import { ArcoFormInstance } from './hooks/useArcoForm';
-import { UseFieldNavigationReturn, VirtualScrollState } from '@lania-pro-components/shared';
 
 /**
  * 验证规则类型
@@ -372,12 +371,11 @@ export interface DraftConfig {
  */
 export interface ProFormProps<TValues = Record<string, unknown>> {
   /**
-   * 表单状态对象（由 useProForm 返回）。
+   * 表单实例（由 useProForm 返回的 instance）。
    *
-   * 传入后 ProForm 复用该状态，不再内部调用 useProForm 创建新实例。
-   * form.instance 是唯一的。
+   * 传入后 ProForm 复用该状态和数据，不再内部调用 useProForm 创建新实例。
    */
-  form?: UseProFormReturn<TValues>;
+  instance?: ProFormInstance<TValues>;
 
   /** 表单字段配置数组 */
   schemas?: Array<ProFormSchema<TValues>>;
@@ -611,6 +609,10 @@ export interface FormStoreAPI {
  * ProForm 实例
  */
 export interface ProFormInstance<TValues = Record<string, unknown>> {
+  /** Arco Design Form 桥接实例 */
+  arcoForm: ArcoFormInstance;
+  /** 表单数据仓库 */
+  store: FormStore;
   /** 验证所有字段 */
   validate: () => Promise<TValues>;
   /** 验证指定字段 */
@@ -629,8 +631,12 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   getRef: <R = unknown>(name: string) => R | undefined;
   /** 动态更新表单配置 */
   setSchemas: (schemas: Array<ProFormSchema<TValues>>) => void;
+  /** 获取表单配置 */
+  getSchemas: () => Array<ProFormSchema<TValues>>;
   /** 动态更新表单属性 */
   setProps: (props: Partial<ProFormProps<TValues>>) => void;
+  /** 获取表单属性 */
+  getProps: (props: Partial<ProFormProps<TValues>>) => void;
   /** 重置字段值 */
   resetFields: (nameList?: Array<keyof TValues>) => void;
   /** 滚动到指定字段 */
@@ -641,6 +647,10 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   getFieldStatus: (name: string) => FieldStatus;
   /** 设置字段状态 */
   setFieldStatus: (name: string, status: FieldStatus) => void;
+  /** 获取全部字段状态 */
+  getFieldStatusMap: () => Record<string, FieldStatus>;
+  /** 批量设置字段状态 */
+  setFieldStatusMap: () => Record<string, FieldStatus>;
   /** 判断是否为草稿模式 */
   isDraft: () => boolean;
   /** 设置草稿模式 */
@@ -739,9 +749,10 @@ export interface FormItemProps {
 }
 
 export interface ProFormContextValue<TValues = Record<string, unknown>> {
-  formStore: FormStore | null;
-  instance: ProFormInstance<TValues> | null;
-  arcoForm: ArcoFormInstance | null;
+  instance: ProFormInstance<TValues>;
+  bindingProps: ProFormProps<TValues>;
+  store: FormStore;
+  arcoForm: ArcoFormInstance;
 }
 export type UsrProFormFn<TValues = Record<string, unknown>> = () => ProFormContextValue<TValues>;
 
@@ -759,27 +770,14 @@ export interface UseProFormOptions<TValues = Record<string, unknown>> extends Om
  * useProForm Hook 返回值
  */
 export interface UseProFormReturn<TValues = Record<string, unknown>> {
+  /** Arco Design Form 桥接实例 */
   arcoForm: ArcoFormInstance;
+  /** 表单实例（含 validate/setValues/getValues 等数据方法 + focusField/scrollToField 等 UI 方法） */
   instance: ProFormInstance<TValues>;
-  schemas: ProFormSchema<TValues>[];
-  setSchemas: (schemas: ProFormSchema<TValues>[]) => void;
-  formProps: Partial<ProFormProps<TValues>>;
-  setComponentRef: (name: string, ref: unknown) => void;
-  fieldStatusMap: Record<string, FieldStatus>;
-  setFieldStatusMap: (statusMap: Record<string, FieldStatus>) => void;
-  isDraftState: boolean;
-  setIsDraftState: (draft: boolean) => void;
-  isPreviewState: boolean;
-  setIsPreviewState: (preview: boolean) => void;
-  options: UseProFormOptions<TValues>;
+  /** 可直接绑定到 ProForm 组件的 UI 配置 props */
   bindingProps: ProFormProps<TValues>;
-  formStore: FormStore;
-  /** 键盘导航功能 */
-  fieldNavigation: UseFieldNavigationReturn;
-  /** 虚拟滚动状态（ProForm 内部使用） */
-  virtualState: VirtualScrollState<ProFormSchema<TValues>>;
-  /** 虚拟滚动容器 ref（ProForm 内部使用） */
-  virtualContainerRef: React.RefObject<HTMLDivElement | null>;
+  /** 表单数据仓库 */
+  store: FormStore;
 }
 
 export type GetComponentRefFn = <R = unknown>(name: string) => R | undefined;

@@ -16,19 +16,19 @@
  * <ProForm form={form} />
  * ```
  */
-import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
-import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions, UseProFormReturn } from './types';
+import type { ProFormProps, ProFormInstance, ProFormSchema, SchemaProcessOptions } from './types';
 import { useProForm, ProFormContext } from './useProForm';
 import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
-import { useGroupLazyLoad, usePriorityLoad } from '@lania-pro-components/shared';
+import { useGroupLazyLoad, usePriorityLoad, useVirtualScroll } from '@lania-pro-components/shared';
+import { useFieldNavigation } from './hooks/useFieldNavigation';
 import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
 import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
 import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-components/utils';
 import type { DraftConfig } from './types';
-import type { UseFieldNavigationReturn, VirtualScrollState } from '@lania-pro-components/shared';
 import type { ArcoFormInstance } from './hooks/useArcoForm';
 import type { FormStore } from './core/FormStore';
 
@@ -39,31 +39,19 @@ interface ProFormRendererProps extends ProFormProps {
   formStore: FormStore;
   arcoForm: ArcoFormInstance;
   instance: ProFormInstance;
-  setComponentRef: (name: string, ref: unknown) => void;
-  fieldNavigation: UseFieldNavigationReturn;
-  virtualState: VirtualScrollState<ProFormSchema>;
-  virtualContainerRef: React.RefObject<HTMLDivElement | null>;
-  isDraftState: boolean;
-  isPreviewState: boolean;
-  setIsDraftState: (v: boolean) => void;
-  setIsPreviewState: (v: boolean) => void;
 }
 
-// ===== 纯渲染组件（无 useProForm 调用）=====
+/**
+ * ProFormRenderer — 渲染组件。
+ *
+ * 内部创建 UI 能力（componentRefs / fieldNavigation / virtualScroll / draft 状态），
+ * 通过 useEffect 覆写 instance 上的桩方法。
+ */
 const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
   const {
-    // 内部状态
     formStore,
     arcoForm,
     instance,
-    setComponentRef,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
-    isDraftState,
-    isPreviewState,
-    setIsDraftState,
-    setIsPreviewState,
     // 用户 props
     schemas = [],
     layout = 'vertical',
@@ -126,6 +114,70 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     keyboardNavigation,
     draftStorage,
   } = props;
+
+  // ===== 内部 UI 能力（由 Renderer 创建，不来自 useProForm）=====
+  const componentRefs = useRef<Record<string, unknown>>({});
+  const getRef = useCallback((name: string) => componentRefs.current[name], []);
+  const setComponentRef = useCallback((name: string, ref: unknown) => {
+    componentRefs.current[name] = ref;
+  }, []);
+
+  // 本地 draft / preview 状态
+  const [isDraftState, setIsDraftState] = useState(!!draft);
+  const [isPreviewState, setIsPreviewState] = useState(!!preview);
+  useEffect(() => {
+    if (draft !== undefined && draft !== isDraftState) setIsDraftState(draft);
+  }, [draft, isDraftState]);
+  useEffect(() => {
+    if (preview !== undefined && preview !== isPreviewState) setIsPreviewState(preview);
+  }, [preview, isPreviewState]);
+
+  const fieldNavigation = useFieldNavigation({
+    schemas,
+    getRef,
+    keyboardNavigation,
+    formStore,
+    onFocus: undefined,
+    onBlur: undefined,
+  });
+
+  const {
+    containerRef: virtualContainerRef,
+    virtualState,
+    scrollToIndex,
+  } = useVirtualScroll(schemas, {
+    itemHeight: props.performance?.virtualScroll?.itemHeight || 60,
+    overscan: props.performance?.virtualScroll?.overscan || 5,
+    containerHeight: props.performance?.virtualScroll?.containerHeight,
+  });
+
+  const scrollToField = useCallback(
+    (name: string) => {
+      const enabled = props.performance?.virtualScroll?.enabled && schemas.length > 20;
+      if (enabled) {
+        const index = schemas.findIndex((s) => {
+          const sn = Array.isArray(s.name) ? s.name.join('.') : s.name;
+          return String(sn) === name;
+        });
+        if (index !== -1) {
+          scrollToIndex(index);
+          return;
+        }
+      }
+      arcoForm.scrollToField(name);
+    },
+    [arcoForm, props.performance, schemas, scrollToIndex],
+  );
+
+  // 覆写 instance 的桩方法
+  useEffect(() => {
+    instance.focusField = fieldNavigation.focusField;
+    instance.focusNextField = fieldNavigation.focusNextField;
+    instance.focusPrevField = fieldNavigation.focusPrevField;
+    (instance as unknown as Record<string, unknown>).getFocusedField = () => fieldNavigation.focusedField;
+    instance.scrollToField = scrollToField;
+    instance.getRef = getRef as ProFormInstance['getRef'];
+  }, [instance, fieldNavigation, scrollToField, getRef]);
 
   const processSchema = useCallback((schema: ProFormSchema, options: SchemaProcessOptions = {}): ProFormSchema => {
     const { autoLabel, autoPlaceholder, autoAllowClear, autoRules, autoDefaultValue, autoRangePickerName } = options;
@@ -629,105 +681,70 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
   );
 };
 
-// ===== 受控模式：接收外部 form prop =====
+/**
+ * ProFormControlled — 受控模式。
+ *
+ * 接收外部 useProForm() 返回的 instance，
+ * 从 instance 读取 store / arcoForm 等状态。
+ * 内部仅创建 ProFormContext.Provider 供子组件消费。
+ */
 // eslint-disable-next-line react/display-name
 const ProFormControlled = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
-  const fullState = props.form as UseProFormReturn;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { form: _form, ...rest } = props;
-  const {
-    formStore,
-    arcoForm,
-    instance,
-    setComponentRef,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
-    isDraftState,
-    isPreviewState,
-    setIsDraftState,
-    setIsPreviewState,
-  } = fullState;
+  const instance = props.instance as ProFormInstance;
+  const { store, arcoForm } = instance;
+  const { instance: _omit, ...rest } = props;
+  void _omit;
+  const bindingProps = rest as unknown as ProFormProps;
 
   const Provider = useMemo(() => {
-    const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-      <ProFormContext.Provider value={{ formStore, instance, arcoForm }}>{children}</ProFormContext.Provider>
+    const P = ({ children }: { children: React.ReactNode }) => (
+      <ProFormContext.Provider value={{ instance, bindingProps, store, arcoForm }}>{children}</ProFormContext.Provider>
     );
     return P;
-  }, [formStore, instance, arcoForm]);
+  }, [instance, bindingProps, store, arcoForm]);
 
   useImperativeHandle(ref, () => instance, [instance]);
 
   return (
     <Provider>
-      <ProFormRenderer
-        {...rest}
-        formStore={formStore}
-        arcoForm={arcoForm}
-        instance={instance}
-        setComponentRef={setComponentRef}
-        fieldNavigation={fieldNavigation}
-        virtualState={virtualState}
-        virtualContainerRef={virtualContainerRef}
-        isDraftState={isDraftState}
-        isPreviewState={isPreviewState}
-        setIsDraftState={setIsDraftState}
-        setIsPreviewState={setIsPreviewState}
-      />
+      <ProFormRenderer {...rest} formStore={store} arcoForm={arcoForm} instance={instance} />
     </Provider>
   );
 });
 
-// ===== 独立模式：内部创建一次 useProForm =====
+/**
+ * ProFormStandalone — 独立模式。
+ */
 // eslint-disable-next-line react/display-name
 const ProFormStandalone = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
   const fullState = useProForm(props);
-  const {
-    formStore,
-    arcoForm,
-    instance,
-    setComponentRef,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
-    isDraftState,
-    isPreviewState,
-    setIsDraftState,
-    setIsPreviewState,
-  } = fullState;
+  const { store, arcoForm, instance, bindingProps } = fullState;
 
   const Provider = useMemo(() => {
     const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-      <ProFormContext.Provider value={{ formStore, instance, arcoForm }}>{children}</ProFormContext.Provider>
+      <ProFormContext.Provider value={{ instance, bindingProps, store, arcoForm }}>{children}</ProFormContext.Provider>
     );
     return P;
-  }, [formStore, instance, arcoForm]);
+  }, [instance, bindingProps, store, arcoForm]);
 
   useImperativeHandle(ref, () => instance, [instance]);
 
   return (
     <Provider>
-      <ProFormRenderer
-        {...(props as ProFormProps)}
-        formStore={formStore}
-        arcoForm={arcoForm}
-        instance={instance}
-        setComponentRef={setComponentRef}
-        fieldNavigation={fieldNavigation}
-        virtualState={virtualState}
-        virtualContainerRef={virtualContainerRef}
-        isDraftState={isDraftState}
-        isPreviewState={isPreviewState}
-        setIsDraftState={setIsDraftState}
-        setIsPreviewState={setIsPreviewState}
-      />
+      <ProFormRenderer {...(props as ProFormProps)} formStore={store} arcoForm={arcoForm} instance={instance} />
     </Provider>
   );
 });
 
-// ===== 公开 API：调度层 =====
+/**
+ * ProForm — 调度层。
+ *
+ * 检测 props.instance 是否存在：
+ * - 有 → ProFormControlled（受控模式，复用外部状态）
+ * - 无 → ProFormStandalone（独立模式，内部创建状态）
+ */
 export const ProForm = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
-  if (props.form) {
+  if (props.instance) {
     return <ProFormControlled {...props} ref={ref} />;
   }
   return <ProFormStandalone {...props} ref={ref} />;

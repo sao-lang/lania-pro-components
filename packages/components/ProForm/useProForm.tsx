@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type {
   ProFormInstance,
   ProFormSchema,
@@ -6,12 +6,10 @@ import type {
   ProFormProps,
   UseProFormOptions,
   UseProFormReturn,
-  GetComponentRefFn,
 } from './types';
 import { createFormStore } from './core/FormStore';
 import { useArcoForm } from './hooks/useArcoForm';
-import { createProProvider, useVirtualScroll } from '@lania-pro-components/shared';
-import { useFieldNavigation } from './hooks/useFieldNavigation';
+import { createProProvider } from '@lania-pro-components/shared';
 import { ProFormContextValue, UsrProFormFn } from './types';
 
 const { useContext: useProFormContextInner, Context: ProFormContext } =
@@ -23,7 +21,20 @@ export const useProFormContext: UsrProFormFn = () => {
   return useProFormContextInner() as ProFormContextValue;
 };
 
-// ===== 内部 Hook：纯数据层 =====
+/** @internal 桩函数，ProFormRenderer 挂载后通过 useEffect 覆写 */
+const noop = () => {};
+
+/**
+ * useFormStore — 纯数据层内部 Hook。
+ *
+ * 职责：
+ * - 创建 FormStore（数据仓库）和 arcoForm（Arco Form 桥接实例）
+ * - 提供纯数据操作方法：validate / setFieldsValue / getFieldsValue / resetFields / submit
+ * - 不涉及任何 UI 状态（聚焦、虚拟滚动、草稿模式等）
+ *
+ * 返回值中 baseInstance 是 ProFormInstance 的数据子集，
+ * 由 useProForm 组合 useFormUI 的 UI 方法后合并为完整实例。
+ */
 function useFormStore() {
   const formStore = useMemo(() => createFormStore(), []);
   const arcoForm = useArcoForm(formStore);
@@ -100,9 +111,9 @@ function useFormStore() {
         const field = formStore.getField(name);
         if (field) {
           field.setValue(value);
-        } else {
-          arcoForm.setFieldValue(name, value);
         }
+
+        arcoForm.setFieldValue(name, value);
       });
     },
     [formStore, arcoForm],
@@ -113,9 +124,8 @@ function useFormStore() {
       const field = formStore.getField(name);
       if (field) {
         field.setValue(value);
-      } else {
-        arcoForm.setFieldValue(name, value);
       }
+      arcoForm.setFieldValue(name, value);
     },
     [formStore, arcoForm],
   );
@@ -142,10 +152,13 @@ function useFormStore() {
   const resetFields = useCallback(
     (nameList?: string[]) => {
       if (nameList) {
-        nameList.forEach((name) => formStore.resetField(name));
+        nameList.forEach((name) => {
+          formStore.resetField(name);
+        });
       } else {
         formStore.reset();
       }
+      arcoForm.resetFields(nameList);
     },
     [formStore],
   );
@@ -171,104 +184,6 @@ function useFormStore() {
   };
 
   return { formStore, arcoForm, baseInstance };
-}
-
-// ===== 内部 Hook：UI 能力层 =====
-function useFormUI<TValues = Record<string, unknown>>(
-  schemas: ProFormSchema<TValues>[],
-  formStore: ReturnType<typeof createFormStore>,
-  arcoForm: ReturnType<typeof useArcoForm>,
-  options: {
-    keyboardNavigation?: ProFormProps['keyboardNavigation'];
-    onFieldFocus?: (name: string) => void;
-    onFieldBlur?: (name: string) => void;
-    performance?: ProFormProps['performance'];
-  },
-) {
-  const componentRefs = useRef<Record<string, unknown>>({});
-  const [fieldStatusMap, setFieldStatusMap] = useState<Record<string, FieldStatus>>({});
-  const [isDraftState, setIsDraftState] = useState(false);
-  const [isPreviewState, setIsPreviewState] = useState(false);
-
-  const getRef = useCallback(((name: string) => componentRefs.current[name]) as GetComponentRefFn, []);
-
-  const setComponentRef = useCallback((name: string, ref: unknown) => {
-    componentRefs.current[name] = ref;
-  }, []);
-
-  const fieldNavigation = useFieldNavigation({
-    schemas,
-    getRef,
-    keyboardNavigation: options.keyboardNavigation,
-    formStore,
-    onFocus: options.onFieldFocus,
-    onBlur: options.onFieldBlur,
-  });
-
-  const virtualScrollConfig = options.performance?.virtualScroll;
-  const {
-    containerRef: virtualContainerRef,
-    virtualState,
-    scrollToIndex,
-  } = useVirtualScroll(schemas, {
-    itemHeight: virtualScrollConfig?.itemHeight || 60,
-    overscan: virtualScrollConfig?.overscan || 5,
-    containerHeight: virtualScrollConfig?.containerHeight,
-  });
-
-  const scrollToField = useCallback(
-    (name: string) => {
-      const enabled = virtualScrollConfig?.enabled && schemas.length > 20;
-      if (enabled) {
-        const index = schemas.findIndex((s) => {
-          const schemaName = Array.isArray(s.name) ? s.name.join('.') : s.name;
-          return String(schemaName) === name;
-        });
-        if (index !== -1) {
-          scrollToIndex(index);
-          return;
-        }
-      }
-      arcoForm.scrollToField(name);
-    },
-    [arcoForm, schemas, scrollToIndex, virtualScrollConfig?.enabled],
-  );
-
-  const getFieldStatus = useCallback((name: string): FieldStatus => fieldStatusMap[name] || 'edit', [fieldStatusMap]);
-
-  const setFieldStatus = useCallback((name: string, status: FieldStatus) => {
-    setFieldStatusMap((prev) => ({ ...prev, [name]: status }));
-  }, []);
-
-  const uiMethods = {
-    getRef,
-    setComponentRef,
-    focusField: fieldNavigation.focusField,
-    focusNextField: fieldNavigation.focusNextField,
-    focusPrevField: fieldNavigation.focusPrevField,
-    getFocusedField: () => fieldNavigation.focusedField,
-    scrollToField,
-    getFieldStatus,
-    setFieldStatus,
-    isDraft: () => isDraftState,
-    setDraft: (v: boolean) => setIsDraftState(v),
-    isPreview: () => isPreviewState,
-    setPreview: (v: boolean) => setIsPreviewState(v),
-  };
-
-  return {
-    setComponentRef,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
-    fieldStatusMap,
-    setFieldStatusMap,
-    isDraftState,
-    setIsDraftState,
-    isPreviewState,
-    setIsPreviewState,
-    uiMethods,
-  };
 }
 
 // ===== 公开 Hook：组合数据层 + UI 层 =====
@@ -325,46 +240,21 @@ export const useProForm = <TValues = Record<string, unknown>,>(
     wrapperColProps,
     cardContainer,
     keyboardNavigation,
-    performance,
     onFieldFocus,
     onFieldBlur,
   } = options;
 
   const [schemas, setSchemasState] = useState<ProFormSchema<TValues>[]>(initialSchemas || []);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [formProps, setFormPropsState] = useState<Partial<ProFormProps<TValues>>>({});
 
-  // 数据层
   const { formStore, arcoForm, baseInstance } = useFormStore();
 
-  // UI 能力层
-  // const draftPreview = useMemo(
-  //   () => ({ isDraftState: draft || false, isPreviewState: preview || false }),
-  //   [draft, preview],
-  // );
+  const [fieldStatusMap, setFieldStatusMap] = useState<Record<string, FieldStatus>>({});
+  const [isDraftState, setIsDraftState] = useState(draft || false);
+  const [isPreviewState, setIsPreviewState] = useState(preview || false);
 
-  const {
-    setComponentRef,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
-    fieldStatusMap,
-    setFieldStatusMap,
-    isDraftState,
-    setIsDraftState,
-    isPreviewState,
-    setIsPreviewState,
-    uiMethods,
-  } = useFormUI(schemas, formStore, arcoForm, { keyboardNavigation, onFieldFocus, onFieldBlur, performance });
-
-  // 同步 draft/preview 外部 prop 到内部 state
-  if (draft !== undefined && draft !== isDraftState) {
-    setIsDraftState(draft);
-  }
-  if (preview !== undefined && preview !== isPreviewState) {
-    setIsPreviewState(preview);
-  }
-
-  const getRef = uiMethods.getRef;
+  const getRef = useCallback(() => undefined, []);
 
   const setSchemas = useCallback((newSchemas: ProFormSchema<TValues>[]) => {
     setSchemasState(newSchemas);
@@ -374,18 +264,37 @@ export const useProForm = <TValues = Record<string, unknown>,>(
     setFormPropsState((prev) => ({ ...prev, ...props }));
   }, []);
 
-  /** ProForm 实例对象 */
-  const instance: ProFormInstance<TValues> = useMemo(() => {
-    const getFocusedField = () => fieldNavigation.focusedField;
-    return {
-      ...baseInstance,
-      ...uiMethods,
-      setSchemas,
-      setProps,
-      getRef,
-      getFocusedField,
-    } as ProFormInstance<TValues>;
-  }, [baseInstance, uiMethods, setSchemas, setProps, getRef, fieldNavigation.focusedField]);
+  /** ProForm 实例对象 — UI 方法为桩，ProFormRenderer 挂载后通过 useEffect 覆写 */
+  const instance: ProFormInstance<TValues> = useMemo(
+    () =>
+      ({
+        ...baseInstance,
+        store: formStore,
+        arcoForm,
+        setSchemas,
+        getSchemas: () => schemas,
+        setProps,
+        getProps: () => formProps,
+        getRef,
+        focusField: noop,
+        focusNextField: noop,
+        focusPrevField: noop,
+        getFocusedField: () => undefined,
+        scrollToField: noop,
+        getFieldStatus: (name: string): FieldStatus => fieldStatusMap[name] || 'edit',
+        setFieldStatus: (name: string, status: FieldStatus) => {
+          setFieldStatusMap((prev) => ({ ...prev, [name]: status }));
+        },
+        isDraft: () => isDraftState,
+        setDraft: (v: boolean) => setIsDraftState(v),
+        isPreview: () => isPreviewState,
+        setPreview: (v: boolean) => setIsPreviewState(v),
+        getFieldFocused: (name: string): boolean => formStore.getField(name)?.focused || false,
+        getFieldStatusMap: () => fieldStatusMap,
+        setFieldStatusMap: setFieldStatusMap as ProFormInstance['setFieldStatusMap'],
+      }) as ProFormInstance<TValues>,
+    [baseInstance, setSchemas, setProps, getRef, fieldStatusMap, isDraftState, isPreviewState, formStore],
+  );
 
   /** 组合 bindingProps */
   const bindingProps = useMemo<ProFormProps<TValues>>(
@@ -500,25 +409,7 @@ export const useProForm = <TValues = Record<string, unknown>,>(
   return {
     arcoForm,
     instance,
-    schemas,
-    setSchemas,
-    formProps,
-    setComponentRef,
-    fieldStatusMap,
-    setFieldStatusMap,
-    isDraftState,
-    setIsDraftState,
-    isPreviewState,
-    setIsPreviewState,
-    options: {
-      initialValues,
-      onValuesChange,
-      onFieldsChange,
-    } satisfies UseProFormOptions<TValues>,
     bindingProps,
-    formStore,
-    fieldNavigation,
-    virtualState,
-    virtualContainerRef,
+    store: formStore,
   };
 };
