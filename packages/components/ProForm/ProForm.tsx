@@ -12,8 +12,8 @@
  * <ProForm schemas={[...]} ref={formRef} />
  *
  * // 配合 useProForm（避免重复实例）
- * const form = useProForm({ schemas });
- * <ProForm form={form} />
+ * const { instance } = useProForm({ schemas });
+ * <ProForm instance={instance} />
  * ```
  */
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
