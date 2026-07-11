@@ -113,6 +113,8 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     dateFormat,
     keyboardNavigation,
     draftStorage,
+    onFieldFocus,
+    onFieldBlur
   } = props;
 
   // ===== 内部 UI 能力（由 Renderer 创建，不来自 useProForm）=====
@@ -137,8 +139,8 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     getRef,
     keyboardNavigation,
     formStore,
-    onFocus: undefined,
-    onBlur: undefined,
+    onFocus: onFieldFocus,
+    onBlur: onFieldBlur,
   });
 
   const {
