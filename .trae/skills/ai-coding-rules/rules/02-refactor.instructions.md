@@ -20,21 +20,6 @@ applyTo: 'packages/**/*.{ts,tsx}'
 
 - 修改文件与行数
 - 解决的问题
-- 建议运行 `prettier --write` + `tsc --noEmit`
 - 潜在隐患
-- 追加记录到 `overview.md`（格式见下）
-
-```md
-### YYYY-MM-DD
-
-#### N. 标题
-
-- **时间：** YYYY-MM-DD HH:mm:ss
-- **发起人：** user
-- **修改文件：** path/to/file
-- **修改内容：** 摘要
-- **复盘结果：** 摘要
-- **潜在风险：** 注意事项
-```
 
 > 普通 Bug 修复跳此流程，直接按 Base Rules 修复。

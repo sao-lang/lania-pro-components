@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "./.github/hooks/scripts/auto-format.ps1",
+        "description": "Auto-format modified files with prettier + eslint --fix",
+        "timeout": 30
+      }
+    ]
+  }
+}
