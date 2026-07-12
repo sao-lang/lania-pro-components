@@ -1,4 +1,4 @@
-import { ProTable } from '..';
+import ProTable from './components/ProTable';
 
 // 导出类型
 export type {
@@ -14,15 +14,15 @@ export type {
   ProTableBatchOperationConfig,
   ProTableRowSelectionConfig,
   TableDensity,
-  OpenDialogConfig,
-  ConfirmDialogConfig,
-  DialogReturnProps,
   ProTableNEventHandlers,
   OprActionButtonConfig,
   ToolbarActionButtonConfig,
   OprColumnConfig,
   ToolbarActionConfig,
 } from './types';
+
+// 弹窗类型从 ProDialog 导出
+export type { OpenDialogConfig, ConfirmDialogConfig, DialogReturnProps } from '../ProDialog/types';
 
 // 导出 Context
 export {

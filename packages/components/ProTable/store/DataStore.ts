@@ -53,6 +53,8 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
       filters: {},
       selectedRowKeys: [],
       selectedRows: [],
+      expandedRowKeys: [],
+      expandedRows: [],
       isPolling: false,
       pollingInterval: undefined,
     });
@@ -153,6 +155,16 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
     this.store.setState({ selectedRowKeys: [], selectedRows: [] });
   }
 
+  // ==================== 展开操作 ====================
+
+  setExpandedRows(keys: (string | number)[], rows: T[]): void {
+    this.store.setState({ expandedRowKeys: keys, expandedRows: rows });
+  }
+
+  clearExpanded(): void {
+    this.store.setState({ expandedRowKeys: [], expandedRows: [] });
+  }
+
   // ==================== 轮询操作 ====================
 
   setPolling(isPolling: boolean, interval?: number): void {
@@ -218,6 +230,14 @@ class DataStoreImpl<T = unknown> implements DataStoreState<T>, DataStoreActions<
 
   get selectedRows(): T[] {
     return this.store.getState().selectedRows;
+  }
+
+  get expandedRowKeys(): (string | number)[] {
+    return this.store.getState().expandedRowKeys;
+  }
+
+  get expandedRows(): T[] {
+    return this.store.getState().expandedRows;
   }
 
   get isPolling(): boolean {

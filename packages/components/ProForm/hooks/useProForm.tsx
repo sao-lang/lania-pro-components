@@ -1,9 +1,15 @@
-import { useState, useCallback, useMemo } from 'react';
-import type { ProFormInstance, ProFormSchema, ProFormProps, UseProFormOptions, UseProFormReturn } from './types';
-import { createFormStore } from './core/FormStore';
-import { useArcoForm } from './hooks/useArcoForm';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import type {
+  ProFormInstance,
+  ProFormSchema,
+  ProFormProps,
+  UseProFormOptions,
+  UseProFormReturn,
+} from '../types';
+import { createFormStore } from '../core/FormStore';
+import { useArcoForm } from './useArcoForm';
 import { createProProvider } from '@lania-pro-components/shared';
-import { ProFormContextValue, UsrProFormFn } from './types';
+import { ProFormContextValue, UsrProFormFn } from '../types';
 
 const { useContext: useProFormContextInner, Context: ProFormContext } =
   createProProvider<ProFormContextValue>('ProForm');
@@ -18,16 +24,11 @@ export const useProFormContext: UsrProFormFn = () => {
 const noop = () => {};
 
 /**
- * useFormStore — 纯数据层内部 Hook。
- *
- * 职责：
- * - 创建 FormStore（数据仓库）和 arcoForm（Arco Form 桥接实例）
- * - 提供纯数据操作方法：validate / setFieldsValue / getFieldsValue / resetFields / submit
- * - 不涉及任何 UI 状态（聚焦、虚拟滚动、草稿模式等）
- *
- * 返回值中 baseInstance 是 ProFormInstance 的数据子集，
- * 由 useProForm 组合 useFormUI 的 UI 方法后合并为完整实例。
- */
+ * useFormStore �?纯数据层内部 Hook�? *
+ * 职责�? * - 创建 FormStore（数据仓库）�?arcoForm（Arco Form 桥接实例�? * - 提供纯数据操作方法：validate / setFieldsValue / getFieldsValue / resetFields / submit
+ * - 不涉及任�?UI 状态（聚焦、虚拟滚动、草稿模式等�? *
+ * 返回值中 baseInstance �?ProFormInstance 的数据子集，
+ * �?useProForm 组合 useFormUI �?UI 方法后合并为完整实例�? */
 function useFormStore() {
   const formStore = useMemo(() => createFormStore(), []);
   const arcoForm = useArcoForm(formStore);
@@ -178,69 +179,18 @@ function useFormStore() {
   return { formStore, arcoForm, baseInstance };
 }
 
-// ===== 公开 Hook：组合数据层 + UI 层 =====
+// ===== 公开 Hook：组合数据层 + UI �?=====
 export const useProForm = <TValues = Record<string, unknown>,>(
   options: UseProFormOptions<TValues> = {},
 ): UseProFormReturn<TValues> => {
-  const {
-    schemas: initialSchemas,
-    layout,
-    labelCol,
-    wrapperCol,
-    colon,
-    labelAlign,
-    size,
-    disabled,
-    readonly,
-    draft,
-    preview,
-    initialValues,
-    onFinish,
-    onFinishFailed,
-    onValuesChange,
-    onFieldsChange,
-    onDraftChange,
-    onPreviewChange,
-    showButton,
-    submitText,
-    resetText,
-    submitLoading,
-    resetLoading,
-    buttonPosition,
-    collapsible,
-    collapsed,
-    defaultCollapsed,
-    expandText,
-    collapseText,
-    collapsedRows,
-    onCollapseChange,
-    rows,
-    buttons,
-    buttonList,
-    okButtonProps,
-    cancelButtonProps,
-    rowProps,
-    colProps,
-    columns,
-    gutter,
-    className,
-    style,
-    formRef: formRefProp,
-    scrollToFirstError,
-    validateTrigger,
-    labelColProps,
-    wrapperColProps,
-    cardContainer,
-    keyboardNavigation,
-    onFieldFocus,
-    onFieldBlur,
-  } = options;
+  const { schemas: initialSchemas } = options;
 
   const [schemas, setSchemasState] = useState<ProFormSchema<TValues>[]>(initialSchemas || []);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [formProps, setFormPropsState] = useState<Partial<ProFormProps<TValues>>>({});
+  const [dynamicProps, setDynamicProps] = useState<Partial<ProFormProps<TValues>>>({});
 
   const { formStore, arcoForm, baseInstance } = useFormStore();
+
+  const bindingPropsRef = useRef<ProFormProps<TValues>>({} as ProFormProps<TValues>);
 
   const getRef = useCallback(() => undefined, []);
 
@@ -249,10 +199,12 @@ export const useProForm = <TValues = Record<string, unknown>,>(
   }, []);
 
   const setProps = useCallback((props: Partial<ProFormProps<TValues>>) => {
-    setFormPropsState((prev) => ({ ...prev, ...props }));
+    setDynamicProps((prev) => ({ ...prev, ...props }));
   }, []);
 
-  /** ProForm 实例对象 — UI 方法为桩，ProFormRenderer 挂载后通过 useEffect 覆写 */
+  const getProps = useCallback(() => bindingPropsRef.current, []);
+
+  /** ProForm 实例对象 �?UI 方法为桩，ProFormRenderer 挂载后通过 useEffect 覆写 */
   const instance: ProFormInstance<TValues> = useMemo(
     () =>
       ({
@@ -262,7 +214,7 @@ export const useProForm = <TValues = Record<string, unknown>,>(
         setSchemas,
         getSchemas: () => schemas,
         setProps,
-        getProps: () => formProps,
+        getProps,
         getRef,
         focusField: noop,
         focusNextField: noop,
@@ -279,123 +231,26 @@ export const useProForm = <TValues = Record<string, unknown>,>(
         getFieldStatusMap: () => ({}),
         setFieldStatusMap: noop as ProFormInstance['setFieldStatusMap'],
       }) as ProFormInstance<TValues>,
-    [baseInstance, setSchemas, setProps, getRef, formStore],
+    [baseInstance, setSchemas, setProps, getProps, getRef, formStore],
   );
 
   /** 组合 bindingProps */
-  const bindingProps = useMemo<ProFormProps<TValues>>(
-    () => ({
+  const bindingProps = useMemo<ProFormProps<TValues>>(() => {
+    const props = {
+      ...options,
       schemas,
-      layout,
-      labelCol,
-      wrapperCol,
-      colon,
-      labelAlign,
-      size,
-      disabled,
-      readonly,
-      draft,
-      preview,
-      initialValues,
-      onFinish,
-      onFinishFailed,
-      onValuesChange,
-      onFieldsChange,
-      onDraftChange,
-      onPreviewChange,
-      showButton,
-      submitText,
-      resetText,
-      submitLoading,
-      resetLoading,
-      buttonPosition,
-      collapsible,
-      collapsed,
-      defaultCollapsed,
-      expandText,
-      collapseText,
-      collapsedRows,
-      onCollapseChange,
-      rows,
-      buttons,
-      buttonList,
-      okButtonProps,
-      cancelButtonProps,
-      rowProps,
-      colProps,
-      columns,
-      gutter,
-      className,
-      style,
-      formRef: formRefProp,
-      scrollToFirstError,
-      validateTrigger,
-      labelColProps,
-      wrapperColProps,
-      cardContainer,
-      keyboardNavigation,
-      onFieldFocus,
-      onFieldBlur,
-    }),
-    [
-      schemas,
-      layout,
-      labelCol,
-      wrapperCol,
-      colon,
-      labelAlign,
-      size,
-      disabled,
-      readonly,
-      draft,
-      preview,
-      initialValues,
-      onFinish,
-      onFinishFailed,
-      onValuesChange,
-      onFieldsChange,
-      onDraftChange,
-      onPreviewChange,
-      showButton,
-      submitText,
-      resetText,
-      submitLoading,
-      resetLoading,
-      buttonPosition,
-      collapsible,
-      collapsed,
-      defaultCollapsed,
-      expandText,
-      collapseText,
-      collapsedRows,
-      onCollapseChange,
-      rows,
-      buttons,
-      buttonList,
-      okButtonProps,
-      cancelButtonProps,
-      rowProps,
-      colProps,
-      columns,
-      gutter,
-      className,
-      style,
-      formRefProp,
-      scrollToFirstError,
-      validateTrigger,
-      labelColProps,
-      wrapperColProps,
-      cardContainer,
-      keyboardNavigation,
-      onFieldFocus,
-      onFieldBlur,
-    ],
-  );
+      ...dynamicProps,
+    };
+    bindingPropsRef.current = props;
+    return props;
+  }, [options, schemas, dynamicProps]);
 
   return {
     arcoForm,
     instance,
     bindingProps,
     store: formStore,
+    setProps,
+    getProps,
   };
 };

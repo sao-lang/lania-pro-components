@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { TableProps, TableColumnProps, PaginationProps, ButtonProps } from '@arco-design/web-react';
 import type { ProFormSchema, ProFormInstance, ProFormProps } from '../ProForm/types';
+import type { OpenDialogConfig, ConfirmDialogConfig, DialogReturnProps } from '../ProDialog/types';
 
 /**
  * 操作按钮配置
@@ -464,342 +465,9 @@ export interface ProColumnType<T = Record<string, unknown>> extends Omit<
  * 打开弹窗配置
  * 支持 Modal 组件的所有属性透传
  */
-export interface OpenDialogConfig<TValues = Record<string, unknown>, TRow = Record<string, unknown>> {
-  /**
-   * 表格列配置
-   */
-  columns?: ProColumnType<TRow>[];
-  /**
-   * 表格数据请求
-   */
-  request?: ProTableRequest<TRow>;
-  /**
-   * 表格数据源
-   */
-  dataSource?: TRow[];
-  /**
-   * 弹窗标题
-   */
-  title?: ReactNode;
-  /**
-   * 弹窗内容
-   */
-  content?:
-    | ReactNode
-    | ((props: {
-        close: () => void;
-        update: (config: Partial<OpenDialogConfig<TValues, TRow>>) => void;
-        destroy: () => void;
-      }) => ReactNode);
-  /**
-   * 弹窗宽度
-   */
-  width?: number | string;
-  /**
-   * 确认回调
-   */
-  onOk?: (values: TValues, row?: TRow) => void | boolean | Promise<void | boolean>;
-  /**
-   * 取消回调
-   */
-  onCancel?: () => void;
-  /**
-   * 是否显示遮罩
-   * @default true
-   */
-  mask?: boolean;
-  /**
-   * 点击遮罩是否关闭
-   * @default true
-   */
-  maskClosable?: boolean;
-  /**
-   * 是否显示关闭按钮
-   * @default true
-   */
-  closable?: boolean;
-  /**
-   * 是否居中显示
-   * @default false
-   */
-  alignCenter?: boolean;
-  /**
-   * 是否全屏显示
-   * @default false
-   */
-  fullscreen?: boolean;
-  /**
-   * 自定义弹窗样式
-   */
-  modalStyle?: React.CSSProperties;
-  /**
-   * 自定义弹窗类名
-   */
-  modalClassName?: string;
-  /**
-   * 自定义遮罩样式
-   */
-  maskStyle?: React.CSSProperties;
-  /**
-   * 是否显示底部按钮
-   * @default true
-   */
-  footer?: boolean | ReactNode;
-  /**
-   * 确认按钮文字
-   * @default '确认'
-   */
-  okText?: string;
-  /**
-   * 取消按钮文字
-   * @default '取消'
-   */
-  cancelText?: string;
-  /**
-   * 确认按钮属性
-   */
-  okButtonProps?: Record<string, unknown>;
-  /**
-   * 取消按钮属性
-   */
-  cancelButtonProps?: Record<string, unknown>;
-  /**
-   * 是否隐藏确认按钮
-   * @default false
-   */
-  hideOkButton?: boolean;
-  /**
-   * 是否隐藏取消按钮
-   * @default false
-   */
-  hideCancelButton?: boolean;
-  /**
-   * 是否隐藏全屏按钮
-   * @default false
-   */
-  hideFullscreenButton?: boolean;
-  /**
-   * 弹窗打开后的回调
-   */
-  afterOpen?: () => void;
-  /**
-   * 弹窗关闭后的回调
-   */
-  afterClose?: () => void;
-  /**
-   * 自定义挂载容器
-   */
-  getPopupContainer?: () => HTMLElement;
-  /**
-   * 是否在初次打开对话框时才渲染 dom
-   * @default true
-   */
-  mountOnEnter?: boolean;
-  /**
-   * 是否在隐藏之后销毁DOM结构
-   * @default true
-   */
-  unmountOnExit?: boolean;
-  /**
-   * 按 `ESC` 键关闭
-   * @default true
-   */
-  escToExit?: boolean;
-  /**
-   * 是否默认聚焦第一个可聚焦元素
-   * @default true
-   */
-  autoFocus?: boolean;
-  /**
-   * 是否将焦点锁定在弹出框内
-   * @default true
-   */
-  focusLock?: boolean;
-  /**
-   * 简洁模式的样式
-   * @default false
-   */
-  simple?: boolean;
-  /**
-   * 自定义右上角的关闭按钮节点
-   */
-  closeIcon?: ReactNode;
-  /**
-   * 自定义渲染对话框
-   */
-  modalRender?: (modalNode: ReactNode) => ReactNode;
-}
-
 /**
- * 确认对话框配置
- * 支持 Modal 组件的所有属性透传
+ * 弹窗配置类型（复用 ProDialog）
  */
-export interface ConfirmDialogConfig {
-  /**
-   * 标题
-   */
-  title?: ReactNode;
-  /**
-   * 内容
-   */
-  content?:
-    | ReactNode
-    | ((props: {
-        close: () => void;
-        update: (config: Partial<ConfirmDialogConfig>) => void;
-        destroy: () => void;
-      }) => ReactNode);
-  /**
-   * 确认回调
-   */
-  onConfirm?: () => void | boolean | Promise<void | boolean>;
-  /**
-   * 取消回调
-   */
-  onCancel?: () => void;
-  /**
-   * 弹窗宽度
-   * @default 400
-   */
-  width?: number | string;
-  /**
-   * 是否显示遮罩
-   * @default true
-   */
-  mask?: boolean;
-  /**
-   * 点击遮罩是否关闭
-   * @default false
-   */
-  maskClosable?: boolean;
-  /**
-   * 是否显示关闭按钮
-   * @default true
-   */
-  closable?: boolean;
-  /**
-   * 是否居中显示
-   * @default true
-   */
-  alignCenter?: boolean;
-  /**
-   * 自定义弹窗样式
-   */
-  modalStyle?: React.CSSProperties;
-  /**
-   * 自定义弹窗类名
-   */
-  modalClassName?: string;
-  /**
-   * 自定义遮罩样式
-   */
-  maskStyle?: React.CSSProperties;
-  /**
-   * 确认按钮文字
-   * @default '确认'
-   */
-  confirmText?: string;
-  /**
-   * 取消按钮文字
-   * @default '取消'
-   */
-  cancelText?: string;
-  /**
-   * 确认按钮类型
-   * @default 'primary'
-   */
-  confirmButtonType?: 'primary' | 'secondary' | 'outline' | 'text';
-  /**
-   * 确认按钮状态
-   */
-  confirmButtonStatus?: 'default' | 'success' | 'warning' | 'danger';
-  /**
-   * 确认按钮属性
-   */
-  confirmButtonProps?: Record<string, unknown>;
-  /**
-   * 取消按钮属性
-   */
-  cancelButtonProps?: Record<string, unknown>;
-  /**
-   * 是否隐藏确认按钮
-   * @default false
-   */
-  hideConfirmButton?: boolean;
-  /**
-   * 是否隐藏取消按钮
-   * @default false
-   */
-  hideCancelButton?: boolean;
-  /**
-   * 弹窗打开后的回调
-   */
-  afterOpen?: () => void;
-  /**
-   * 弹窗关闭后的回调
-   */
-  afterClose?: () => void;
-  /**
-   * 自定义挂载容器
-   */
-  getPopupContainer?: () => HTMLElement;
-  /**
-   * 是否在初次打开对话框时才渲染 dom
-   * @default true
-   */
-  mountOnEnter?: boolean;
-  /**
-   * 是否在隐藏之后销毁DOM结构
-   * @default true
-   */
-  unmountOnExit?: boolean;
-  /**
-   * 按 `ESC` 键关闭
-   * @default true
-   */
-  escToExit?: boolean;
-  /**
-   * 是否默认聚焦第一个可聚焦元素
-   * @default true
-   */
-  autoFocus?: boolean;
-  /**
-   * 是否将焦点锁定在弹出框内
-   * @default true
-   */
-  focusLock?: boolean;
-  /**
-   * 简洁模式的样式
-   * @default false
-   */
-  simple?: boolean;
-  /**
-   * 自定义右上角的关闭按钮节点
-   */
-  closeIcon?: ReactNode;
-  /**
-   * 自定义渲染对话框
-   */
-  modalRender?: (modalNode: ReactNode) => ReactNode;
-}
-
-/**
- * 弹窗返回对象
- */
-export interface DialogReturnProps<TValues = Record<string, unknown>, TRow = Record<string, unknown>> {
-  /**
-   * 更新弹窗配置
-   */
-  update: (config: Partial<OpenDialogConfig<TValues, TRow>>) => void;
-  /**
-   * 关闭弹窗
-   */
-  close: () => void;
-  /**
-   * 销毁弹窗
-   */
-  destroy: () => void;
-}
 
 /**
  * 表格操作类型
@@ -859,6 +527,12 @@ export interface ProTableActionType<T = Record<string, unknown>> {
   getExpandedRowKeys: () => (string | number)[];
   /** 设置展开的行 keys */
   setExpandedRowKeys: (keys: (string | number)[]) => void;
+  /** 设置展开的行 */
+  setExpandedRows: (keys: (string | number)[], rows: T[]) => void;
+  /** 获取当前展开的行 */
+  getExpandedRows: () => T[];
+  /** 清空展开 */
+  clearExpanded: () => void;
   /**
    * 打开弹窗
    * @param config 弹窗配置
@@ -866,7 +540,7 @@ export interface ProTableActionType<T = Record<string, unknown>> {
    */
   openDialog: <TValues = Record<string, unknown>, TRow = Record<string, unknown>>(
     config: OpenDialogConfig<TValues, TRow>,
-  ) => DialogReturnProps<TValues, TRow>;
+  ) => DialogReturnProps;
   /**
    * 打开确认对话框
    * @param config 确认对话框配置
@@ -998,6 +672,8 @@ export interface ProTableRowSelectionConfig<T = Record<string, unknown>> {
 export interface ProTableInstance<T = Record<string, unknown>> {
   /** 表格操作 */
   action: ProTableActionType<T>;
+  /** store实例 */
+  store: DataStoreImpl<T>;
   /** 表单实例 */
   form: ProFormInstance | undefined;
   /** 当前数据 */
@@ -1008,6 +684,10 @@ export interface ProTableInstance<T = Record<string, unknown>> {
   selectedRows: T[];
   /** 选中行 keys */
   selectedRowKeys: (string | number)[];
+  /** 展开行 */
+  expandedRows: T[];
+  /** 展开行 keys */
+  expandedRowKeys: (string | number)[];
   /** 分页信息 */
   pagination: { current: number; pageSize: number; total: number };
   /** 查询参数 */
@@ -1017,6 +697,10 @@ export interface ProTableInstance<T = Record<string, unknown>> {
    * @param params 可选查询参数，传入后将合并到现有查询条件
    */
   fetchData: (params?: Record<string, unknown>) => void;
+  /** 动态更新表格属性 */
+  setProps: (props: Partial<ProTableProps<T>>) => void;
+  /** 获取表格属性 */
+  getProps: () => ProTableProps<T>;
 }
 
 /**
@@ -1027,7 +711,7 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
   'columns' | 'pagination' | 'rowSelection'
 > {
   /** 表格实例（由 useProTable 返回的 instance）。传入后复用该状态和数据 */
-  table?: ProTableInstance<T>;
+  instance?: ProTableInstance<T>;
 
   /** 表格列配置 */
   columns: ProColumnType<T>[];
@@ -1039,9 +723,6 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
 
   /** 数据请求函数 */
   request?: ProTableRequest<T>;
-
-  /** 表格实例名称，用于 useProTable */
-  instance?: string;
 
   /** 获取数据的 key，用于缓存 */
   params?: Record<string, unknown>;
@@ -1110,6 +791,9 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
   /** 展开的行（受控） */
   expandedRowKeys?: (string | number)[];
 
+  /** 展开/收起回调 */
+  onRowExpandChange?: (record: T, expanded: boolean, expandedRows: T[], expandedRowKeys: (string | number)[]) => void;
+
   /** 展开行渲染函数 */
   expandedRowRender?: (record: T, index: number) => ReactNode;
 
@@ -1121,6 +805,9 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
     rowExpandable?: (record: T) => boolean;
     expandRowByClick?: boolean;
   };
+
+  /** 获取行 key */
+  getRowKey?: (record: T) => string | number;
 
   /** 表格密度 */
   density?: TableDensity;
@@ -1470,83 +1157,11 @@ export interface ProTableToolbarConfig {
   actions?: ToolbarActionConfig;
 }
 
-export interface UseProTableOptions<T = Record<string, unknown>> {
+export interface UseProTableOptions<T = Record<string, unknown>> extends ProTableProps<T> {
   /** 表格 store */
   store?: DataStoreImpl<T>;
   /** 可编辑表格实例 */
   editableInstance?: EditableTableInstance<T>;
-  /** 展开控制 */
-  expandedRowKeys?: (string | number)[];
-  /** 设置展开 keys */
-  setExpandedRowKeys?: (keys: (string | number)[]) => void;
-  /** 获取行 key */
-  getRowKey?: (record: T) => string | number;
-  /** 数据源 */
-  dataSource?: T[];
-  /** 列配置 */
-  columns?: ProColumnType<T>[];
-  /** 请求函数 */
-  request?: ProTableProps<T>['request'];
-  /** 工具栏配置 */
-  toolbar?: ProTableProps<T>['toolbar'];
-  /** 搜索表单配置 */
-  search?: ProTableProps<T>['search'];
-  /** 行选择配置 */
-  rowSelection?: ProTableProps<T>['rowSelection'];
-  /** 批量操作配置 */
-  batchOperation?: ProTableProps<T>['batchOperation'];
-  /** 分页配置 */
-  pagination?: ProTableProps<T>['pagination'];
-  /** 卡片容器配置 */
-  cardContainer?: ProTableProps<T>['cardContainer'];
-  /** URL 同步配置 */
-  urlSync?: ProTableProps<T>['urlSync'];
-  /** 查询方案配置 */
-  searchSchema?: ProTableProps<T>['searchSchema'];
-  /** 编辑配置 */
-  editable?: ProTableProps<T>['editable'];
-  /** 默认页码 */
-  defaultPageSize?: number;
-  /** 页码选项 */
-  pageSizeOptions?: number[];
-  /** 行 key */
-  rowKey?: string | ((record: T) => string | number);
-  /** 加载状态 */
-  loading?: boolean;
-  /** 空状态渲染 */
-  emptyRender?: ProTableProps<T>['emptyRender'];
-  /** 错误状态渲染 */
-  errorRender?: ProTableProps<T>['errorRender'];
-  /** 请求前钩子 */
-  beforeRequest?: ProTableProps<T>['beforeRequest'];
-  /** 请求后钩子 */
-  afterRequest?: ProTableProps<T>['afterRequest'];
-  /** 请求错误回调 */
-  onRequestError?: ProTableProps<T>['onRequestError'];
-  /** 数据格式化 */
-  postData?: ProTableProps<T>['postData'];
-  /** 防抖时间 */
-  debounceTime?: number;
-  /** 轮询间隔 */
-  polling?: ProTableProps<T>['polling'];
-  /** 是否手动触发请求 */
-  manual?: boolean;
-  /** 拖拽排序配置 */
-  dragSort?: ProTableProps<T>['dragSort'];
-  /** 虚拟滚动配置 */
-  virtualScroll?: ProTableProps<T>['virtualScroll'];
-  /** 虚拟滚动详细配置 */
-  virtualScrollConfig?: ProTableProps<T>['virtualScrollConfig'];
-  /** 卡片模式配置 */
-  cardMode?: ProTableProps<T>['cardMode'];
-  /** 缓存配置 */
-  cache?: ProTableProps<T>['cache'];
-  /** 缓存 key */
-  cacheKey?: string;
-  /** 视图模式 */
-  viewMode?: 'table' | 'card';
-  /** 视图模式变化回调 */
-  onViewModeChange?: (mode: 'table' | 'card') => void;
 }
 
 export interface UseProTableReturn<T = Record<string, unknown>> {
@@ -1556,6 +1171,4 @@ export interface UseProTableReturn<T = Record<string, unknown>> {
   bindingProps: ProTableProps<T>;
   /** DataStore 实例（供 ProTable 内部 Context 使用） */
   store: DataStoreImpl<T>;
-  /** 设置 Form 实例（由 ProTable 内部调用，填充 instance.form 和 action.getFormInstance） */
-  setFormInstance: (form: ProFormInstance | undefined) => void;
 }

@@ -1,5 +1,5 @@
 /**
- * TableRenderer — 表格渲染器
+ * TableContent — 表格内容渲染器
  *
  * 负责将 ProTable 的数据和列配置转换为 Arco Design Table 组件：
  * - 列转换（ProColumnType → Arco TableColumnProps）
@@ -10,7 +10,7 @@
  * - 单元格合并
  */
 /**
- * TableRenderer — 表格渲染器组件
+ * TableContent — 表格内容渲染器组件
  *
  * 核心渲染组件：
  * 1. 从 DataContext/ColumnContext/RootContext 读取合并后的配置
@@ -30,7 +30,7 @@ import type { ProTableRowSelectionConfig, ProTableNEventHandlers, ProTableProps,
 import type { TableColumnProps } from '@arco-design/web-react';
 import { getCellMergeProps } from '../utils/cellMerge';
 
-export interface TableRendererProps<T = Record<string, unknown>> {
+export interface TableContentProps<T = Record<string, unknown>> {
   className?: string;
   style?: React.CSSProperties;
   emptyRender?: React.ReactNode | (() => React.ReactNode);
@@ -70,7 +70,7 @@ export interface TableRendererProps<T = Record<string, unknown>> {
   cellMerge?: ProTableProps<T>['cellMerge'];
 }
 
-export const TableRenderer = <T extends Record<string, unknown>>(props: TableRendererProps<T>) => {
+export const TableContent = <T extends Record<string, unknown>>(props: TableContentProps<T>) => {
   const {
     className,
     style,
@@ -93,6 +93,9 @@ export const TableRenderer = <T extends Record<string, unknown>>(props: TableRen
     selectedRowKeys,
     selectedRows,
     setSelectedRows,
+    expandedRowKeys,
+    expandedRows,
+    setExpandedRows,
     setPage,
     setPageSize,
     setSorter,
@@ -114,8 +117,7 @@ export const TableRenderer = <T extends Record<string, unknown>>(props: TableRen
     expandProps,
     rowSelection: propRowSelection,
     onChange: onTableChange,
-    onExpand,
-    onExpandedRowsChange,
+    onRowExpandChange,
     ...restProps
   } = tableRootProps;
 
@@ -338,6 +340,26 @@ export const TableRenderer = <T extends Record<string, unknown>>(props: TableRen
     );
   }
 
+  const handleExpand = useMemo(
+    () => (record: T, expanded: boolean) => {
+      const key = typeof rowKey === 'function' ? rowKey(record) : (record[rowKey as string] as string | number);
+      const newKeys = expanded ? [...expandedRowKeys, key] : expandedRowKeys.filter((k) => k !== key);
+      const newRows = expanded
+        ? [...expandedRows, record]
+        : expandedRows.filter((r) => {
+            const rKey = typeof rowKey === 'function' ? rowKey(r) : (r[rowKey as string] as string | number);
+            return rKey !== key;
+          });
+
+      setExpandedRows(newKeys, newRows);
+
+      if (onRowExpandChange) {
+        onRowExpandChange(record, expanded, newRows, newKeys);
+      }
+    },
+    [expandedRowKeys, expandedRows, setExpandedRows, onRowExpandChange, rowKey],
+  );
+
   return (
     <Spin loading={loading} style={{ width: '100%' }}>
       <ConfigProvider componentConfig={{ Table: { borderCell: bordered } }}>
@@ -348,8 +370,8 @@ export const TableRenderer = <T extends Record<string, unknown>>(props: TableRen
           rowKey={rowKey}
           rowSelection={rowSelectionConfig as TableProps<T>['rowSelection']}
           onChange={handleTableChange as TableProps<T>['onChange']}
-          onExpand={onExpand}
-          onExpandedRowsChange={onExpandedRowsChange}
+          onExpand={handleExpand}
+          expandedRowKeys={expandedRowKeys}
           scroll={scroll}
           className={`${tableClassName} pro-table-density-${density}`}
           style={tableStyle}

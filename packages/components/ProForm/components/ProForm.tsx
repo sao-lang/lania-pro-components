@@ -1,13 +1,10 @@
 /**
- * ProForm — Schema 驱动的表单组件。
- *
- * 三层架构：
- * - useProForm（状态层）：创建 FormStore / arcoForm / instance / 字段导航
+ * ProForm �?Schema 驱动的表单组件�? *
+ * 三层架构�? * - useProForm（状态层）：创建 FormStore / arcoForm / instance / 字段导航
  * - ProFormRenderer（渲染层）：Schema 合并、Grid 布局、按钮组、草稿持久化
- * - ProForm（调度层）：检测 form prop，分发到受控/独立模式
+ * - ProForm（调度层）：检�?form prop，分发到受控/独立模式
  *
- * 使用方式：
- * ```tsx
+ * 使用方式�? * ```tsx
  * // 独立使用
  * <ProForm schemas={[...]} ref={formRef} />
  *
@@ -19,18 +16,18 @@
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import { Form, Button, Grid, Card } from '@arco-design/web-react';
 import type { ProFormProps, ProFormInstance, ProFormSchema, FieldStatus } from './types';
-import { useProForm, ProFormContext } from './useProForm';
-import { FormField } from './components/FormField';
-import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
+import { useProForm, ProFormContext } from '../hooks/useProForm';
+import { FormField } from './FormField';
+import { RootContextProvider, LayoutContextProvider, createFormState } from '../context';
 import { useGroupLazyLoad, usePriorityLoad, useVirtualScroll } from '@lania-pro-components/shared';
-import { useFieldNavigation } from './hooks/useFieldNavigation';
-import { useDraft } from './hooks/useDraft';
+import { useFieldNavigation } from '../hooks/useFieldNavigation';
+import { useDraft } from '../hooks/useDraft';
 import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
 import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-components/utils';
 import type { DraftConfig } from './types';
-import type { ArcoFormInstance } from './hooks/useArcoForm';
-import type { FormStore } from './core/FormStore';
-import { createSchemaProcessor } from './utils/SchemaProcessor';
+import type { ArcoFormInstance } from '../hooks/useArcoForm';
+import type { FormStore } from '../core/FormStore';
+import { createSchemaProcessor } from '../utils/SchemaProcessor';
 
 const { Row, Col } = Grid;
 
@@ -42,11 +39,8 @@ interface ProFormRendererProps extends ProFormProps {
 }
 
 /**
- * ProFormRenderer — 渲染组件。
- *
- * 内部创建 UI 能力（componentRefs / fieldNavigation / virtualScroll / draft 状态），
- * 通过 useEffect 覆写 instance 上的桩方法。
- */
+ * ProFormRenderer �?渲染组件�? *
+ * 内部创建 UI 能力（componentRefs / fieldNavigation / virtualScroll / draft 状态）�? * 通过 useEffect 覆写 instance 上的桩方法�? */
 const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
   const {
     formStore,
@@ -116,15 +110,14 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     onFieldBlur,
   } = props;
 
-  // ===== 内部 UI 能力（由 Renderer 创建，不来自 useProForm）=====
+  // ===== 内部 UI 能力（由 Renderer 创建，不来自 useProForm�?====
   const componentRefs = useRef<Record<string, unknown>>({});
   const getRef = useCallback((name: string) => componentRefs.current[name], []);
   const setComponentRef = useCallback((name: string, ref: unknown) => {
     componentRefs.current[name] = ref;
   }, []);
 
-  // 本地 draft / preview 状态
-  const [isDraftState, setIsDraftState] = useState(!!draft);
+  // 本地 draft / preview 状�?  const [isDraftState, setIsDraftState] = useState(!!draft);
   const [isPreviewState, setIsPreviewState] = useState(!!preview);
   useEffect(() => {
     if (draft !== undefined && draft !== isDraftState) setIsDraftState(draft);
@@ -232,24 +225,21 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     return schemas.map((s) => createSchemaProcessor(schemaProcessOptions).processSchema(s, props));
   }, [schemas, schemaProcessOptions, transform, lifecycle, valueFormat, dateFormat, initialValues, keyboardNavigation]);
 
-  // 同步 draft 状态
-  useEffect(() => {
+  // 同步 draft 状�?  useEffect(() => {
     if (draft !== undefined && draft !== isDraftState) {
       setIsDraftState(draft);
       onDraftChange?.(draft);
     }
   }, [draft, isDraftState, setIsDraftState, onDraftChange]);
 
-  // 同步 preview 状态
-  useEffect(() => {
+  // 同步 preview 状�?  useEffect(() => {
     if (preview !== undefined && preview !== isPreviewState) {
       setIsPreviewState(preview);
       onPreviewChange?.(preview);
     }
   }, [preview, isPreviewState, setIsPreviewState, onPreviewChange]);
 
-  // 初始化表单值
-  useEffect(() => {
+  // 初始化表单�?  useEffect(() => {
     if (initialValues) {
       const timer = setTimeout(() => {
         formStore?.setValues(initialValues);
@@ -259,8 +249,7 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     }
   }, [initialValues, arcoForm, formStore]);
 
-  // 草稿持久化
-  const resolveDraftStorage = (storage: DraftConfig['storage']) => {
+  // 草稿持久�?  const resolveDraftStorage = (storage: DraftConfig['storage']) => {
     if (!storage || storage === 'localStorage') return localStorageStrategy;
     if (storage === 'sessionStorage') return sessionStorageStrategy;
     return storage as DraftStorage;
@@ -285,8 +274,7 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     formStore.setBatchUpdateConfig(performance?.batchUpdate);
   }, [formStore, performance?.batchUpdate]);
 
-  // 折叠状态
-  const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);
+  // 折叠状�?  const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);
   const isControlledCollapse = typeof collapsedProp !== 'undefined';
   const finalCollapsed = isControlledCollapse ? collapsedProp : innerCollapsed;
   const toggleCollapse = () => {
@@ -300,8 +288,7 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
     [isPreviewState, readonly, disabled, submitLoading],
   );
 
-  // 同步表单级约束到 store（供 FieldNode._effectiveStatus 计算）
-  useEffect(() => {
+  // 同步表单级约束到 store（供 FieldNode._effectiveStatus 计算�?  useEffect(() => {
     formStore.setFormConstraints({
       preview: isPreviewState,
       readonly,
@@ -665,12 +652,8 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
 };
 
 /**
- * ProFormControlled — 受控模式。
- *
- * 接收外部 useProForm() 返回的 instance，
- * 从 instance 读取 store / arcoForm 等状态。
- * 内部仅创建 ProFormContext.Provider 供子组件消费。
- */
+ * ProFormControlled �?受控模式�? *
+ * 接收外部 useProForm() 返回�?instance�? * �?instance 读取 store / arcoForm 等状态�? * 内部仅创�?ProFormContext.Provider 供子组件消费�? */
 // eslint-disable-next-line react/display-name
 const ProFormControlled = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
   const instance = props.instance as ProFormInstance;
@@ -678,26 +661,30 @@ const ProFormControlled = forwardRef<ProFormInstance, ProFormProps>((props, ref)
   const { instance: _omit, ...rest } = props;
   void _omit;
   const bindingProps = rest as unknown as ProFormProps;
-
+  const finalProps = useMemo(() => {
+    return {
+      ...rest,
+      ...instance.getProps(),
+    };
+  }, [bindingProps]);
   const Provider = useMemo(() => {
     const P = ({ children }: { children: React.ReactNode }) => (
       <ProFormContext.Provider value={{ instance, bindingProps, store, arcoForm }}>{children}</ProFormContext.Provider>
     );
     return P;
-  }, [instance, bindingProps, store, arcoForm]);
+  }, [instance, finalProps, store, arcoForm]);
 
   useImperativeHandle(ref, () => instance, [instance]);
 
   return (
     <Provider>
-      <ProFormRenderer {...rest} formStore={store} arcoForm={arcoForm} instance={instance} />
+      <ProFormRenderer {...finalProps} formStore={store} arcoForm={arcoForm} instance={instance} />
     </Provider>
   );
 });
 
 /**
- * ProFormStandalone — 独立模式。
- */
+ * ProFormStandalone �?独立模式�? */
 // eslint-disable-next-line react/display-name
 const ProFormStandalone = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
   const fullState = useProForm(props);
@@ -720,15 +707,13 @@ const ProFormStandalone = forwardRef<ProFormInstance, ProFormProps>((props, ref)
 });
 
 /**
- * ProForm — 调度层。
- *
- * 检测 props.instance 是否存在：
- * - 有 → ProFormControlled（受控模式，复用外部状态）
- * - 无 → ProFormStandalone（独立模式，内部创建状态）
+ * ProForm �?调度层�? *
+ * 检�?props.instance 是否存在�? * - �?�?ProFormControlled（受控模式，复用外部状态）
+ * - �?�?ProFormStandalone（独立模式，内部创建状态）
  */
 export const ProForm = forwardRef<ProFormInstance, ProFormProps>((props, ref) => {
   if (props.instance) {
-    return <ProFormControlled {...props} ref={ref} />;
+    return <ProFormControlled {...props.instance.getProps()} ref={ref} />;
   }
   return <ProFormStandalone {...props} ref={ref} />;
 });

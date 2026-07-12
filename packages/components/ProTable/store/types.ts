@@ -29,6 +29,10 @@ export interface DataStoreState<T = unknown> {
   selectedRowKeys: (string | number)[];
   selectedRows: T[];
 
+  // 展开状态
+  expandedRowKeys: (string | number)[];
+  expandedRows: T[];
+
   // 轮询状态
   isPolling: boolean;
   pollingInterval?: number;
@@ -54,6 +58,10 @@ export interface DataStoreActions<T = unknown> {
   // 选择操作
   setSelectedRows: (keys: (string | number)[], rows: T[]) => void;
   clearSelected: () => void;
+
+  // 展开操作
+  setExpandedRows: (keys: (string | number)[], rows: T[]) => void;
+  clearExpanded: () => void;
 
   // 轮询操作
   setPolling: (isPolling: boolean, interval?: number) => void;

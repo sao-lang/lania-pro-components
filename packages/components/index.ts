@@ -77,7 +77,7 @@ export { ProForm } from './ProForm';
 export type { ProFormInstance } from './ProForm/types';
 export { ProFormProvider } from './ProForm/ProFormProvider';
 export { FormField } from './ProForm/components/FormField';
-export { useProForm } from './ProForm/useProForm';
+export { useProForm } from './ProForm/hooks/useProForm';
 export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProForm/types';
 export type {
   ProFormListProps,
@@ -88,7 +88,7 @@ export type {
   ProFormStepSchema,
 } from './ProForm/components/types';
 
-export { ProTable } from './ProTable';
+export { default as ProTable } from './ProTable';
 export { useProTable } from './ProTable/hooks/useProTable';
 export type { ProTableActionType } from './ProTable/types';
 export type { ProTableProps, ProColumnType, ProTableState } from './ProTable/types';

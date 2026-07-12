@@ -728,7 +728,7 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
   /** 动态更新表单属性 */
   setProps: (props: Partial<ProFormProps<TValues>>) => void;
   /** 获取表单属性 */
-  getProps: (props: Partial<ProFormProps<TValues>>) => void;
+  getProps: () => ProFormProps<TValues>;
   /** 重置字段值 */
   resetFields: (nameList?: Array<keyof TValues>) => void;
   /** 滚动到指定字段 */
@@ -907,6 +907,10 @@ export interface UseProFormReturn<TValues = Record<string, unknown>> {
   bindingProps: ProFormProps<TValues>;
   /** 表单数据仓库 */
   store: FormStore;
+  /** 动态更新表单属性 */
+  setProps: (props: Partial<ProFormProps<TValues>>) => void;
+  /** 获取表单属性 */
+  getProps: () => ProFormProps<TValues>;
 }
 
 export type GetComponentRefFn = <R = unknown>(name: string) => R | undefined;

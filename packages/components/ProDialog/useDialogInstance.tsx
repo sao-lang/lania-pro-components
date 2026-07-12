@@ -13,7 +13,8 @@ import type {
   DialogSize,
 } from './types';
 import { ProForm, ProFormInstance, ProFormSchema } from '../ProForm';
-import { ProTable, ProTableActionType } from '../ProTable';
+import ProTable from '../ProTable';
+import type { ProTableActionType } from '../ProTable';
 import { getSizeWidth, getFooterJustify } from './utils';
 
 export interface UseDialogInstanceOptions<TValues, T> {
@@ -896,7 +897,10 @@ export function useDialogInstance<
         tableActionRef.current?.clearSelected();
       },
       setTableSelectedRows: (rows) => {
-        tableActionRef.current?.setSelectedRows(rows);
+        const keys = rows.map((row) =>
+          typeof rowKey === 'function' ? rowKey(row) : (row[rowKey as keyof T] as string | number),
+        );
+        tableActionRef.current?.setSelectedRows(keys, rows);
       },
       setTableSelectedRowKeys: (keys) => {
         tableActionRef.current?.setSelectedRowKeys(keys);

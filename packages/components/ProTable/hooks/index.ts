@@ -13,7 +13,8 @@
  */
 export * from './useUrlSync';
 export * from './useSearchSchema';
-export * from './useProTable';
+export { useProTable, useProTableContext, ProTableContext } from './useProTable';
+export type { UseProTableOptions, UseProTableReturn } from '../types';
 export { useVirtualScroll, useDynamicVirtualScroll } from '@lania-pro-components/shared';
 export type {
   VirtualScrollConfig,

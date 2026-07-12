@@ -58,11 +58,11 @@ export type {
 export { resolveSchemaValue, resolveSchemaFields } from './utils/resolveSchemaValue';
 
 // 核心组件
-export { ProForm } from './ProForm';
+export { ProForm } from './components/ProForm';
 export { FormField } from './components/FormField';
 
 // Hook
-export { useProForm, useProFormContext, ProFormContext } from './useProForm';
+export { useProForm, useProFormContext, ProFormContext } from './hooks/useProForm';
 
 // 上下文
 export {
