@@ -29,6 +29,7 @@
  * ```
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type { UseCacheReturn } from './useCache';
 
 /**
  * useAsyncRequest 配置选项
@@ -69,6 +70,12 @@ export interface AsyncRequestOptions<TParams, TResponse> {
    * 参考 ahooks useRequest refreshDeps。
    */
   refreshDeps?: unknown[];
+  /** 缓存实例 */
+  cache?: UseCacheReturn<TResponse>;
+  /** 缓存键前缀 */
+  cacheKey?: string;
+  /** 是否启用缓存 */
+  cacheEnabled?: boolean;
 }
 
 /**
@@ -102,6 +109,14 @@ export interface AsyncRequestReturn<TParams, TResponse> {
 }
 
 /**
+ * 生成缓存键
+ */
+function generateCacheKey<TParams>(params: TParams, cacheKey?: string): string {
+  const paramsString = typeof params === 'string' ? params : JSON.stringify(params);
+  return cacheKey ? `${cacheKey}:${paramsString}` : paramsString;
+}
+
+/**
  * 通用异步请求 Hook
  */
 export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = unknown>(
@@ -119,6 +134,9 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
     onError,
     silentPolling = false,
     refreshDeps,
+    cache,
+    cacheKey,
+    cacheEnabled = false,
   } = options;
 
   const [data, setData] = useState<TResponse | undefined>();
@@ -144,7 +162,7 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
   /**
    * 执行请求的核心函数
    *
-   * 流程：取消上次请求 → 新建 AbortController → beforeRequest 拦截 → request → afterRequest 拦截 → setData/onSuccess。
+   * 流程：取消上次请求 → 缓存检查 → 新建 AbortController → beforeRequest 拦截 → request → afterRequest 拦截 → setData/onSuccess。
    * silentPolling 启用且本次被标记 silent 时跳过 loading/error 切换，适合轮询静默刷新。
    * 请求被取消或组件已卸载时返回 undefined，不更新状态。
    */
@@ -154,7 +172,6 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
       /** @internal 内部标记，外部不应使用 */
       internalOptions?: { silent?: boolean },
     ): Promise<TResponse | undefined> => {
-      // 取消上一次请求
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -163,10 +180,23 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
       abortControllerRef.current = controller;
       latestParamsRef.current = params;
 
-      // 仅当 silentPolling 启用且本次调用被标记为 silent 时才跳过 loading/error 切换
       if (!silentPolling || !internalOptions?.silent) {
         setLoading(true);
         setError(undefined);
+      }
+
+      // ===== 缓存检查 =====
+      if (cacheEnabled && cache) {
+        const cachedKey = generateCacheKey(params, cacheKey);
+        const cachedData = cache.getCache(cachedKey);
+        if (cachedData) {
+          if (!silentPolling || !internalOptions?.silent) {
+            setData(cachedData);
+            setLoading(false);
+          }
+          onSuccess?.(cachedData, params);
+          return cachedData;
+        }
       }
 
       try {
@@ -191,6 +221,12 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
           setLoading(false);
         }
 
+        // 写入缓存
+        if (cacheEnabled && cache) {
+          const cachedKey = generateCacheKey(params, cacheKey);
+          cache.setCache(cachedKey, finalResponse);
+        }
+
         onSuccess?.(finalResponse, finalParams);
         return finalResponse;
       } catch (err) {
@@ -206,7 +242,7 @@ export function useAsyncRequest<TParams = Record<string, unknown>, TResponse = u
         return undefined;
       }
     },
-    [request, beforeRequest, afterRequest, onSuccess, onError, silentPolling],
+    [request, beforeRequest, afterRequest, onSuccess, onError, silentPolling, cache, cacheKey, cacheEnabled],
   );
 
   /**

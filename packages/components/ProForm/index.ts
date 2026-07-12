@@ -43,6 +43,7 @@ export type {
   ReadonlyRenderer,
   QuickComponentConfig,
   ComponentRegistry,
+  ProFormFieldComponentProps,
   ReadonlyRegistry,
   LayoutMode,
   ButtonPosition,
@@ -51,8 +52,6 @@ export type {
   ResolvedSchema,
   ButtonConfig,
   ProFormPerformanceConfig,
-  LazyLoadConfig,
-  BatchUpdateConfig,
 } from './types';
 
 // 工具函数
@@ -64,9 +63,6 @@ export { FormField } from './components/FormField';
 
 // Hook
 export { useProForm, useProFormContext, ProFormContext } from './useProForm';
-
-// Provider
-export { ProFormProvider } from './ProFormProvider';
 
 // 上下文
 export {
@@ -86,6 +82,7 @@ export {
   registerComponent,
   registerQuickComponent,
   parseQuickComponent,
+  stripFormControlProps,
   readonlyRegistry,
   registerReadonlyRenderer,
   getReadonlyRenderer,
@@ -112,4 +109,11 @@ import './components/QuickComponents';
 
 // 高级组件
 export { ProFormList, ProFormSteps } from './components';
-export type { ProFormListProps, ProFormStepsProps, ProFormStepSchema, ProFormStepsInstance } from './components';
+export type {
+  ProFormListProps,
+  ProFormListInstance,
+  ProFormListActions,
+  ProFormStepsProps,
+  ProFormStepSchema,
+  ProFormStepsInstance,
+} from './components';

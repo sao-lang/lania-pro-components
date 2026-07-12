@@ -1403,90 +1403,158 @@ const renderReadonlyContent = useMemo(() => {
 
 **文件**：`components/ProFormList.tsx`
 
-**职责**：支持动态添加/删除列表项的表单组件
+**职责**：支持动态添加/删除/复制/移动/清空列表项的表单组件。
+
+**受控/非受控模式**（核心设计）：
+
+- **受控模式**：提供 `value` prop，行数组由父组件控制，所有变更通过 `onChange` 回调通知父组件，由父组件更新 `value` 实现同步。此时组件内部不维护状态。
+- **非受控模式**：不提供 `value` prop，行数组由组件内部 state 主导，挂载时从 store 读取初始值（兼容 ProForm `initialValues` 注入），此后所有变更单向同步回 store。
+- 行内字段以扁平字段名 `name[index].field` 形式注册到 store，与数组值 `name` 相互独立。
+- 结构变更（move/remove）时主动通过 `readRowValues` / `writeRowValues` 重排扁平字段值，保证显示与数据一致。
 
 **Props**：
 
-| 属性                                 | 类型                          | 说明                      |
-| ------------------------------------ | ----------------------------- | ------------------------- |
-| `name`                               | string                        | 字段名                    |
-| `label`                              | string                        | 标签                      |
-| `itemTitle`                          | string \| ((index) => string) | 项标题                    |
-| `schemas`                            | ProFormSchema[]               | 项内字段配置              |
-| `min`                                | number                        | 最小条数（默认 0）        |
-| `max`                                | number                        | 最大条数（默认 Infinity） |
-| `addText` / `removeText`             | string                        | 添加/删除按钮文本         |
-| `showAddButton` / `showRemoveButton` | boolean                       | 是否显示按钮              |
-| `onAdd(index)` / `onRemove(index)`   | function                      | 添加/删除回调             |
-| `card`                               | boolean                       | 是否使用 Card 包裹        |
-| `cardProps`                          | object                        | Card 属性                 |
+| 属性                                              | 类型                                                                | 说明                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
+| `name`                                            | string                                                              | 列表字段名（数组值的存储键）          |
+| `label`                                           | string                                                              | 列表标签                              |
+| `itemTitle`                                       | string \| ((index) => string)                                       | 行标题                                |
+| `schemas`                                         | ProFormSchema[]                                                     | 行内字段配置                          |
+| `min` / `max`                                     | number                                                              | 最小/最大行数（默认 0 / Infinity）    |
+| `addText` / `removeText`                          | string                                                              | 添加/删除按钮文本                     |
+| `showAddButton` / `showRemoveButton`              | boolean                                                             | 是否显示按钮                          |
+| `copyText` / `showCopyButton`                     | string / boolean                                                    | 复制按钮文本 / 是否显示               |
+| `moveUpText` / `moveDownText`                     | string                                                              | 上移/下移按钮文本                     |
+| `showMoveButtons`                                 | boolean                                                             | 是否显示上移/下移按钮                 |
+| `clearText` / `showClearButton`                   | string / boolean                                                    | 清空按钮文本 / 是否显示               |
+| `creatorRecord`                                   | Record<string, unknown>                                             | 新增行默认记录（替代空对象 `{}`）     |
+| `onAdd(index)` / `onRemove(index)`                | function                                                            | 添加/删除回调                         |
+| `onCopy(index)` / `onMove(from, to)` / `onClear`  | function                                                            | 复制/移动/清空回调                    |
+| `value`                                           | unknown[]                                                           | 行数组（受控），提供此 prop 时进入受控模式 |
+| `onChange(value)`                                 | function                                                            | 行数组变更回调，受控模式下必须提供以实现值同步 |
+| `onValuesChange`                                  | 由 RootContext 注入                                                 | 表单值变化回调（非受控模式）          |
+| `initialValue`                                    | unknown[]                                                           | 初始行数组（非受控模式，默认 `[]`）   |
+| `disabled` / `readonly`                           | boolean                                                             | 禁用/只读                             |
+| `card` / `cardProps`                              | boolean / object                                                    | 是否用 Card 包裹 / Card 属性          |
+| `itemRender(item, index, actions)`                | function                                                            | 自定义单项渲染                        |
+| `emptyText`                                       | ReactNode                                                           | 空列表占位内容（默认"暂无数据"）      |
+| `className` / `style`                             | string / CSSProperties                                              | 自定义类名/样式                       |
 
 **字段名生成逻辑**：
 
 ```typescript
-// 列表项字段名格式：{name}[{index}].{fieldName}
+// 列表项字段名格式：{name}[{index}].{fieldKey}
+// fieldKey = Array.isArray(schema.name) ? schema.name.join('.') : schema.name
 const itemSchemas = schemas.map((schema) => ({
   ...schema,
-  name: `${name}[${index}].${schema.name}`,
+  name: `${name}[${index}].${getFieldKey(schema.name)}`,
 }));
 ```
 
-**核心操作**：
+**核心操作**（通过 ref 实例方法调用）：
 
-- `handleAdd`：`[...currentValue, {}]` → `formStore.setValue(name, newValue)`
-- `handleRemove`：`currentValue.filter((_, i) => i !== index)` → `formStore.setValue(name, newValue)`
-- 边界控制：`listValue.length <= min` 禁用删除，`listValue.length >= max` 禁用添加
+- `add(record?)`：预置扁平字段值后追加一行，受 `max` 限制
+- `remove(index)`：读取所有行扁平值 → 删除目标行 → 重排，受 `min` 限制
+- `copy(index)`：复制指定行扁平值并追加到末尾，受 `max` 限制
+- `move(from, to)`：读取所有行扁平值 → 重排 → 按新顺序重写扁平字段值
+- `moveUp(index)` / `moveDown(index)`：`move` 的便捷封装
+- `clear()`：清空所有行，受 `min` 约束保留 `min` 条
+- 边界控制：`items.length <= min` 禁用删除/清空，`items.length >= max` 禁用添加/复制
+
+**实例接口**：
+
+```typescript
+interface ProFormListActions {
+  add: (record?: Record<string, unknown>) => void;
+  remove: (index: number) => void;
+  copy: (index: number) => void;
+  moveUp: (index: number) => void;
+  moveDown: (index: number) => void;
+  move: (from: number, to: number) => void;
+  clear: () => void;
+}
+
+interface ProFormListInstance extends ProFormListActions {
+  getList: () => unknown[]; // 获取当前行数组（浅拷贝）
+  getLength: () => number; // 获取当前行数
+}
+```
 
 ### 13.4 ProFormSteps — 分步表单
 
 **文件**：`components/ProFormSteps.tsx`
 
-**职责**：支持多步骤表单，每步独立验证
+**职责**：支持多步骤表单，每步独立验证。
+
+**受控/非受控模式**（步骤索引）：
+
+- **受控模式**：提供 `current` prop，步骤索引由父组件控制，所有变更通过 `onChange` 回调通知父组件，由父组件更新 `current` 实现同步。
+- **非受控模式**：不提供 `current` prop，步骤索引由组件内部 state 主导，使用 `defaultCurrent` 作为初始值。
+
+**实现说明**：每步通过内嵌一个 `<ProForm>` 渲染该步字段，并通过 `innerFormRef` 获取内嵌实例，使 `validateStep` / `submit` / `reset` 能精确作用于当前步的字段（父级 store 无法访问内嵌字段）。
 
 **Props**：
 
 | 属性                                   | 类型                       | 说明                                           |
 | -------------------------------------- | -------------------------- | ---------------------------------------------- |
 | `steps`                                | ProFormStepSchema[]        | 步骤配置（每步含 title, description, schemas） |
-| `current`                              | number                     | 当前步骤（受控）                               |
-| `defaultCurrent`                       | number                     | 默认步骤（默认 0）                             |
-| `onChange(current)`                    | function                   | 步骤变化回调                                   |
+| `current`                              | number                     | 当前步骤（受控），提供此 prop 时进入受控模式    |
+| `defaultCurrent`                       | number                     | 默认步骤（非受控模式，默认 0）                  |
+| `onChange(current)`                    | function                   | 步骤变化回调，受控模式下必须提供以实现值同步    |
 | `onStepChange(from, to)`               | function                   | 步骤切换回调                                   |
 | `prevText` / `nextText` / `submitText` | string                     | 按钮文本                                       |
 | `validateOnNext`                       | boolean                    | 切换时是否验证（默认 true）                    |
 | `showSteps`                            | boolean                    | 是否显示步骤条                                 |
 | `direction`                            | 'horizontal' \| 'vertical' | 步骤条方向                                     |
+| `stepsProps`                           | object                     | Steps 组件透传属性                             |
 | `showButton`                           | boolean                    | 是否显示按钮                                   |
+| `onFinish(values)`                     | function                   | 最后一步提交回调（由 submit 按钮或 `submit()` 触发） |
+| `showResetButton`                      | boolean                    | 是否显示重置按钮（默认 false）                 |
+| `resetText`                            | string                     | 重置按钮文本                                   |
+| `onReset`                              | function                   | 重置回调                                       |
+| `className` / `style`                  | string / CSSProperties     | 自定义类名/样式                                |
 
 **实例接口**：
 
 ```typescript
 interface ProFormStepsInstance {
   prev: () => void;
-  next: () => void;
+  next: () => Promise<void>; // 最后一步时触发提交
   goTo: (index: number) => void;
   getCurrent: () => number;
+  getStep: (index: number) => ProFormStepSchema | undefined;
+  getSteps: () => ProFormStepSchema[];
+  validateStep: (index?: number) => Promise<boolean>; // 校验指定步骤（默认当前步）
+  reset: () => void; // 重置到第一步并清除校验状态
+  submit: () => Promise<void>; // 触发 onFinish
 }
 ```
 
-**步骤验证逻辑**：
+**步骤验证逻辑**（基于内嵌实例的 store）：
 
 ```typescript
 const handleNext = async () => {
-  if (validateOnNext && formStore) {
-    const currentStepSchemas = steps[current]?.schemas || [];
-    let hasError = false;
-    for (const fieldName of currentStepSchemas.map((s) => s.name)) {
-      const field = formStore.getField(fieldName);
-      if (field) {
-        const error = await field.validate();
-        if (error) hasError = true;
-      }
-    }
-    if (hasError) return; // 验证失败，阻止切换
+  // 最后一步：触发提交
+  if (current >= steps.length - 1) {
+    await submit();
+    return;
+  }
+  if (validateOnNext) {
+    const ok = await validateStep(current); // 通过 innerFormRef.current.store 校验
+    if (!ok) return; // 验证失败，阻止切换
   }
   setCurrent(Math.min(steps.length - 1, current + 1));
 };
+
+// validateStep 内部通过 innerFormRef.current.store.getField(name) 访问 FieldNode
+const store = innerFormRef.current?.store;
+for (const s of step.schemas) {
+  const field = store.getField(Array.isArray(s.name) ? s.name[0] : s.name);
+  if (field) {
+    const error = await field.validate();
+    if (error) hasError = true;
+  }
+}
 ```
 
 ### 13.5 QuickComponents — 快捷组件
@@ -2242,8 +2310,14 @@ const schemas = [
 
 ### 15.8 动态列表 ProFormList
 
+ProFormList 支持**受控/非受控双模式**。非受控模式下通过 ref 获取实例可命令式操作行。
+
+**非受控模式**（推荐，行数组由内部 state 主导）：
+
 ```tsx
+import { useRef } from 'react';
 import { ProForm, ProFormList } from '@/pro-components/ProForm';
+import type { ProFormListInstance } from '@/pro-components/ProForm';
 
 const contactSchemas = [
   { name: 'name', label: '联系人', component: 'Input', required: true },
@@ -2260,6 +2334,52 @@ const contactSchemas = [
 ];
 
 function ListForm() {
+  const listRef = useRef<ProFormListInstance>(null);
+
+  const handleAddContact = () => {
+    // 命令式新增一行（预填默认值）
+    listRef.current?.add({ name: '', phone: '', relation: 'family' });
+  };
+
+  return (
+    <ProForm>
+      <ProFormList
+        ref={listRef}
+        name='contacts'
+        label='紧急联系人'
+        schemas={contactSchemas}
+        min={1}
+        max={5}
+        addText='添加联系人'
+        removeText='删除'
+        showCopyButton
+        showMoveButtons
+        showClearButton
+        creatorRecord={{ name: '', phone: '', relation: 'family' }}
+        card
+        onAdd={(index) => console.log('新增第', index, '项')}
+        onRemove={(index) => console.log('删除第', index, '项')}
+        onChange={(rows) => console.log('当前行数', rows.length)}
+      />
+      <button type='button' onClick={handleAddContact}>
+        外部按钮新增
+      </button>
+    </ProForm>
+  );
+}
+```
+
+**受控模式**（行数组由父组件控制）：
+
+```tsx
+import { useState } from 'react';
+import { ProForm, ProFormList } from '@/pro-components/ProForm';
+
+function ControlledListForm() {
+  const [contacts, setContacts] = useState([
+    { name: '张三', phone: '13800138001', relation: 'family' },
+  ]);
+
   return (
     <ProForm>
       <ProFormList
@@ -2268,68 +2388,81 @@ function ListForm() {
         schemas={contactSchemas}
         min={1}
         max={5}
-        addText='添加联系人'
-        removeText='删除'
-        card
-        onAdd={(index) => console.log('新增第', index, '项')}
-        onRemove={(index) => console.log('删除第', index, '项')}
+        value={contacts}
+        onChange={setContacts}
       />
     </ProForm>
   );
 }
 ```
 
+实例方法（`ProFormListInstance`）：`add` / `remove` / `copy` / `move` / `moveUp` / `moveDown` / `clear` / `getList` / `getLength`。完整 Props 与实例接口见 [13.3](#133-proformlist--动态表单列表)。
+
 ### 15.9 分步表单 ProFormSteps
 
-**文件**：`components/ProFormSteps.tsx`
+ProFormSteps 支持**受控/非受控双模式**（步骤索引）。每步内嵌一个 `<ProForm>` 渲染该步字段，通过 `innerFormRef` 访问内嵌实例，使 `validateStep` / `submit` / `reset` 精确作用于当前步字段。
 
-**职责**：支持多步骤表单，每步独立验证
+**非受控模式**（推荐，步骤索引由内部 state 主导）：
 
-**Props**：
+```tsx
+import { useRef } from 'react';
+import { ProForm, ProFormSteps } from '@/pro-components/ProForm';
+import type { ProFormStepsInstance } from '@/pro-components/ProForm';
 
-| 属性                                   | 类型                       | 说明                                           |
-| -------------------------------------- | -------------------------- | ---------------------------------------------- |
-| `steps`                                | ProFormStepSchema[]        | 步骤配置（每步含 title, description, schemas） |
-| `current`                              | number                     | 当前步骤（受控）                               |
-| `defaultCurrent`                       | number                     | 默认步骤（默认 0）                             |
-| `onChange(current)`                    | function                   | 步骤变化回调                                   |
-| `onStepChange(from, to)`               | function                   | 步骤切换回调                                   |
-| `prevText` / `nextText` / `submitText` | string                     | 按钮文本                                       |
-| `validateOnNext`                       | boolean                    | 切换时是否验证（默认 true）                    |
-| `showSteps`                            | boolean                    | 是否显示步骤条                                 |
-| `direction`                            | 'horizontal' \| 'vertical' | 步骤条方向                                     |
-| `showButton`                           | boolean                    | 是否显示按钮                                   |
+const basicSchemas = [
+  { name: 'name', label: '姓名', component: 'Input', required: true },
+];
+const contactSchemas = [
+  { name: 'phone', label: '电话', component: 'Phone', required: true },
+];
 
-**实例接口**：
+function StepsForm() {
+  const stepsRef = useRef<ProFormStepsInstance>(null);
 
-```typescript
-interface ProFormStepsInstance {
-  prev: () => void;
-  next: () => void;
-  goTo: (index: number) => void;
-  getCurrent: () => number;
+  return (
+    <ProForm>
+      <ProFormSteps
+        ref={stepsRef}
+        steps={[
+          { title: '基本信息', schemas: basicSchemas },
+          { title: '联系方式', schemas: contactSchemas },
+        ]}
+        showResetButton
+        onFinish={(values) => console.log('提交', values)}
+        onStepChange={(from, to) => console.log(`从第 ${from} 步切换到 ${to} 步`)}
+      />
+    </ProForm>
+  );
 }
 ```
 
-**步骤验证逻辑**：
+**受控模式**（步骤索引由父组件控制）：
 
-```typescript
-const handleNext = async () => {
-  if (validateOnNext && formStore) {
-    const currentStepSchemas = steps[current]?.schemas || [];
-    let hasError = false;
-    for (const fieldName of currentStepSchemas.map((s) => s.name)) {
-      const field = formStore.getField(fieldName);
-      if (field) {
-        const error = await field.validate();
-        if (error) hasError = true;
-      }
-    }
-    if (hasError) return; // 验证失败，阻止切换
-  }
-  setCurrent(Math.min(steps.length - 1, current + 1));
-};
+```tsx
+import { useState } from 'react';
+import { ProForm, ProFormSteps } from '@/pro-components/ProForm';
+
+function ControlledStepsForm() {
+  const [currentStep, setCurrentStep] = useState(0);
+
+  return (
+    <ProForm>
+      <ProFormSteps
+        steps={[
+          { title: '基本信息', schemas: basicSchemas },
+          { title: '联系方式', schemas: contactSchemas },
+        ]}
+        current={currentStep}
+        onChange={setCurrentStep}
+        showResetButton
+        onFinish={(values) => console.log('提交', values)}
+      />
+    </ProForm>
+  );
+}
 ```
+
+实例方法（`ProFormStepsInstance`）：`prev` / `next`（最后一步触发提交） / `goTo` / `getCurrent` / `getStep` / `getSteps` / `validateStep` / `reset` / `submit`。完整 Props 与实例接口见 [13.4](#134-proformsteps--分步表单)。
 
 ### 15.10 大表单性能优化
 

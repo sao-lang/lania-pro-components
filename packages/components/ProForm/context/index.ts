@@ -42,15 +42,6 @@ export {
   type LayoutContextValue,
 } from './LayoutContext';
 
-// FormConfigContext
-export {
-  FormConfigProvider,
-  useFormConfig,
-  useFormConfigOptional,
-  type FormConfigContextValue,
-  type FormConfigProviderProps,
-} from './FormConfigContext';
-
 // ExtensionContext
 export {
   ExtensionContext,

@@ -18,20 +18,12 @@
 import React, { FC, useState, useCallback } from 'react';
 import { Input, InputNumber, Select, Radio, Button, Image, DatePicker, TimePicker } from '@arco-design/web-react';
 import { IconEye, IconEyeInvisible } from '@arco-design/web-react/icon';
-import { registerComponent } from '../registry/componentRegistry';
-import type { FieldStatus, ResolvedSchema, FieldNodeAPI, ProFormInstance } from '../types';
+import { registerComponent, stripFormControlProps } from '../registry/componentRegistry';
+import type { ProFormFieldComponentProps } from '../types';
 
-interface QuickInputWithSuffixProps {
-  value?: string;
-  onChange?: (value: string) => void;
+interface QuickInputWithSuffixProps extends ProFormFieldComponentProps<string> {
   suffix?: string;
   prefix?: string;
-  status?: FieldStatus;
-  values?: Record<string, unknown>;
-  schema?: ResolvedSchema;
-  field?: FieldNodeAPI;
-  form?: ProFormInstance;
-  [key: string]: unknown;
 }
 
 const QuickInputWithSuffix: FC<QuickInputWithSuffixProps> = ({
@@ -60,17 +52,9 @@ const QuickInputWithSuffix: FC<QuickInputWithSuffixProps> = ({
   );
 };
 
-interface QuickInputNumberWithSuffixProps {
-  value?: number;
-  onChange?: (value: number) => void;
+interface QuickInputNumberWithSuffixProps extends ProFormFieldComponentProps<number> {
   suffix?: string;
   prefix?: string;
-  status?: FieldStatus;
-  values?: Record<string, unknown>;
-  schema?: ResolvedSchema;
-  field?: FieldNodeAPI;
-  form?: ProFormInstance;
-  [key: string]: unknown;
 }
 
 const QuickInputNumberWithSuffix: FC<QuickInputNumberWithSuffixProps> = ({
@@ -431,25 +415,26 @@ const TimeRangePicker: FC<TimeRangePickerProps> = ({ value, onChange, ...props }
 };
 
 // 注册所有快速组件
-registerComponent('Password', PasswordInput);
-registerComponent('YesNo', YesNoSelect);
-registerComponent('MaleFemale', MaleFemaleSelect);
-registerComponent('EnableDisable', EnableDisableSelect);
-registerComponent('Status', StatusSelect);
-registerComponent('OpenClose', OpenCloseSelect);
-registerComponent('VerificationCode', VerificationCode);
-registerComponent('ImageList', ImageList);
-registerComponent('Phone', PhoneInput);
-registerComponent('Email', EmailInput);
-registerComponent('IdCard', IdCardInput);
-registerComponent('Amount', AmountInput);
-registerComponent('Percentage', PercentageInput);
-registerComponent('YearPicker', YearPicker);
-registerComponent('MonthPicker', MonthPicker);
-registerComponent('WeekPicker', WeekPicker);
-registerComponent('QuarterPicker', QuarterPicker);
-registerComponent('RangePicker', RangePicker);
-registerComponent('TimeRangePicker', TimeRangePicker);
+registerComponent('Password', stripFormControlProps(PasswordInput));
+registerComponent('YesNo', stripFormControlProps(YesNoSelect));
+registerComponent('MaleFemale', stripFormControlProps(MaleFemaleSelect));
+registerComponent('EnableDisable', stripFormControlProps(EnableDisableSelect));
+registerComponent('Status', stripFormControlProps(StatusSelect));
+registerComponent('OpenClose', stripFormControlProps(OpenCloseSelect));
+registerComponent('VerificationCode', stripFormControlProps(VerificationCode));
+registerComponent('ImageList', stripFormControlProps(ImageList));
+registerComponent('Phone', stripFormControlProps(PhoneInput));
+registerComponent('Email', stripFormControlProps(EmailInput));
+registerComponent('IdCard', stripFormControlProps(IdCardInput));
+registerComponent('Amount', stripFormControlProps(AmountInput));
+registerComponent('Percentage', stripFormControlProps(PercentageInput));
+registerComponent('YearPicker', stripFormControlProps(YearPicker));
+registerComponent('MonthPicker', stripFormControlProps(MonthPicker));
+registerComponent('WeekPicker', stripFormControlProps(WeekPicker));
+registerComponent('QuarterPicker', stripFormControlProps(QuarterPicker));
+registerComponent('RangePicker', stripFormControlProps(RangePicker));
+registerComponent('TimeRangePicker', stripFormControlProps(TimeRangePicker));
+// QuickInputWithSuffix / QuickInputNumberWithSuffix 消费 status 字段，不做剥离
 registerComponent('QuickInputWithSuffix', QuickInputWithSuffix);
 registerComponent('QuickInputNumberWithSuffix', QuickInputNumberWithSuffix);
 

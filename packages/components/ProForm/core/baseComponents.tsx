@@ -33,35 +33,7 @@ import {
   Slider,
   ColorPicker,
 } from '@arco-design/web-react';
-import { registerComponents } from '../registry/componentRegistry';
-
-/**
- * 高阶函数：包装组件以剥离 FormField 注入的自定义 props
- * 这些 props 仅供自定义表单控件消费，原生 Arco 组件不需要它们。
- */
-function stripFormControlProps<P extends Record<string, unknown>>(
-  Component: React.ComponentType<P>,
-): React.ComponentType<P> {
-  const Wrapped: React.FC<P> = (props) => {
-    const {
-      status: _s,
-      values: _v,
-      schema: _sc,
-      field: _f,
-      form: _fm,
-      ...rest
-    } = props as P & {
-      status?: unknown;
-      values?: unknown;
-      schema?: unknown;
-      field?: unknown;
-      form?: unknown;
-    };
-    return <Component {...(rest as unknown as P)} />;
-  };
-  Wrapped.displayName = `FormFieldWrapped(${Component.displayName || Component.name || 'Unknown'})`;
-  return Wrapped;
-}
+import { registerComponents, stripFormControlProps } from '../registry/componentRegistry';
 
 // 注册基础 Arco 组件（带包装）
 registerComponents({

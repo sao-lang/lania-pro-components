@@ -1449,6 +1449,8 @@ import type {
   OprColumnConfig,
   ToolbarActionConfig,
 } from './types-action-button';
+import { DataStoreImpl } from './store/DataStore';
+import { EditableTableInstance } from './editable/types';
 
 export type {
   OprActionButtonConfig,
@@ -1466,4 +1468,94 @@ export interface ProTableToolbarConfig {
    * 工具栏按钮配置（新方式）
    */
   actions?: ToolbarActionConfig;
+}
+
+export interface UseProTableOptions<T = Record<string, unknown>> {
+  /** 表格 store */
+  store?: DataStoreImpl<T>;
+  /** 可编辑表格实例 */
+  editableInstance?: EditableTableInstance<T>;
+  /** 展开控制 */
+  expandedRowKeys?: (string | number)[];
+  /** 设置展开 keys */
+  setExpandedRowKeys?: (keys: (string | number)[]) => void;
+  /** 获取行 key */
+  getRowKey?: (record: T) => string | number;
+  /** 数据源 */
+  dataSource?: T[];
+  /** 列配置 */
+  columns?: ProColumnType<T>[];
+  /** 请求函数 */
+  request?: ProTableProps<T>['request'];
+  /** 工具栏配置 */
+  toolbar?: ProTableProps<T>['toolbar'];
+  /** 搜索表单配置 */
+  search?: ProTableProps<T>['search'];
+  /** 行选择配置 */
+  rowSelection?: ProTableProps<T>['rowSelection'];
+  /** 批量操作配置 */
+  batchOperation?: ProTableProps<T>['batchOperation'];
+  /** 分页配置 */
+  pagination?: ProTableProps<T>['pagination'];
+  /** 卡片容器配置 */
+  cardContainer?: ProTableProps<T>['cardContainer'];
+  /** URL 同步配置 */
+  urlSync?: ProTableProps<T>['urlSync'];
+  /** 查询方案配置 */
+  searchSchema?: ProTableProps<T>['searchSchema'];
+  /** 编辑配置 */
+  editable?: ProTableProps<T>['editable'];
+  /** 默认页码 */
+  defaultPageSize?: number;
+  /** 页码选项 */
+  pageSizeOptions?: number[];
+  /** 行 key */
+  rowKey?: string | ((record: T) => string | number);
+  /** 加载状态 */
+  loading?: boolean;
+  /** 空状态渲染 */
+  emptyRender?: ProTableProps<T>['emptyRender'];
+  /** 错误状态渲染 */
+  errorRender?: ProTableProps<T>['errorRender'];
+  /** 请求前钩子 */
+  beforeRequest?: ProTableProps<T>['beforeRequest'];
+  /** 请求后钩子 */
+  afterRequest?: ProTableProps<T>['afterRequest'];
+  /** 请求错误回调 */
+  onRequestError?: ProTableProps<T>['onRequestError'];
+  /** 数据格式化 */
+  postData?: ProTableProps<T>['postData'];
+  /** 防抖时间 */
+  debounceTime?: number;
+  /** 轮询间隔 */
+  polling?: ProTableProps<T>['polling'];
+  /** 是否手动触发请求 */
+  manual?: boolean;
+  /** 拖拽排序配置 */
+  dragSort?: ProTableProps<T>['dragSort'];
+  /** 虚拟滚动配置 */
+  virtualScroll?: ProTableProps<T>['virtualScroll'];
+  /** 虚拟滚动详细配置 */
+  virtualScrollConfig?: ProTableProps<T>['virtualScrollConfig'];
+  /** 卡片模式配置 */
+  cardMode?: ProTableProps<T>['cardMode'];
+  /** 缓存配置 */
+  cache?: ProTableProps<T>['cache'];
+  /** 缓存 key */
+  cacheKey?: string;
+  /** 视图模式 */
+  viewMode?: 'table' | 'card';
+  /** 视图模式变化回调 */
+  onViewModeChange?: (mode: 'table' | 'card') => void;
+}
+
+export interface UseProTableReturn<T = Record<string, unknown>> {
+  /** 表格实例（状态 + 操作方法） */
+  instance: ProTableInstance<T>;
+  /** 可直接绑定到 ProTable 组件的 props */
+  bindingProps: ProTableProps<T>;
+  /** DataStore 实例（供 ProTable 内部 Context 使用） */
+  store: DataStoreImpl<T>;
+  /** 设置 Form 实例（由 ProTable 内部调用，填充 instance.form 和 action.getFormInstance） */
+  setFormInstance: (form: ProFormInstance | undefined) => void;
 }

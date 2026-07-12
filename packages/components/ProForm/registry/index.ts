@@ -25,6 +25,7 @@ export {
   getRegisteredComponentNames,
   parseQuickComponent,
   clearComponentRegistry,
+  stripFormControlProps,
   componentRegistry,
   quickComponentConfigs,
 } from './componentRegistry';

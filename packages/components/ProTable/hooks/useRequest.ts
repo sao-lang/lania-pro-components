@@ -13,7 +13,7 @@
  *
  * 自 2026-07 重构：移除 RequestEngine 层，消除双重重 wrap。
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAsyncRequest } from '@lania-pro-components/shared';
 import type { AsyncRequestOptions } from '@lania-pro-components/shared';
 import type { ProTableRequest, ProTableRequestParams, ProTableRequestResponse } from '../types';
@@ -61,43 +61,6 @@ export interface UseRequestReturn {
   stopPolling: () => void;
 }
 
-/**
- * 请求函数包装器：将 ProTableRequest 适配为 useAsyncRequest 所需的签名，
- * 内置 beforeRequest / afterRequest / postData / AbortSignal 透传逻辑。
- */
-function createRequestExecutor<T extends Record<string, unknown>>(
-  requestFn: ProTableRequest<T>,
-  options: Pick<UseRequestOptions<T>, 'beforeRequest' | 'afterRequest' | 'postData'>,
-): (params: ProTableRequestParams) => Promise<ProTableRequestResponse<T>> {
-  const { beforeRequest, afterRequest, postData } = options;
-
-  return async (params: ProTableRequestParams): Promise<ProTableRequestResponse<T>> => {
-    let finalParams: ProTableRequestParams = params;
-    if (beforeRequest) {
-      finalParams = await beforeRequest(params);
-    }
-
-    // 透传 AbortSignal（修复架构债务 #3）
-    const response = await requestFn({
-      ...finalParams,
-    } as ProTableRequestParams & { signal: AbortSignal });
-
-    let { data, total } = response;
-
-    if (afterRequest) {
-      const result = await afterRequest(data, total);
-      data = result.data;
-      total = result.total;
-    }
-
-    if (postData) {
-      data = postData(data);
-    }
-
-    return { data, total, success: true };
-  };
-}
-
 export const useRequest = <T extends Record<string, unknown> = Record<string, unknown>>(
   options: UseRequestOptions<T>,
 ): UseRequestReturn => {
@@ -107,28 +70,16 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     manual = false,
     debounceTime = 300,
     polling,
-    cache,
-    cacheKey,
-    cacheEnabled = false,
     beforeRequest,
     afterRequest,
     onRequestError,
     postData,
+    cache,
+    cacheKey,
+    cacheEnabled = false,
   } = options;
 
-  // ===== Refs =====
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isPollingEnabledRef = useRef(true);
-
-  /**
-   * 生成缓存键
-   */
-  const generateCacheKey = useCallback(
-    (params: ProTableRequestParams): string =>
-      cacheKey ? `${cacheKey}:${JSON.stringify(params)}` : JSON.stringify(params),
-    [cacheKey],
-  );
+  const [currentPollingInterval, setCurrentPollingInterval] = useState<number>(0);
 
   /**
    * 从 DataStore 获取当前请求参数
@@ -145,19 +96,57 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
     [store],
   );
 
+  /**
+   * 请求函数：将 ProTableRequest 适配为 useAsyncRequest 所需的签名
+   */
+  const request = useCallback(
+    async (params: ProTableRequestParams): Promise<ProTableRequestResponse<T>> => {
+      if (!requestFn) {
+        return { data: [], total: 0, success: true };
+      }
+      const response = await requestFn({
+        ...params,
+      } as ProTableRequestParams & { signal: AbortSignal });
+      return response;
+    },
+    [requestFn],
+  );
+
   // ===== useAsyncRequest（通用请求管理） =====
   // 注意：我们只使用 useAsyncRequest 的 execute/cancel/polling 能力，
   // 而不使用其 data/loading/error 状态（这些由 DataStore 管理）
   const asyncRequest = useAsyncRequest<ProTableRequestParams, ProTableRequestResponse<T>>({
-    request: createRequestExecutor(requestFn ?? (async () => ({ data: [], total: 0 })), {
-      beforeRequest,
-      afterRequest,
-      postData,
-    }),
-    manual: true, // 由 DataStore 订阅控制触发时机
-    debounceTime: 0, // 防抖由本层自行管理（需与 DataStore 集成）
-    onSuccess: (response, params) => {
-      // ===== ⭐ 分页自动调整（核心逻辑） =====
+    request,
+    manual: true,
+    debounceTime,
+    pollingInterval: currentPollingInterval,
+    cache,
+    cacheKey,
+    cacheEnabled,
+    beforeRequest: async (params) => {
+      store.setLoading(true);
+      store.setError(undefined);
+      if (beforeRequest) {
+        return await beforeRequest(params);
+      }
+      return params;
+    },
+    afterRequest: async (response) => {
+      let { data, total } = response;
+
+      if (afterRequest) {
+        const result = await afterRequest(data, total);
+        data = result.data;
+        total = result.total;
+      }
+
+      if (postData) {
+        data = postData(data);
+      }
+
+      return { data, total, success: true };
+    },
+    onSuccess: (response) => {
       const { current, pageSize } = store.pagination;
       const totalPages = Math.ceil(response.total / pageSize);
 
@@ -175,107 +164,54 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
       store.setTotal(response.total);
       store.setLoading(false);
 
-      // 写入缓存
-      if (cacheEnabled && cache) {
-        const cachedKey = generateCacheKey(params);
-        cache.setCache(cachedKey, response);
+      if (polling) {
+        const interval = typeof polling === 'function' ? polling(response.data) : polling;
+        if (interval && interval > 0) {
+          store.setPolling(true, interval);
+          setCurrentPollingInterval(interval);
+        } else {
+          store.stopPolling();
+          setCurrentPollingInterval(0);
+        }
       }
     },
     onError: (error) => {
       store.setError(error);
       store.setLoading(false);
       store.stopPolling();
+      setCurrentPollingInterval(0);
       onRequestError?.(error);
     },
   } as AsyncRequestOptions<ProTableRequestParams, ProTableRequestResponse<T>>);
 
   /**
-   * 核心：执行数据请求
-   *
-   * 支持：
-   * - 缓存检查（命中则不走网络）
-   * - loading/error 状态同步到 DataStore
-   * - 分页自动调整
+   * 执行数据请求
    */
   const fetchData = useCallback(async () => {
     if (!requestFn) return;
-
-    store.setLoading(true);
-    store.setError(undefined);
-
-    const params = getRequestParams();
-
-    // ===== 缓存检查 =====
-    if (cacheEnabled && cache) {
-      const cachedKey = generateCacheKey(params);
-      const cachedData = cache.getCache(cachedKey);
-      if (cachedData) {
-        store.setDataSource(cachedData.data);
-        store.setTotal(cachedData.total);
-        store.setLoading(false);
-        if (polling && isPollingEnabledRef.current) {
-          startPollingWithData(cachedData.data);
-        }
-        return;
-      }
-    }
-
-    // 委托给 useAsyncRequest.execute（包含 AbortController + 拦截器）
-    await asyncRequest.execute(params);
-  }, [requestFn, store, getRequestParams, cacheEnabled, cache, generateCacheKey, polling, asyncRequest]);
+    if (store.isPolling && currentPollingInterval <= 0) return;
+    await asyncRequest.execute(getRequestParams());
+  }, [requestFn, store, getRequestParams, asyncRequest, currentPollingInterval]);
 
   /**
-   * 防抖请求
+   * 开始轮询
    */
-  const debouncedFetchData = useCallback(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      fetchData();
-    }, debounceTime);
-  }, [fetchData, debounceTime]);
-
-  /**
-   * 取消进行中的请求
-   */
-  const cancelRequest = useCallback(() => {
-    asyncRequest.cancel();
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-  }, [asyncRequest]);
-
-  /**
-   * 使用当前数据启动轮询
-   */
-  const startPollingWithData = useCallback(
-    (data: T[]) => {
-      if (!polling || !isPollingEnabledRef.current) return;
-      const interval = typeof polling === 'function' ? polling(data) : polling;
-      if (!interval || interval <= 0) return;
-      store.setPolling(true, interval);
-      pollingTimerRef.current = setTimeout(() => fetchData(), interval);
-    },
-    [polling, store, fetchData],
-  );
-
-  /** 开始轮询 */
   const startPolling = useCallback(() => {
     if (!polling) return;
-    isPollingEnabledRef.current = true;
-    startPollingWithData(store.dataSource);
-  }, [polling, store, startPollingWithData]);
+    const interval = typeof polling === 'function' ? polling(store.dataSource) : polling;
+    if (!interval || interval <= 0) return;
+    store.setPolling(true, interval);
+    setCurrentPollingInterval(interval);
+    asyncRequest.startPolling();
+  }, [polling, store, asyncRequest]);
 
-  /** 停止轮询 */
+  /**
+   * 停止轮询
+   */
   const stopPolling = useCallback(() => {
-    isPollingEnabledRef.current = false;
-    if (pollingTimerRef.current) {
-      clearTimeout(pollingTimerRef.current);
-      pollingTimerRef.current = null;
-    }
-    asyncRequest.stopPolling();
     store.stopPolling();
+    setCurrentPollingInterval(0);
+    asyncRequest.stopPolling();
   }, [store, asyncRequest]);
 
   // ===== 核心：监听 DataStore 状态变化自动触发请求 =====
@@ -292,7 +228,7 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
         JSON.stringify(state.query) !== JSON.stringify(prevState.query);
 
       if (shouldFetch) {
-        debouncedFetchData();
+        asyncRequest.debouncedExecute(getRequestParams());
       }
     });
 
@@ -300,10 +236,10 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
 
     return () => {
       unsubscribe();
-      cancelRequest();
+      asyncRequest.cancel();
       stopPolling();
     };
-  }, [manual, requestFn, store, fetchData, debouncedFetchData, cancelRequest, stopPolling]);
+  }, [manual, requestFn, store, fetchData, getRequestParams, asyncRequest, stopPolling]);
 
   // ===== 注册 store.onReload（替代 window.dispatchEvent 全局广播，架构债务 #1/#7） =====
   useEffect(() => {
@@ -313,8 +249,8 @@ export const useRequest = <T extends Record<string, unknown> = Record<string, un
 
   return {
     fetchData,
-    debouncedFetchData,
-    cancelRequest,
+    debouncedFetchData: () => asyncRequest.debouncedExecute(getRequestParams()),
+    cancelRequest: () => asyncRequest.cancel(),
     startPolling,
     stopPolling,
   };

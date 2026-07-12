@@ -21,7 +21,15 @@
  */
 
 import type { FormStoreAPI, FieldNodeAPI, FieldReaction } from '../types';
-import { reactive, batchUpdate, watch } from '@lania-pro-components/utils';
+import type { BatchUpdateConfig } from '@lania-pro-components/shared';
+import {
+  reactive,
+  batchUpdate,
+  asyncBatchUpdate,
+  setAsyncBatchConfig,
+  clearAsyncBatch,
+  watch,
+} from '@lania-pro-components/utils';
 
 /**
  * 值变化监听器类型
@@ -75,6 +83,9 @@ export class FormStore implements FormStoreAPI {
   // 字段值变化的 effect 清理函数映射
   private valueEffectCleanups: Map<string, () => void> = new Map();
 
+  // 是否启用异步批量更新（由 performance.batchUpdate 配置控制）
+  private useAsyncBatch = false;
+
   constructor() {
     // 创建响应式状态
     this.state = reactive<FormState>({
@@ -93,6 +104,10 @@ export class FormStore implements FormStoreAPI {
     if (constraints.preview !== undefined) this.formConstraints.preview = constraints.preview;
     if (constraints.readonly !== undefined) this.formConstraints.readonly = constraints.readonly;
     if (constraints.disabled !== undefined) this.formConstraints.disabled = constraints.disabled;
+
+    Object.values(this.state.fields).forEach((field) => {
+      field.refreshEffectiveStatus();
+    });
   }
 
   /**
@@ -100,6 +115,34 @@ export class FormStore implements FormStoreAPI {
    */
   getFormConstraints(): { preview: boolean; readonly: boolean; disabled: boolean } {
     return { ...this.formConstraints };
+  }
+
+  /**
+   * 配置批量更新策略
+   *
+   * - 未配置或 enabled=false：使用同步 batchUpdate（fn 内的多次状态变更在 fn 结束后立即统一通知 effect）
+   * - enabled=true：使用异步 asyncBatchUpdate（effect 延迟到下一个定时器触发，合并多次分散的状态变更）
+   *
+   * @param config 来自 ProFormProps.performance.batchUpdate
+   */
+  setBatchUpdateConfig(config?: BatchUpdateConfig): void {
+    this.useAsyncBatch = !!config?.enabled;
+    if (this.useAsyncBatch) {
+      setAsyncBatchConfig({ delay: config?.delay, maxBatchSize: config?.maxBatchSize });
+    } else {
+      clearAsyncBatch();
+    }
+  }
+
+  /**
+   * 执行批量更新（内部根据配置选择同步/异步）
+   */
+  private runBatch(fn: () => void): void {
+    if (this.useAsyncBatch) {
+      asyncBatchUpdate(fn);
+    } else {
+      batchUpdate(fn);
+    }
   }
 
   /**
@@ -122,7 +165,7 @@ export class FormStore implements FormStoreAPI {
   setValue(name: string, value: unknown): void {
     const oldValue = this.state.values[name];
 
-    batchUpdate(() => {
+    this.runBatch(() => {
       this.state.values[name] = value;
       this.state.touched[name] = true;
     });
@@ -141,7 +184,7 @@ export class FormStore implements FormStoreAPI {
    * 批量设置值
    */
   setValues(values: Record<string, unknown>): void {
-    batchUpdate(() => {
+    this.runBatch(() => {
       Object.entries(values).forEach(([name, value]) => {
         this.state.values[name] = value;
         this.state.touched[name] = true;
@@ -183,7 +226,7 @@ export class FormStore implements FormStoreAPI {
     // 数组类型使用第一个字段名作为主键
     const fieldName = Array.isArray(field.name) ? field.name[0] : field.name;
 
-    batchUpdate(() => {
+    this.runBatch(() => {
       this.state.fields[fieldName] = field;
 
       // 初始化值
@@ -213,34 +256,35 @@ export class FormStore implements FormStoreAPI {
    * 设置字段值监听
    */
   private setupFieldValueWatch(field: FieldNodeAPI, fieldName: string): void {
-    // 清理旧的监听
     const oldCleanup = this.valueEffectCleanups.get(fieldName);
     if (oldCleanup) {
       oldCleanup();
     }
 
-    // 监听当前字段值变化
+    const hasDeps = !!field.schema.dependencies && field.schema.dependencies.length > 0;
+
     const cleanup = watch(
       () => this.state.values[fieldName],
-      (_newValue, _oldValue) => {
-        // 执行联动规则
+      () => {
         this.runReactions(fieldName);
+
+        if (!hasDeps) {
+          field.refreshEffectiveStatus();
+        }
       },
     );
 
     this.valueEffectCleanups.set(fieldName, cleanup);
 
-    // 监听依赖字段变化
     if (field.schema.dependencies) {
       field.schema.dependencies.forEach((depName) => {
         const depCleanup = watch(
           () => this.state.values[depName],
           () => {
-            // 依赖字段值变化时，FieldNode._effectiveStatus 的 computed 会自动追踪并重算
+            field.refreshEffectiveStatus();
           },
         );
 
-        // 存储依赖清理函数
         const existingCleanups = this.valueEffectCleanups.get(`${fieldName}_deps`) || (() => {});
         this.valueEffectCleanups.set(`${fieldName}_deps`, () => {
           existingCleanups();
@@ -273,7 +317,7 @@ export class FormStore implements FormStoreAPI {
       this.valueEffectCleanups.delete(`${fieldName}_deps`);
     }
 
-    batchUpdate(() => {
+    this.runBatch(() => {
       delete this.state.fields[fieldName];
       delete this.state.reactions[fieldName];
       delete this.state.errors[fieldName];
@@ -407,7 +451,7 @@ export class FormStore implements FormStoreAPI {
    * 重置所有值
    */
   reset(): void {
-    batchUpdate(() => {
+    this.runBatch(() => {
       Object.entries(this.state.fields).forEach(([name, field]) => {
         const { initialValue } = field.schema;
         this.state.values[name] = initialValue;
@@ -438,7 +482,7 @@ export class FormStore implements FormStoreAPI {
     if (field) {
       const { initialValue } = field.schema;
 
-      batchUpdate(() => {
+      this.runBatch(() => {
         this.state.values[name] = initialValue;
         delete this.state.errors[name];
         delete this.state.touched[name];

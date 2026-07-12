@@ -79,7 +79,14 @@ export { ProFormProvider } from './ProForm/ProFormProvider';
 export { FormField } from './ProForm/components/FormField';
 export { useProForm } from './ProForm/useProForm';
 export type { ProFormProps, ProFormSchema, FormItemProps, LayoutMode, ValidationRule } from './ProForm/types';
-export type { ProFormListProps, ProFormStepsProps } from './ProForm/components/types';
+export type {
+  ProFormListProps,
+  ProFormListInstance,
+  ProFormListActions,
+  ProFormStepsProps,
+  ProFormStepsInstance,
+  ProFormStepSchema,
+} from './ProForm/components/types';
 
 export { ProTable } from './ProTable';
 export { useProTable } from './ProTable/hooks/useProTable';

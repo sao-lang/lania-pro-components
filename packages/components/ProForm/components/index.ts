@@ -20,7 +20,14 @@
 export { ProFormList } from './ProFormList';
 export { ProFormSteps } from './ProFormSteps';
 
-export type { ProFormListProps, ProFormStepsProps, ProFormStepSchema, ProFormStepsInstance } from './types';
+export type {
+  ProFormListProps,
+  ProFormListInstance,
+  ProFormListActions,
+  ProFormStepsProps,
+  ProFormStepSchema,
+  ProFormStepsInstance,
+} from './types';
 
 // 快速组件导出
 export {

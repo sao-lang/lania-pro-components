@@ -12,7 +12,7 @@
  *
  * 迁移自 ProTable/hooks/useCache.ts
  */
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 
 /**
  * 缓存配置
@@ -274,14 +274,6 @@ export function useCache<T = Record<string, unknown>>(config?: CacheConfig): Use
 
   /** 获取当前缓存条目数 */
   const getCacheSize = useCallback((): number => cacheRef.current.size(), []);
-
-  // 组件卸载时不自动清空（缓存实例由 ref 持有，会随 GC 回收）
-  useEffect(
-    () => () => {
-      // 组件卸载时不自动清空
-    },
-    [],
-  );
 
   return {
     getCache,

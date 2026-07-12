@@ -42,12 +42,11 @@ export class FieldNode implements FieldNodeAPI {
   private _focused = ref<boolean>(false);
 
   // 计算属性 - 自动追踪依赖
-  private _effectiveStatus: ComputedRef<FieldStatus>;
   private _computedRequired: ComputedRef<boolean>;
   private _resolvedSchema: ComputedRef<ResolvedSchema>;
 
   private store: FormStoreAPI;
-  private onChangeCallbacks: Set<(value: unknown) => void> = new Set();
+  private onChangeCallbacks: Set<(value: unknown, oldValue: unknown) => void> = new Set();
   private onStatusChangeCallbacks: Set<(status: FieldStatus, oldStatus: FieldStatus) => void> = new Set();
   private onResolvedSchemaChangeCallbacks: Set<(resolved: ResolvedSchema) => void> = new Set();
   private valueWatchCleanup?: () => void;
@@ -67,41 +66,7 @@ export class FieldNode implements FieldNodeAPI {
       this._value.value = schema.initialValue;
     }
 
-    // ===== 计算属性：有效状态（合并 schema.behavior + 表单级约束） =====
-    this._effectiveStatus = computed<FieldStatus>(() => {
-      const values = store.getValues();
-      const formConstraints = store.getFormConstraints();
-
-      // 1. 解析 schema.behavior
-      let fieldWanted: FieldStatus | undefined;
-      const behavior = schema.behavior as BehaviorDecl;
-      if (behavior === undefined) {
-        fieldWanted = undefined;
-      } else if (typeof behavior === 'function') {
-        fieldWanted = behavior(values);
-      } else {
-        fieldWanted = behavior;
-      }
-
-      // 2. 合并：全局优先级高于字段级
-      //    hidden 是绝对隐藏，不受表单级覆盖
-      if (fieldWanted === 'hidden') return 'hidden';
-      if (formConstraints.preview) return 'readonly';
-      if (formConstraints.readonly) return 'readonly';
-      if (formConstraints.disabled) return 'disabled';
-      return fieldWanted ?? 'edit';
-    });
-
-    // 同步 _effectiveStatus → _status
-    watch(
-      () => this._effectiveStatus.value,
-      (newStatus, oldStatus) => {
-        if (newStatus !== oldStatus && newStatus !== this._status.value) {
-          this.setStatus(newStatus);
-        }
-      },
-      { immediate: true },
-    );
+    this.refreshEffectiveStatus();
 
     // 必填标识独立计算（schema.required 支持函数形式的条件必填）
     this._computedRequired = computed(() => {
@@ -158,16 +123,18 @@ export class FieldNode implements FieldNodeAPI {
     // 使用 watch 监听 store 中的值变化
     this.valueWatchCleanup = watch(
       () => this.store.getValue(fieldName),
-      (newValue, oldValue) => {
+      (newValue, _oldValue) => {
         if (newValue !== this._value.value) {
+          // 获取旧组件值（赋值前）
+          const oldComponentValue = this.getValue();
           this._value.value = newValue;
           // 订阅回调传递组件值（经过 input 转换），与 value getter 语义一致
           const componentValue = this.getValue();
-          this.onChangeCallbacks.forEach((cb) => cb(componentValue));
+          this.onChangeCallbacks.forEach((cb) => cb(componentValue, oldComponentValue));
 
           // 触发生命周期（传递组件值，用户层回调更关注展示形态）
           if (this.schema.lifecycle?.onValueChange) {
-            this.schema.lifecycle.onValueChange(componentValue, oldValue, this, this.store);
+            this.schema.lifecycle.onValueChange(componentValue, oldComponentValue, this, this.store);
           }
         }
       },
@@ -232,12 +199,14 @@ export class FieldNode implements FieldNodeAPI {
       transformedValue = this.schema.transform.output(allValues);
     }
 
+    // 获取旧组件值（赋值前）
+    const oldComponentValue = this.getValue();
     this._value.value = transformedValue;
     this.store.setValue(fieldName, transformedValue);
 
     // 通知订阅者（传递组件值，与 value getter 语义一致）
     const componentValue = this.getValue();
-    this.onChangeCallbacks.forEach((cb) => cb(componentValue));
+    this.onChangeCallbacks.forEach((cb) => cb(componentValue, oldComponentValue));
   }
 
   /**
@@ -284,14 +253,49 @@ export class FieldNode implements FieldNodeAPI {
 
     // 触发生命周期
     if (this.schema.lifecycle?.onStatusChange) {
-      this.schema.lifecycle.onStatusChange(status, oldStatus, this, this.store);
+      this.schema.lifecycle?.onStatusChange(status, oldStatus, this, this.store);
     }
+  }
+
+  /**
+   * 计算有效状态（合并 schema.behavior + 表单级约束）
+   */
+  private computeEffectiveStatus(): FieldStatus {
+    const values = this.store.getValues();
+    const formConstraints = this.store.getFormConstraints();
+
+    let fieldWanted: FieldStatus | undefined;
+    const behavior = this.schema.behavior as BehaviorDecl;
+    if (behavior === undefined) {
+      fieldWanted = undefined;
+    } else if (typeof behavior === 'function') {
+      fieldWanted = behavior(values);
+    } else {
+      fieldWanted = behavior;
+    }
+
+    if (fieldWanted === 'hidden') return 'hidden';
+    if (formConstraints.preview) return 'readonly';
+    if (formConstraints.readonly) return 'readonly';
+    if (formConstraints.disabled) return 'disabled';
+    return fieldWanted ?? 'edit';
+  }
+
+  /**
+   * 手动刷新有效状态
+   *
+   * 不通过 computed 缓存，直接重算并 setStatus。
+   * 用于 FormStore 的 watch 回调中，确保依赖字段变化时状态及时更新。
+   */
+  refreshEffectiveStatus(): void {
+    const newStatus = this.computeEffectiveStatus();
+    this.setStatus(newStatus);
   }
 
   /**
    * 订阅值变化
    */
-  subscribeToValueChange(callback: (value: unknown) => void): () => void {
+  subscribeToValueChange(callback: (value: unknown, oldValue: unknown) => void): () => void {
     this.onChangeCallbacks.add(callback);
     return () => {
       this.onChangeCallbacks.delete(callback);

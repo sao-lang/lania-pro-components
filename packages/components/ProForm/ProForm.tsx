@@ -24,7 +24,6 @@ import { FormField } from './components/FormField';
 import { RootContextProvider, LayoutContextProvider, createFormState } from './context';
 import { useGroupLazyLoad, usePriorityLoad, useVirtualScroll } from '@lania-pro-components/shared';
 import { useFieldNavigation } from './hooks/useFieldNavigation';
-import { setAsyncBatchConfig, clearAsyncBatch } from '@lania-pro-components/utils';
 import { useDraft } from './hooks/useDraft';
 import type { DraftData, DraftStorage } from '@lania-pro-components/utils';
 import { localStorageStrategy, sessionStorageStrategy } from '@lania-pro-components/utils';
@@ -283,14 +282,8 @@ const ProFormRenderer: React.FC<ProFormRendererProps> = (props) => {
 
   // 批量更新配置
   useEffect(() => {
-    const bc = performance?.batchUpdate;
-    if (bc?.enabled) {
-      setAsyncBatchConfig({ delay: bc.delay, maxBatchSize: bc.maxBatchSize });
-    }
-    return () => {
-      clearAsyncBatch();
-    };
-  }, [performance?.batchUpdate]);
+    formStore.setBatchUpdateConfig(performance?.batchUpdate);
+  }, [formStore, performance?.batchUpdate]);
 
   // 折叠状态
   const [innerCollapsed, setInnerCollapsed] = useState<boolean>(defaultCollapsed);

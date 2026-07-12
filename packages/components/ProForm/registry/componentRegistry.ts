@@ -12,7 +12,7 @@
  * 而无需指定完整的 componentProps。
  */
 import React from 'react';
-import type { ComponentRegistry, QuickComponentConfig } from '../types';
+import type { ComponentRegistry, ProFormFieldComponentProps, QuickComponentConfig } from '../types';
 
 /**
  * 组件注册表
@@ -26,11 +26,15 @@ const quickComponentConfigs: Record<string, QuickComponentConfig> = {};
 
 /**
  * 注册组件
+ *
  * @param name 组件名称
- * @param component 组件
+ * @param component 组件（props 应匹配 ProFormFieldComponentProps；可指定 TValue 泛型明确 value 类型）
  */
-export function registerComponent(name: string, component: React.ComponentType<any>): void {
-  componentRegistry[name] = component;
+export function registerComponent<TValue = unknown>(
+  name: string,
+  component: React.ComponentType<ProFormFieldComponentProps<TValue>>,
+): void {
+  componentRegistry[name] = component as React.ComponentType<ProFormFieldComponentProps>;
 }
 
 /**
@@ -57,7 +61,7 @@ export function registerQuickComponent(name: string, config: QuickComponentConfi
  * @param name 组件名称
  * @returns 组件
  */
-export function getComponent(name: string): React.ComponentType<any> | undefined {
+export function getComponent(name: string): React.ComponentType<ProFormFieldComponentProps> | undefined {
   return componentRegistry[name];
 }
 
@@ -145,6 +149,27 @@ export function clearComponentRegistry(): void {
   Object.keys(componentRegistry).forEach((key) => {
     delete componentRegistry[key];
   });
+}
+
+/**
+ * 高阶函数：包装组件以剥离 FormField 注入的控制 props
+ *
+ * FormField 在编辑态渲染时会向组件注入 value/onChange/status/values/schema/field/form/onFocus/onBlur 等 props。
+ * 原生组件（如 Arco 组件）只需要 value/onChange 等数据 props，不需要 status/values/schema/field/form 等控制 props。
+ * 本函数剥离这些控制 props，避免它们被透传到 DOM 导致 React 警告。
+ *
+ * 自定义表单控件如需消费这些控制 props，可直接按 ProFormFieldComponentProps 定义组件 props，无需包装。
+ */
+export function stripFormControlProps<P extends Record<string, unknown>>(
+  Component: React.ComponentType<P>,
+): React.ComponentType<ProFormFieldComponentProps> {
+  const Wrapped = (props: ProFormFieldComponentProps) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status: _s, values: _v, schema: _sc, field: _f, form: _fm, ...rest } = props;
+    return React.createElement(Component, rest as unknown as P);
+  };
+  Wrapped.displayName = `FormFieldWrapped(${Component.displayName || Component.name || 'Unknown'})`;
+  return Wrapped as React.ComponentType<ProFormFieldComponentProps>;
 }
 
 // 导出注册表供外部访问

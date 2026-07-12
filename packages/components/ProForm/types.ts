@@ -3,6 +3,7 @@ import { ColProps } from '@arco-design/web-react/lib/Grid';
 import type { DraftStorage, DraftData } from '@lania-pro-components/utils';
 import { FormStore } from './core';
 import { ArcoFormInstance } from './hooks/useArcoForm';
+import { BatchUpdateConfig, LazyLoadConfig, VirtualScrollConfig } from '@lania-pro-components/shared';
 
 /**
  * 验证规则类型
@@ -80,55 +81,6 @@ export type FieldStatus = 'edit' | 'readonly' | 'disabled' | 'hidden';
  * 其他值遵循「全局优先级高于字段级」的合并规则。
  */
 export type BehaviorDecl = FieldStatus | ((values: Record<string, unknown>) => FieldStatus) | undefined;
-
-/**
- * @deprecated 请从 @lania-pro-components/shared 导入 VirtualScrollConfig
- * 此类型为向后兼容保留的本地副本
- */
-export interface VirtualScrollConfig {
-  /** 是否启用虚拟滚动 */
-  enabled?: boolean;
-  /** 列表项高度（像素） */
-  itemHeight?: number;
-  /** 可视区域外额外渲染的项数 */
-  overscan?: number;
-  /** 容器高度（像素） */
-  containerHeight?: number;
-}
-
-/**
- * @deprecated 请从 @lania-pro-components/shared 导入 LazyLoadConfig
- * 此类型为向后兼容保留的本地副本
- */
-export interface LazyLoadConfig {
-  /** 是否启用懒加载 */
-  enabled?: boolean;
-  /** 延迟加载时间（毫秒） */
-  delay?: number;
-  /** 是否在视口内才加载 */
-  inViewport?: boolean;
-  /** 分组大小（用于分组懒加载） */
-  groupSize?: number;
-  /** 组间延迟（毫秒） */
-  groupDelay?: number;
-  /** 高优先级字段列表 */
-  highPriorityFields?: string[];
-  /** 中优先级字段列表 */
-  mediumPriorityFields?: string[];
-}
-
-/**
- * @deprecated 请从 @lania-pro-components/shared 导入 BatchUpdateConfig
- * 此类型为向后兼容保留的本地副本
- */
-export interface BatchUpdateConfig {
-  /** 是否启用批量更新 */
-  enabled?: boolean;
-  /** 延迟时间（毫秒） */
-  delay?: number;
-  /** 最大批量大小 */
-  maxBatchSize?: number;
-}
 
 /**
  * ProForm 性能优化配置
@@ -684,12 +636,14 @@ export interface FieldNodeAPI {
   setError: (error?: string) => void;
   /** 设置状态 */
   setStatus: (status: FieldStatus) => void;
+  /** 手动刷新有效状态（合并 schema.behavior + 表单级约束） */
+  refreshEffectiveStatus: () => void;
   /** 设置焦点 */
   setFocus: () => void;
   /** 移除焦点 */
   removeFocus: () => void;
   /** 订阅值变化（回调参数为组件值，即经过 transform.input 转换后的值） */
-  subscribeToValueChange: (callback: (value: unknown) => void) => () => void;
+  subscribeToValueChange: (callback: (value: unknown, oldValue: unknown) => void) => () => void;
   /** 订阅状态变化 */
   subscribeToStatusChange: (callback: (status: FieldStatus, oldStatus: FieldStatus) => void) => () => void;
   /**
@@ -739,6 +693,8 @@ export interface FormStoreAPI {
   setFormConstraints: (constraints: { preview?: boolean; readonly?: boolean; disabled?: boolean }) => void;
   /** 获取表单级约束 */
   getFormConstraints: () => { preview: boolean; readonly: boolean; disabled: boolean };
+  /** 配置批量更新策略（同步/异步） */
+  setBatchUpdateConfig: (config?: BatchUpdateConfig) => void;
 }
 
 /**
@@ -808,11 +764,39 @@ export interface ProFormInstance<TValues = Record<string, unknown>> {
 }
 
 /**
+ * ProForm 注入给自定义表单控件的 props
+ *
+ * 自定义表单控件注册到 componentRegistry 后，在编辑态渲染时由 FormField 自动注入以下字段。
+ * 开发者可在此基础上通过 componentProps 透传额外的业务 props（泛型扩展）。
+ */
+export interface ProFormFieldComponentProps<TValue = unknown, TValues = Record<string, unknown>> {
+  /** 字段值（经 transform.input 转换后的展示形态） */
+  value: TValue;
+  /** 值变化回调（内部走 transform.output 转换后写入 store） */
+  onChange: (value: TValue, ...rest: unknown[]) => void;
+  /** 字段状态 */
+  status: FieldStatus;
+  /** 整个表单的值 */
+  values: TValues;
+  /** 已解析的 schema（label/componentProps/rules 等已解析为最终值） */
+  schema: ResolvedSchema;
+  /** FieldNode 实例（提供 getValue/setValue/validate/setStatus 等能力） */
+  field: FieldNodeAPI;
+  /** 表单实例（提供 getFieldsValue/setFieldsValue/validate 等能力） */
+  form: ProFormInstance<TValues>;
+  /** 获焦回调 */
+  onFocus: () => void;
+  /** 失焦回调 */
+  onBlur: () => void;
+  /** 允许通过 componentProps 透传额外的业务 props */
+  [key: string]: unknown;
+}
+
+/**
  * 组件注册表
  */
 export interface ComponentRegistry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: React.ComponentType<any>;
+  [key: string]: React.ComponentType<ProFormFieldComponentProps>;
 }
 
 /**

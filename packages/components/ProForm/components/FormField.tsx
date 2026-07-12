@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { Form } from '@arco-design/web-react';
-import type { ProFormSchema, FieldStatus, FieldNodeAPI, ResolvedSchema } from '../types';
+import type { ProFormSchema, FieldStatus, FieldNodeAPI, ResolvedSchema, ProFormFieldComponentProps } from '../types';
 import { getComponent, parseQuickComponent, getReadonlyRenderer, getRendererByMode } from '../registry';
 import {
   useRootContext,
@@ -10,7 +10,9 @@ import {
   SchemaContextProvider,
   FieldContextProvider,
   LayoutContextProvider,
+  useExtension,
 } from '../context';
+import type { PermissionExtension, AuditExtension, I18nExtension } from '../context/ExtensionContext';
 import { createFieldNode } from '../core/FieldNode';
 import type { FormStore } from '../core/FormStore';
 import type { ArcoFormInstance } from '../hooks/useArcoForm';
@@ -62,6 +64,11 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   const rootContext = useRootContext();
   const layoutContext = useLayoutContext();
 
+  // ========== 扩展上下文 ==========
+  const permission = useExtension<PermissionExtension>('permission');
+  const audit = useExtension<AuditExtension>('audit');
+  const i18n = useExtension<I18nExtension>('i18n');
+
   // ========== 本地状态（由 FieldNode 驱动） ==========
   const [value, setValueState] = useState<unknown>(fieldNode.value);
   const [status, setStatusState] = useState<FieldStatus>(fieldNode.status);
@@ -107,19 +114,22 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
   // ========== 订阅 FieldNode 状态变更 ==========
   useEffect(() => {
     // 初始化本地状态
-    setValueState(fieldNode.value);
+    const initialValue = fieldNode.value;
+    setValueState(initialValue);
     setStatusState(fieldNode.status);
     setResolvedSchema(fieldNode.resolvedSchema);
 
-    // 订阅 value 变化 → 同步回 ArcoForm
-    const unsubscribeValue = fieldNode.subscribeToValueChange((newValue) => {
+    // 订阅 value 变化 → 同步回 ArcoForm + 审计日志
+    const unsubscribeValue = fieldNode.subscribeToValueChange((newValue, oldValue) => {
       setValueState(newValue);
       arcoForm.setFieldValue(fieldName, newValue);
+      audit?.logFieldChange(fieldName, oldValue, newValue);
     });
 
-    // 订阅 status 变化
-    const unsubscribeStatus = fieldNode.subscribeToStatusChange((newStatus) => {
+    // 订阅 status 变化 + 审计日志
+    const unsubscribeStatus = fieldNode.subscribeToStatusChange((newStatus, oldStatus) => {
       setStatusState(newStatus);
+      audit?.log('field.status.change', { field: fieldName, oldStatus, newStatus });
     });
 
     // 订阅 resolvedSchema 变化（label / componentProps / rules 等解析结果）
@@ -133,7 +143,7 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
       unsubscribeStatus();
       unsubscribeResolved();
     };
-  }, [fieldNode, arcoForm, fieldName]);
+  }, [fieldNode, arcoForm, fieldName, audit]);
 
   // ========== 注册组件 ref 到上层 ==========
   useEffect(() => {
@@ -232,6 +242,25 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     return null;
   }
 
+  // ========== 权限扩展检查 ==========
+  // checkVisible 返回 false → 不渲染
+  if (permission && !permission.checkVisible(fieldName)) {
+    return null;
+  }
+  // checkEditable 返回 false 且当前为编辑态 → 降级为只读
+  const effectiveStatus: FieldStatus =
+    permission && status === 'edit' && !permission.checkEditable(fieldName) ? 'readonly' : status;
+
+  // ========== 国际化扩展 ==========
+  // 对 label / tooltip / extra 等文案应用 i18n.t() 转换
+  // 只有 string 类型的文案才做 i18n 转换；ReactNode（如 JSX）直接使用
+  const displayLabel =
+    i18n && typeof resolvedSchema.label === 'string' ? i18n.t(resolvedSchema.label) : resolvedSchema.label;
+  const displayTooltip =
+    i18n && typeof resolvedSchema.tooltip === 'string' ? i18n.t(resolvedSchema.tooltip) : resolvedSchema.tooltip;
+  const displayExtra =
+    i18n && typeof resolvedSchema.extra === 'string' ? i18n.t(resolvedSchema.extra) : resolvedSchema.extra;
+
   const parsedQuickComponent = parseQuickComponent(resolvedSchema.component);
 
   const displayValue = useMemo(() => {
@@ -296,12 +325,16 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
    * 2. 直接按组件名称查找
    */
   const renderComponent = () => {
-    if (status === 'readonly') {
+    if (effectiveStatus === 'readonly') {
       return renderReadonlyContent;
     }
 
-    let ComponentToRender: React.ComponentType<Record<string, unknown>> | undefined;
+    let ComponentToRender: React.ComponentType<ProFormFieldComponentProps> | undefined;
     const additionalProps: Record<string, unknown> = {};
+
+    // 快速组件的 formatter/parser（仅 type === 'quick' 时有效）
+    let quickFormatter: ((value: unknown) => unknown) | undefined;
+    let quickParser: ((value: unknown) => unknown) | undefined;
 
     if (parsedQuickComponent.type === 'unit') {
       ComponentToRender =
@@ -316,7 +349,25 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
           : getComponent('QuickInputWithSuffix');
       additionalProps.prefix = parsedQuickComponent.prefix;
     } else if (parsedQuickComponent.type === 'quick') {
-      ComponentToRender = getComponent(parsedQuickComponent.name);
+      const { config } = parsedQuickComponent;
+
+      // 如果 config 声明了 prefix/suffix，复用 unit/prefix 的渲染逻辑
+      if (config.suffix) {
+        ComponentToRender = getComponent(
+          config.baseComponent === 'InputNumber' ? 'QuickInputNumberWithSuffix' : 'QuickInputWithSuffix',
+        );
+        additionalProps.suffix = config.suffix;
+      } else if (config.prefix) {
+        ComponentToRender = getComponent(
+          config.baseComponent === 'InputNumber' ? 'QuickInputNumberWithSuffix' : 'QuickInputWithSuffix',
+        );
+        additionalProps.prefix = config.prefix;
+      } else {
+        ComponentToRender = getComponent(parsedQuickComponent.name);
+      }
+
+      quickFormatter = config.formatter;
+      quickParser = config.parser;
     } else {
       ComponentToRender = getComponent(resolvedSchema.component);
     }
@@ -327,7 +378,15 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
     }
 
     const { style: userStyle, ...restComponentProps } = resolvedSchema.componentProps || {};
-    const componentValue = getComponentValue();
+
+    // 应用 formatter（存储值 → 展示值）
+    const rawValue = getComponentValue();
+    const componentValue = quickFormatter ? quickFormatter(rawValue) : rawValue;
+
+    // 应用 parser（展示值 → 存储值）
+    const componentOnChange = quickParser
+      ? (newValue: unknown, ...rest: unknown[]) => handleChange(quickParser(newValue), ...rest)
+      : handleChange;
 
     return (
       <ComponentToRender
@@ -337,8 +396,8 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
           }
         }}
         value={componentValue}
-        onChange={handleChange}
-        status={status}
+        onChange={componentOnChange}
+        status={effectiveStatus}
         values={rootContext.instance.getFieldsValue()}
         schema={resolvedSchema}
         field={fieldNode}
@@ -404,13 +463,13 @@ const FormFieldInner: React.FC<FormFieldInnerProps> = ({ fieldNode, arcoForm, se
          */}
         <FormItem
           field={fieldName}
-          label={resolvedSchema.label}
+          label={displayLabel}
           labelCol={resolvedSchema.labelCol || layoutContext.labelCol}
           wrapperCol={resolvedSchema.wrapperCol || layoutContext.wrapperCol}
           rules={finalRules}
           initialValue={fieldNode.schema.initialValue}
-          tooltip={resolvedSchema.tooltip}
-          extra={resolvedSchema.extra}
+          tooltip={displayTooltip}
+          extra={displayExtra}
           validateStatus={getValidateStatus()}
           help={error}
         >
@@ -520,6 +579,28 @@ export const FormField: React.FC<FormFieldProps> = ({
     [layoutContext, resolvedSchema.col, resolvedSchema.labelCol, resolvedSchema.wrapperCol],
   );
 
+  // ========== 递归渲染子字段 ==========
+  /**
+   * 当 schema 声明了 children 时，在父字段下方递归渲染子 FormField。
+   * 子字段共享同一个 formStore / arcoForm，独立注册到 FormStore。
+   */
+  const childFields = useMemo(() => {
+    if (!schema.children || schema.children.length === 0) return null;
+    return schema.children.map((childSchema, index) => {
+      const key = (Array.isArray(childSchema.name) ? childSchema.name[0] : childSchema.name) || index;
+      return (
+        <FormField
+          key={key}
+          schema={childSchema}
+          formStore={formStore}
+          arcoForm={arcoForm}
+          setComponentRef={setComponentRef}
+          onFieldChange={childSchema.onFieldChange}
+        />
+      );
+    });
+  }, [schema.children, formStore, arcoForm, setComponentRef]);
+
   return (
     <SchemaContextProvider value={schemaContextValue}>
       <LayoutContextProvider value={layoutContextValue}>
@@ -529,6 +610,7 @@ export const FormField: React.FC<FormFieldProps> = ({
           setComponentRef={setComponentRef}
           onFieldChange={onFieldChange}
         />
+        {childFields && <div className='proform-children'>{childFields}</div>}
       </LayoutContextProvider>
     </SchemaContextProvider>
   );

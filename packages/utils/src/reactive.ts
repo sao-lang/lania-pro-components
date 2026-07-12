@@ -108,6 +108,14 @@ class Dep {
 const targetMap = new WeakMap<object, Map<string | symbol, Dep>>();
 
 /**
+ * 全局 WeakMap：原始对象 → 响应式 Proxy
+ *
+ * 用于缓存已创建的响应式代理，确保同一个原始对象多次调用 reactive()
+ * 返回同一个 Proxy 实例。
+ */
+const reactiveMap = new WeakMap<object, object>();
+
+/**
  * 获取（或创建）指定对象指定属性的 Dep 实例
  *
  * @param target - 目标对象
@@ -166,32 +174,33 @@ function getDep(target: object, key: string | symbol): Dep {
  * ```
  */
 export function reactive<T extends object>(target: T): T {
-  // 非对象类型直接返回（基本类型无法代理）
   if (!isObject(target)) {
     return target;
   }
 
-  // 已经是响应式对象，直接返回（避免重复代理导致多个 Dep 实例）
-  if (targetMap.has(target)) {
+  // 已经是响应式 Proxy，直接返回
+  if ((target as any).__v_isReactive) {
     return target;
   }
 
-  return new Proxy(target, {
-    /**
-     * get 拦截器
-     *
-     * 1. 依赖收集：调用 dep.depend() 将当前 activeEffect 注册为订阅者
-     * 2. 惰性深度代理：如果读取的属性值是对象，递归调用 reactive 使其也变为响应式
-     * 3. 返回属性值
-     */
+  // 已有缓存的 Proxy，直接返回
+  const existing = reactiveMap.get(target);
+  if (existing) {
+    return existing as T;
+  }
+
+  const proxy = new Proxy(target, {
     get(target, key, receiver) {
+      // 内部标志位：用于判断是否为响应式 Proxy
+      if (key === '__v_isReactive') {
+        return true;
+      }
+
       const dep = getDep(target, key);
-      dep.depend(); // ⭐ 核心：依赖收集
+      dep.depend();
 
       const result = Reflect.get(target, key, receiver);
 
-      // 递归代理嵌套对象（惰性深度响应化）
-      // 注意：这里是惰性的，只有访问到嵌套对象时才会将其响应化
       if (isObject(result)) {
         return reactive(result);
       }
@@ -234,6 +243,9 @@ export function reactive<T extends object>(target: T): T {
       return result;
     },
   });
+
+  reactiveMap.set(target, proxy);
+  return proxy;
 }
 
 // ======================== effect ========================
@@ -691,22 +703,19 @@ export function isObject(value: unknown): value is object {
  * @returns 响应式代理后的对象
  */
 export function toReactive<T extends object>(target: T): T {
-  if (targetMap.has(target)) {
-    return target;
-  }
   return reactive(target);
 }
 
 /**
  * 检查目标对象是否已经是响应式的
  *
- * 通过检查 targetMap WeakMap 中是否存在该对象的记录来判断。
+ * 通过访问 __v_isReactive 标志位来判断（会触发 Proxy 的 get handler）。
  *
  * @param target - 待检查的值
  * @returns true 表示已是响应式对象
  */
 export function isReactive(target: unknown): boolean {
-  return isObject(target) && targetMap.has(target);
+  return isObject(target) && (target as any).__v_isReactive === true;
 }
 
 /**
