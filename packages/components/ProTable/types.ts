@@ -701,6 +701,10 @@ export interface ProTableInstance<T = Record<string, unknown>> {
   setProps: (props: Partial<ProTableProps<T>>) => void;
   /** 获取表格属性 */
   getProps: () => ProTableProps<T>;
+  /** 正在编辑的行 keys */
+  editableKeys?: (string | number)[];
+  /** 可编辑表格实例 */
+  editableInstance?: EditableTableInstance<T>;
 }
 
 /**
@@ -926,6 +930,7 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
   virtualScrollConfig?: {
     itemHeight?: number;
     overscan?: number;
+    containerHeight?: number;
   };
 
   /** 编辑行配置 */
@@ -1022,6 +1027,14 @@ export interface ProTableProps<T = Record<string, unknown>> extends Omit<
         serialize?: (params: Record<string, unknown>) => string;
         /** 自定义反序列化 */
         deserialize?: (search: string) => Record<string, unknown>;
+      };
+
+  /** 查询参数自动恢复 — 页面刷新后自动恢复上次的查询参数 */
+  queryAutoRestore?:
+    | boolean
+    | {
+        /** 持久化 key（默认自动生成） */
+        storageKey?: string;
       };
 
   /** 查询方案配置 */

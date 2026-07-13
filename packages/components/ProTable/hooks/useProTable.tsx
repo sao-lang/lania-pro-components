@@ -33,6 +33,7 @@ import type {
 import type { ProFormInstance } from '../../ProForm/types';
 import { useRequest } from './useRequest';
 import { useEditableTable } from '../editable';
+import type { EditableTableInstance } from '../editable/types';
 import { useCache } from '@lania-pro-components/shared';
 
 export interface ProTableContextValue<T = Record<string, unknown>> {
@@ -116,7 +117,14 @@ export const useProTable = <T extends Record<string, unknown>>(
   });
 
   // ===== useEditableTable（可编辑表格）=====
-  const { startEditable, cancelEditable, saveEditable, deleteEditable } = useEditableTable<Record<string, unknown>>({
+  const {
+    startEditable,
+    cancelEditable,
+    saveEditable,
+    deleteEditable,
+    editableKeys,
+    instance: editableInstance,
+  } = useEditableTable<Record<string, unknown>>({
     config: editable as unknown as import('../editable/types').EditableConfig<Record<string, unknown>>,
     getRowKey: (record: Record<string, unknown>) => getRowKey(record as T),
     dataSource: store.dataSource,
@@ -225,7 +233,7 @@ export const useProTable = <T extends Record<string, unknown>>(
       getExpandedRows: () => store.expandedRows,
       clearExpanded: () => store.clearExpanded(),
 
-      // --- 可编辑表�?---
+      // --- 可编辑表格 ---
       startEditable,
       cancelEditable,
       saveEditable,
@@ -300,6 +308,8 @@ export const useProTable = <T extends Record<string, unknown>>(
       setProps,
       getProps,
       store,
+      editableKeys,
+      editableInstance: editableInstance as EditableTableInstance<T>,
     }),
     [
       action,
@@ -317,6 +327,8 @@ export const useProTable = <T extends Record<string, unknown>>(
       requestDataFn,
       setProps,
       getProps,
+      editableKeys,
+      editableInstance,
     ],
   );
 

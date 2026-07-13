@@ -25,18 +25,15 @@ export {
   transformSearchParams,
 } from '../../ProQueryForm/utils';
 
-export interface QueryFormProps {
-  formRef: React.RefObject<ProFormInstance | null>;
-  queryFormRef?: React.Ref<ProQueryFormInstance>;
-}
+export type QueryFormProps = object;
 
-export const QueryForm = forwardRef<ProQueryFormInstance, QueryFormProps>((props, ref) => {
-  const { formRef, queryFormRef } = props;
+export const QueryForm = forwardRef<ProQueryFormInstance, QueryFormProps>((_props, ref) => {
   const dataContext = useDataContext();
   const { columns } = useColumnContext();
   const { props: rootProps } = useRootContext();
 
-  const { search, urlSync, searchSchema: searchSchemaConfig } = rootProps;
+  const { search, urlSync, queryAutoRestore, searchSchema: searchSchemaConfig } = rootProps;
+  const formRef = useRef<ProFormInstance | null>(null);
   const isSettingFormRef = useRef(false);
 
   useEffect(() => {
@@ -77,7 +74,7 @@ export const QueryForm = forwardRef<ProQueryFormInstance, QueryFormProps>((props
 
   return (
     <ProQueryForm
-      ref={ref || queryFormRef}
+      ref={ref}
       columns={columns}
       layout={layout}
       column={formColumns}
@@ -89,10 +86,10 @@ export const QueryForm = forwardRef<ProQueryFormInstance, QueryFormProps>((props
       beforeSearch={beforeSearch}
       showSearch={showSearch}
       showReset={showReset}
-      formRef={formRef}
       formProps={formProps as Record<string, unknown>}
       store={dataContext}
       urlSync={urlSync}
+      queryAutoRestore={queryAutoRestore}
       searchSchema={searchSchemaConfig}
     />
   );

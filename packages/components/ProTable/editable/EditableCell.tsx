@@ -21,7 +21,20 @@
  * 支持行验证失败的红色边框提示。
  */
 import React, { useMemo, useCallback } from 'react';
-import { Input, InputNumber, Select, DatePicker, Switch } from '@arco-design/web-react';
+import {
+  Input,
+  InputNumber,
+  Select,
+  DatePicker,
+  Switch,
+  Rate,
+  Slider,
+  TreeSelect,
+  Cascader,
+  TimePicker,
+  Radio,
+  Checkbox,
+} from '@arco-design/web-react';
 import type { EditableCellConfig, EditableTableInstance } from './types';
 
 const { TextArea } = Input;
@@ -55,6 +68,8 @@ const getDefaultComponent = (valueType?: string) => {
       return Input;
     case 'textarea':
       return TextArea;
+    case 'password':
+      return Input.Password;
     case 'number':
       return InputNumber;
     case 'select':
@@ -63,8 +78,22 @@ const getDefaultComponent = (valueType?: string) => {
       return DatePicker;
     case 'dateRange':
       return DatePicker.RangePicker;
+    case 'time':
+      return TimePicker;
     case 'switch':
       return Switch;
+    case 'rate':
+      return Rate;
+    case 'slider':
+      return Slider;
+    case 'radio':
+      return Radio.Group;
+    case 'checkbox':
+      return Checkbox.Group;
+    case 'treeSelect':
+      return TreeSelect;
+    case 'cascader':
+      return Cascader;
     default:
       return Input;
   }
@@ -193,10 +222,75 @@ export const EditableCell = <T extends Record<string, unknown>>(props: EditableC
       return <Switch {...fieldProps} checked={editValue as boolean} onChange={handleChange} />;
     }
 
+    if (valueType === 'treeSelect') {
+      return (
+        <TreeSelect
+          {...fieldProps}
+          value={editValue as string | string[]}
+          onChange={handleChange}
+          style={{
+            width: '100%',
+            ...(fieldProps?.style as React.CSSProperties),
+          }}
+        />
+      );
+    }
+
+    if (valueType === 'cascader') {
+      return (
+        <Cascader
+          {...fieldProps}
+          value={editValue as string[]}
+          onChange={handleChange}
+          style={{
+            width: '100%',
+            ...(fieldProps?.style as React.CSSProperties),
+          }}
+        />
+      );
+    }
+
+    if (valueType === 'radio') {
+      const options = (fieldProps?.options || []) as Array<{
+        label: string;
+        value: string | number;
+        disabled?: boolean;
+      }>;
+      return (
+        <Radio.Group {...fieldProps} value={editValue as string | number} onChange={handleChange}>
+          {options.map((opt) => (
+            <Radio key={String(opt.value)} value={opt.value} disabled={opt.disabled}>
+              {opt.label}
+            </Radio>
+          ))}
+        </Radio.Group>
+      );
+    }
+
+    if (valueType === 'checkbox') {
+      const options = (fieldProps?.options || []) as Array<{
+        label: string;
+        value: string | number;
+        disabled?: boolean;
+      }>;
+      return (
+        <Checkbox.Group {...fieldProps} value={editValue as (string | number)[]} onChange={handleChange}>
+          {options.map((opt) => (
+            <Checkbox key={String(opt.value)} value={opt.value} disabled={opt.disabled}>
+              {opt.label}
+            </Checkbox>
+          ))}
+        </Checkbox.Group>
+      );
+    }
+
+    // rate / slider / password / time / 兜底: 使用 value + onChange 标准模式
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const DefaultComponent = Component as any;
     return (
-      <Component
+      <DefaultComponent
         {...fieldProps}
-        value={editValue as never}
+        value={editValue}
         onChange={handleChange}
         style={{ width: '100%', ...(fieldProps?.style as React.CSSProperties) }}
       />

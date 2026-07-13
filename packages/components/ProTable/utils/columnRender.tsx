@@ -59,9 +59,13 @@ import type {
   CustomRendererRegistry,
   ProTableNEventHandlers,
   ProTableActionType,
+  ProTableProps,
 } from '../types';
 import { OprActionButtons } from '../components/ActionButtonRenderer';
 import type { OprActionButtonConfig } from '../types-action-button';
+import { EditableCell } from '../editable/EditableCell';
+import { EditableActions } from '../editable/EditableActions';
+import type { EditableTableInstance, EditableConfig } from '../editable/types';
 import {
   formatNumber,
   formatMoney,
@@ -1086,13 +1090,21 @@ export const renderColumnByValueType = <T = Record<string, unknown>,>(
 /**
  * 生成列的渲染函数
  */
+// eslint-disable-next-line react/display-name
 export const createColumnRender =
   <T extends Record<string, unknown>>(
     column: ProColumnType<T>,
     action: ProTableActionType<T>,
     handlers?: ProTableNEventHandlers<T>,
     refreshTable?: () => void,
+    editableOptions?: {
+      editableKeys: (string | number)[];
+      editableInstance: EditableTableInstance<T>;
+      editableConfig?: ProTableProps<T>['editable'];
+      getRowKey: (record: T) => string | number;
+    },
   ): ((value: unknown, record: T, index: number) => ReactNode) =>
+  // eslint-disable-next-line react/display-name
   (value: unknown, record: T, index: number) => {
     let text: unknown = value;
     if ((text === undefined || text === null) && column.dataIndex) {
@@ -1106,11 +1118,68 @@ export const createColumnRender =
     const content = renderColumnByValueType(text, column, record, index, action, handlers, refreshTable);
     const dom = wrapWithCopy(content, text, column, record);
 
+    let rendered = dom;
     if (column.render) {
-      return column.render(dom, record, index, action as ProTableActionType<Record<string, unknown>>, column);
+      rendered = column.render(dom, record, index, action as ProTableActionType<Record<string, unknown>>, column);
     }
 
-    return dom;
+    // === 可编辑集成：列级 editable 配置 → 包裹 EditableCell ===
+    if (editableOptions && column.editable && column.dataIndex) {
+      const isEditing = editableOptions.editableKeys.includes(editableOptions.getRowKey(record));
+      const colEditable = column.editable;
+      // 转换列级 editable 配置到 EditableCellConfig
+      const componentToValueType: Record<string, string> = {
+        Input: 'text',
+        InputPassword: 'password',
+        TextArea: 'textarea',
+        InputNumber: 'number',
+        Select: 'select',
+        DatePicker: 'date',
+        DatePickerRange: 'dateRange',
+        TimePicker: 'time',
+        Switch: 'switch',
+        Rate: 'rate',
+        Slider: 'slider',
+        TreeSelect: 'treeSelect',
+        Cascader: 'cascader',
+        Radio: 'radio',
+        RadioGroup: 'radio',
+        Checkbox: 'checkbox',
+        CheckboxGroup: 'checkbox',
+      };
+      const cellConfig = (() => {
+        if (typeof colEditable === 'boolean') {
+          return { dataIndex: column.dataIndex, editable: colEditable };
+        }
+        if (typeof colEditable === 'function') {
+          return { dataIndex: column.dataIndex, editable: (_v: unknown, row: T, _i: number) => colEditable(row) };
+        }
+        const { component, componentProps, rules, required } = colEditable;
+        return {
+          dataIndex: column.dataIndex,
+          valueType: componentToValueType[component || ''] || column.valueType || 'text',
+          fieldProps: componentProps || {},
+          rules: rules || [],
+          required: required || false,
+          editable: true,
+        };
+      })();
+      return (
+        <EditableCell
+          dataIndex={column.dataIndex}
+          rowKey={editableOptions.getRowKey(record)}
+          record={record}
+          value={value}
+          isEditing={isEditing}
+          cellConfig={cellConfig}
+          instance={editableOptions.editableInstance}
+        >
+          {rendered}
+        </EditableCell>
+      );
+    }
+
+    return rendered;
   };
 
 /**
@@ -1121,6 +1190,12 @@ export const convertColumns = <T extends Record<string, unknown>>(
   action: ProTableActionType<T>,
   handlers?: ProTableNEventHandlers<T>,
   refreshTable?: () => void,
+  editableOptions?: {
+    editableKeys: (string | number)[];
+    editableInstance: EditableTableInstance<T>;
+    editableConfig?: ProTableProps<T>['editable'];
+    getRowKey: (record: T) => string | number;
+  },
 ): TableColumnProps<T>[] =>
   columns
     .filter((col) => !col.hideInTable)
@@ -1131,11 +1206,40 @@ export const convertColumns = <T extends Record<string, unknown>>(
         ...rest,
         title: valueType === 'opr' && !rest.title ? '操作' : rest.title,
         dataIndex: Array.isArray(dataIndex) ? dataIndex.join('.') : dataIndex,
-        render: createColumnRender(column, action, handlers, refreshTable),
+        render: createColumnRender(column, action, handlers, refreshTable, editableOptions),
       } as TableColumnProps<T>;
 
+      // === 可编辑集成：操作列合并 EditableActions + 常规按钮 ===
+      if (editableOptions && valueType === 'opr') {
+        const baseRender = converted.render!;
+        converted.render = (_: unknown, record: T, _index: number) => {
+          const rowKey = editableOptions.getRowKey(record);
+          const isEditing = editableOptions.editableKeys.includes(rowKey);
+          const editableActions = (
+            <EditableActions
+              rowKey={rowKey}
+              record={record}
+              isEditing={isEditing}
+              config={editableOptions.editableConfig as EditableConfig<T>}
+              instance={editableOptions.editableInstance}
+            />
+          );
+          // 编辑态只显示保存/取消，非编辑态合并常规按钮 + 编辑/删除
+          if (isEditing) {
+            return editableActions;
+          }
+          const oprDom = baseRender(_, record, _index);
+          return (
+            <Space size={8}>
+              {oprDom}
+              {editableActions}
+            </Space>
+          );
+        };
+      }
+
       if (children && children.length > 0) {
-        converted.children = convertColumns(children, action, handlers, refreshTable);
+        converted.children = convertColumns(children, action, handlers, refreshTable, editableOptions);
       }
 
       return converted;

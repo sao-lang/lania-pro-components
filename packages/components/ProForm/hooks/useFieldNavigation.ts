@@ -72,9 +72,7 @@ export const useFieldNavigation = ({
     items: schemas.map((schema) => {
       const values = formStore.getValues();
       const resolvedKbNav =
-        typeof schema.keyboardNavigation === 'function'
-          ? schema.keyboardNavigation(values)
-          : schema.keyboardNavigation;
+        typeof schema.keyboardNavigation === 'function' ? schema.keyboardNavigation(values) : schema.keyboardNavigation;
       return {
         id: schema.name,
         onFocus: (name: string) => {

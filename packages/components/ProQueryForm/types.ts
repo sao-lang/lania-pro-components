@@ -50,12 +50,17 @@ export interface ProQueryFormProps<T = Record<string, unknown>> {
   urlSync?: boolean | UrlSyncConfig;
   /** 查询方案管理（轻量/重量模式均可） */
   searchSchema?: SearchSchemaConfig;
+  /** 查询参数自动恢复 — 查询/重置时将表单参数持久化到 localStorage，页面刷新后自动恢复 */
+  queryAutoRestore?:
+    | boolean
+    | {
+        /** 持久化 key（默认自动生成） */
+        storageKey?: string;
+      };
 
   /** === ProForm 透传 === */
   /** 透传给 ProForm 的配置（除 schemas/onFinish/onReset 外） */
   formProps?: Omit<ProFormProps, 'schemas' | 'onFinish' | 'onReset'>;
-  /** formRef（暴露 ProFormInstance） */
-  formRef?: React.Ref<ProFormInstance>;
   /** Schema 自动补全配置 */
   schemaProcessOptions?: SchemaProcessOptions;
 

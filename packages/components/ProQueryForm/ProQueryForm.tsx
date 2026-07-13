@@ -1,10 +1,10 @@
 /**
- * ProQueryForm 组件 — 独立查询表单
+ * ProQueryForm 组件 —— 独立查询表单
  *
  * 核心职责：
  * 1. 双形态入参：columns（列驱动）或 schemas（Schema 驱动）
  * 2. 直接复用 ProForm 渲染查询表单
- * 3. 双模式：轻量（onSearch 回调）/ 重量（store 集成）
+ * 3. 双模式：轻量（onSearch 回调） 重量（store 集成）
  * 4. 查询参数转换：删空值 + search.transform
  * 5. URL 同步：useUrlSync（轻量模式用内部 store，重量模式用传入的 store）
  * 6. 查询方案管理：usePresetManager + localStorage 持久化
@@ -15,10 +15,10 @@
  *
  * @example
  * ```tsx
- * // 形态 A：columns 列驱动
+ * // 形式 A：columns 列驱动
  * <ProQueryForm columns={tableColumns} onSearch={fetchData} />
  *
- * // 形态 B：schemas Schema 驱动
+ * // 形式 B：schemas Schema 驱动
  * <ProQueryForm schemas={mySchemas} onSearch={fetchChartData} />
  *
  * // 重量模式：与 ProTable DataStore 集成
@@ -28,7 +28,7 @@
 
 import React, { useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import type { ProFormInstance, ProFormSchema } from '../ProForm/types';
-import type { ProQueryFormProps, ProQueryFormInstance, LightweightStore, UrlSyncConfig, SearchSchemaConfig } from './types';
+import type { ProQueryFormProps, ProQueryFormInstance, LightweightStore, UrlSyncConfig } from './types';
 import { convertColumnsToSearchSchema, transformSearchParams } from './utils';
 import { QueryFormRenderer } from './QueryFormRenderer';
 import {
@@ -37,7 +37,6 @@ import {
   ProQueryFormActionProvider,
 } from './ProQueryFormContext';
 import { useUrlSync, usePresetManager } from '@lania-pro-components/shared';
-import type { PresetItem } from '@lania-pro-components/shared';
 
 function createLightweightStore(): LightweightStore {
   let state = {
@@ -127,16 +126,14 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
     resetButtonText = '重置',
     store,
     urlSync,
+    queryAutoRestore,
     searchSchema: searchSchemaConfig,
     formProps,
-    formRef: formRefProp,
-    schemaProcessOptions,
     className,
     style,
   } = props;
 
-  const internalFormRef = useRef<ProFormInstance | null>(null);
-  const formInstanceRef = (formRefProp as React.RefObject<ProFormInstance | null>) || internalFormRef;
+  const formRef = useRef<ProFormInstance | null>(null);
 
   const [internalQuery, setInternalQuery] = useState<Record<string, unknown>>({});
 
@@ -162,7 +159,7 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
 
   useEffect(() => {
     if (!store && Object.keys(internalQuery).length > 0) {
-      formInstanceRef.current?.setFieldsValue(internalQuery);
+      formRef.current?.setFieldsValue(internalQuery);
     }
   }, [internalQuery, store]);
 
@@ -175,7 +172,7 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
   const urlSyncEnabled = urlSync !== undefined && urlSync !== false;
   const urlSyncConfig = typeof urlSync === 'object' ? urlSync : {};
 
-  useUrlSync({
+  const { syncToUrl, restoreFromUrl } = useUrlSync({
     enabled: urlSyncEnabled,
     getState: () => effectiveStore.getState(),
     setState: (partial) => {
@@ -192,11 +189,14 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
       });
       if (Object.keys(query).length > 0) {
         effectiveStore.setQuery(query);
-        formInstanceRef.current?.setFieldsValue(query);
+        formRef.current?.setFieldsValue(query);
       }
     },
     serialize: (state) =>
-      filterParams({ current: state.pagination.current, pageSize: state.pagination.pageSize, ...state.query }, urlSyncConfig),
+      filterParams(
+        { current: state.pagination.current, pageSize: state.pagination.pageSize, ...state.query },
+        urlSyncConfig,
+      ),
     deserialize: (params) => {
       const state: Record<string, unknown> = {};
       const { prefix = '' } = urlSyncConfig;
@@ -209,7 +209,54 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
     debounceTime: 300,
   });
 
-  const { presets: searchSchemas, current: currentSearchSchema, save, apply, remove, rename, update } = usePresetManager<Record<string, unknown>>({
+  // 初始化：从 URL 恢复查询参数
+  useEffect(() => {
+    restoreFromUrl();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ===== 查询参数自动恢复（localStorage）====
+  const queryAutoRestoreEnabled = queryAutoRestore !== undefined && queryAutoRestore !== false;
+  const queryAutoRestoreCfg =
+    queryAutoRestoreEnabled && typeof queryAutoRestore === 'object'
+      ? (queryAutoRestore as { storageKey?: string })
+      : undefined;
+  const queryAutoRestoreKey: string = queryAutoRestoreCfg?.storageKey ?? 'pro-query-auto-restore';
+
+  // 初始化：从 localStorage 恢复表单参数
+  useEffect(() => {
+    if (!queryAutoRestoreEnabled) return;
+    try {
+      const saved = localStorage.getItem(queryAutoRestoreKey);
+      if (saved) {
+        const values = JSON.parse(saved) as Record<string, unknown>;
+        formRef.current?.setFieldsValue(values);
+        effectiveStore.setQuery(values);
+      }
+    } catch {
+      // 静默失败
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryAutoRestoreEnabled, queryAutoRestoreKey]);
+
+  const saveQueryToStorage = useCallback(() => {
+    if (!queryAutoRestoreEnabled) return;
+    try {
+      const values = formRef.current?.getFieldsValue() ?? {};
+      localStorage.setItem(queryAutoRestoreKey, JSON.stringify(values));
+    } catch {
+      // 静默失败
+    }
+  }, [queryAutoRestoreEnabled, queryAutoRestoreKey, formRef]);
+
+  const {
+    presets: searchSchemas,
+    current: currentSearchSchema,
+    save,
+    apply,
+    remove,
+    rename,
+  } = usePresetManager<Record<string, unknown>>({
     enabled: searchSchemaConfig?.enabled ?? false,
     persistenceKey: searchSchemaConfig?.persistenceKey,
     defaultPreset: searchSchemaConfig?.defaultSchema,
@@ -231,12 +278,15 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
       } else {
         lightweightStoreRef.current.setQuery(params);
       }
+
+      syncToUrl();
+      saveQueryToStorage();
     },
-    [columns, beforeSearch, onSearch, store],
+    [columns, beforeSearch, onSearch, store, syncToUrl, saveQueryToStorage],
   );
 
   const handleReset = useCallback(() => {
-    formInstanceRef.current?.resetFields();
+    formRef.current?.resetFields();
     onReset?.();
     if (store) {
       store.reset();
@@ -244,17 +294,19 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
       lightweightStoreRef.current.setQuery({});
       lightweightStoreRef.current.setPage(1);
     }
-  }, [onReset, store]);
+    syncToUrl();
+    saveQueryToStorage();
+  }, [onReset, store, syncToUrl, saveQueryToStorage]);
 
   const handleSaveSearchSchema = useCallback(
     (name: string, params?: Record<string, unknown>) => {
       const currentParams = params || {
         ...effectiveStore.getState().query,
-        ...formInstanceRef.current?.getFieldsValue(),
+        ...formRef.current?.getFieldsValue(),
       };
       save(name, currentParams);
     },
-    [save, effectiveStore, formInstanceRef],
+    [save, effectiveStore, formRef],
   );
 
   const handleSwitchSearchSchema = useCallback(
@@ -263,11 +315,12 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
       const schema = searchSchemas.find((s) => s.key === key);
       if (schema) {
         effectiveStore.setQuery(schema.params);
-        formInstanceRef.current?.setFieldsValue(schema.params);
+        formRef.current?.setFieldsValue(schema.params);
         effectiveStore.setPage(1);
       }
+      syncToUrl();
     },
-    [apply, searchSchemas, effectiveStore, formInstanceRef],
+    [apply, searchSchemas, effectiveStore, formRef, syncToUrl],
   );
 
   const handleDeleteSearchSchema = useCallback(
@@ -289,8 +342,8 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
     () => ({
       submit: async () => {
         try {
-          await formInstanceRef.current?.validate();
-          const values = formInstanceRef.current?.getFieldsValue();
+          await formRef.current?.validate();
+          const values = formRef.current?.getFieldsValue();
           if (values) handleSearch(values);
         } catch {
           // 表单验证失败，不做额外处理
@@ -299,9 +352,9 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
       reset: () => {
         handleReset();
       },
-      getFieldsValue: () => formInstanceRef.current?.getFieldsValue() ?? {},
-      setFieldsValue: (values) => formInstanceRef.current?.setFieldsValue(values),
-      getFormInstance: () => formInstanceRef.current,
+      getFieldsValue: () => formRef.current?.getFieldsValue() ?? {},
+      setFieldsValue: (values) => formRef.current?.setFieldsValue(values),
+      getFormInstance: () => formRef.current,
 
       searchSchemas,
       currentSearchSchema,
@@ -313,7 +366,7 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
     [
       handleSearch,
       handleReset,
-      formInstanceRef,
+      formRef,
       searchSchemas,
       currentSearchSchema,
       handleSaveSearchSchema,
@@ -330,7 +383,7 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
     [layout, column, collapsible, defaultCollapsed, collapsedRows],
   );
 
-  const schemaContext = useMemo(() => ({ schemas, formRef: formInstanceRef }), [schemas, formInstanceRef]);
+  const schemaContext = useMemo(() => ({ schemas, formRef: formRef }), [schemas, formRef]);
 
   const actionContext = useMemo(() => ({ onSearch: handleSearch, onReset: handleReset }), [handleSearch, handleReset]);
 
@@ -341,7 +394,7 @@ export const ProQueryForm = forwardRef<ProQueryFormInstance, ProQueryFormProps>(
           <div className={className} style={style}>
             <QueryFormRenderer
               schemas={schemas}
-              formRef={formInstanceRef}
+              formRef={formRef}
               layout={layout}
               columns={column}
               collapsible={collapsible}

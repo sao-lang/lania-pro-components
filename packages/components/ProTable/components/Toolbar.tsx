@@ -16,7 +16,7 @@
  * - 额外渲染区（extraRender）：用于插入视图切换器、查询方案选择器
  * - 事件处理：按钮点击事件通过 handlers（ProTableNEventHandlers）传递
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Space, Button, Tooltip, Trigger, Checkbox, Radio, Divider } from '@arco-design/web-react';
 import {
   IconRefresh,
@@ -144,7 +144,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ extraRender, handlers, refresh
   }, []);
 
   // 监听全屏变化
-  React.useEffect(() => {
+  useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };

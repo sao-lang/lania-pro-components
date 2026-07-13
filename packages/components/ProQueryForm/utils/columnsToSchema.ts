@@ -40,6 +40,7 @@ export const convertColumnsToSearchSchema = <T extends Record<string, unknown>>(
       const searchConfig = col.search || {};
 
       const schema: ProFormSchema = {
+        ...searchConfig,
         name: dataIndex,
         label: col.title ? String(col.title) : '',
         component: searchConfig.component || component,

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * TableContent — 表格内容渲染器
  *
@@ -102,12 +103,15 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
     setSorter,
     setFilters,
     action,
+    editableKeys,
+    editableInstance,
+    editable,
   } = useDataContext<T>();
 
   const dataSource = Array.isArray(propDataSource) && propDataSource.length > 0 ? propDataSource : contextDataSource;
 
   const { columns, density, groupColumns } = useColumnContext<T>();
-  const { props: rootProps } = useRootContext<T>();
+  const { props: rootProps, getRowKey } = useRootContext<T>();
 
   const tableRootProps = rootProps as ProTableProps<T>;
   const {
@@ -197,12 +201,23 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
     return () => renderFn(dataSource);
   }, [tableSummary, dataSource]);
 
+  const editableOptions = useMemo(() => {
+    if (!editable || !editableInstance) return undefined;
+    return {
+      editableKeys: editableKeys || [],
+      editableInstance,
+      editableConfig: editable,
+      getRowKey: getRowKey as (record: T) => string | number,
+    };
+  }, [editable, editableInstance, editableKeys, getRowKey]);
+
   const tableColumns = useMemo<TableColumnProps<T>[]>(() => {
     const convertedColumns = convertColumns(
       columns,
       action,
       handlers as ProTableNEventHandlers<T> | undefined,
       refreshTable as (() => void) | undefined,
+      editableOptions,
     );
 
     let finalColumns: TableColumnProps<T>[] = convertedColumns;
@@ -303,6 +318,7 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
     cellMerge,
     dataSource,
     rootProps.dragSort,
+    editableOptions,
   ]);
 
   const handleTableChange = (

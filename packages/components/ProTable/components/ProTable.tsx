@@ -36,9 +36,8 @@
  * - 自定义列渲染器（columnRender / cellMerge）
  */
 import React, { useImperativeHandle, forwardRef, useRef, useMemo, useCallback, useState, useEffect } from 'react';
-import { Card } from '@arco-design/web-react';
+import { Button, Card } from '@arco-design/web-react';
 import type { ProTableProps, ProTableActionType, ProTableNEventHandlers } from '../types';
-import type { ProFormInstance } from '../../ProForm/types';
 import type { ProQueryFormInstance } from '../../ProQueryForm';
 import { RootProvider, DataProvider, ColumnProvider } from '../context';
 import { QueryForm, TableContent, Toolbar, Pagination, BatchOperation } from './';
@@ -47,8 +46,11 @@ import { useProTable, ProTableContext } from '../hooks/useProTable';
 import type { ProTableContextValue } from '../hooks/useProTable';
 import type { ProTableInstance } from '../types';
 import type { DataStoreImpl } from '../store/DataStore';
-import { useVirtualScroll, useDragSort } from '@lania-pro-components/shared';
-import { CardView, ViewModeSwitch, SearchSchemaSelector } from './';
+import { VirtualScroll, useDragSort } from '@lania-pro-components/shared';
+import type { VirtualScrollHandle, VirtualScrollState } from '@lania-pro-components/shared';
+import { CardView, ViewModeSwitch } from './';
+import { IconRefresh } from '@arco-design/web-react/icon';
+import { SearchSchemaSelector } from '@lania-pro-components/components/ProQueryForm';
 
 /**
  * ProTable 组件 - 重构版高级表格组件
@@ -93,7 +95,7 @@ const ProTableRenderer = forwardRef<
       onDensityChange,
       searchSchema: searchSchemaConfig,
       virtualScroll,
-      virtualScrollConfig,
+      virtualScrollConfig = {},
       dragSort,
       cardMode,
       viewMode: propViewMode,
@@ -119,7 +121,6 @@ const ProTableRenderer = forwardRef<
 
     const rowKeyStr = mergedProps.rowKey || 'id';
 
-    const formRef = useRef<ProFormInstance | null>(null);
     const queryFormRef = useRef<ProQueryFormInstance>(null);
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(propViewMode || 'table');
@@ -161,31 +162,46 @@ const ProTableRenderer = forwardRef<
       getRowKey,
     });
 
-    const {
-      state: virtualScrollState,
-      containerRef: virtualScrollContainerRef,
-      scrollToIndex,
-      scrollToTop: scrollToTopVirtual,
-      scrollToBottom: scrollToBottomVirtual,
-    } = useVirtualScroll<Record<string, unknown>>(dragSortedDataSource, {
-      itemHeight: typeof virtualScrollConfig === 'object' ? (virtualScrollConfig.itemHeight ?? 50) : 50,
-      overscan: typeof virtualScrollConfig === 'object' ? (virtualScrollConfig.overscan ?? 5) : 5,
-      enabled: !!virtualScroll && viewMode === 'table',
-      containerHeight: 400,
-    });
+    const virtualScrollRef = useRef<VirtualScrollHandle>(null);
+    const [virtualVisibleState, setVirtualVisibleState] = useState<VirtualScrollState<Record<string, unknown>> | null>(
+      null,
+    );
+
+    const setVirtualScrollRef = useCallback(
+      (handle: VirtualScrollHandle | null) => {
+        virtualScrollRef.current = handle;
+        if (handle) {
+          Object.assign(instance.action, {
+            scrollToIndex: handle.scrollToIndex,
+            scrollToTop: handle.scrollToTop,
+            scrollToBottom: handle.scrollToBottom,
+          });
+        }
+      },
+      [instance.action],
+    );
+
+    const handleScrollToBottom = useCallback(() => {
+      const { current, pageSize } = store.pagination;
+      const total = store.total;
+      const totalPages = Math.ceil(total / pageSize);
+      if (current < totalPages) {
+        store.setPage(current + 1);
+      }
+    }, [store]);
 
     useEffect(() => {
-      const form = formRef.current ?? undefined;
+      const form = queryFormRef.current?.getFormInstance() ?? undefined;
       instance.form = form;
       instance.action.getFormInstance = () => form;
-    }, [formRef.current]);
+    }, []);
 
     useEffect(() => {
       const originalReset = instance.action.reset;
 
       Object.assign(instance.action, {
         reset: () => {
-          formRef.current?.resetFields();
+          queryFormRef.current?.getFormInstance()?.resetFields();
           originalReset();
         },
         openDialog: ((config: Parameters<typeof ProDialog.open>[0]) => {
@@ -196,12 +212,9 @@ const ProTableRenderer = forwardRef<
           const defaultConfirmConfig = dialogConfig?.confirm || {};
           return ProDialog.confirm({ ...defaultConfirmConfig, ...config });
         },
-        scrollToIndex,
-        scrollToTop: scrollToTopVirtual,
-        scrollToBottom: scrollToBottomVirtual,
         resetDragSort,
       });
-    }, [dialogConfig, scrollToIndex, scrollToTopVirtual, scrollToBottomVirtual, resetDragSort, instance.action]);
+    }, [dialogConfig, resetDragSort, instance.action]);
 
     useImperativeHandle(ref, () => instance.action, [instance.action]);
 
@@ -212,7 +225,9 @@ const ProTableRenderer = forwardRef<
       return (
         <div style={{ padding: 24, textAlign: 'center' }}>
           <div style={{ color: '#f53f3f', marginBottom: 16 }}>加载失败: {err.message}</div>
-          <button onClick={() => instance.action.reload()}>重试</button>
+          <Button size='small' type='primary' icon={<IconRefresh />} onClick={() => instance.action.reload()}>
+            重试
+          </Button>
         </div>
       );
     };
@@ -225,7 +240,7 @@ const ProTableRenderer = forwardRef<
           </div>
         )}
 
-        {search && <QueryForm formRef={formRef} ref={queryFormRef} />}
+        {search && <QueryForm ref={queryFormRef} />}
 
         {toolbar && (
           <Toolbar
@@ -241,7 +256,7 @@ const ProTableRenderer = forwardRef<
                     onRename={queryFormRef.current.renameSearchSchema}
                     getCurrentParams={() => ({
                       ...store.query,
-                      ...formRef.current?.getFieldsValue(),
+                      ...queryFormRef.current?.getFieldsValue(),
                     })}
                   />
                 )}
@@ -289,56 +304,56 @@ const ProTableRenderer = forwardRef<
                   typeof mergedProps.rowSelection === 'object' ? mergedProps.rowSelection.type !== 'radio' : true
                 }
               />
-            ) : (
-              <div
-                ref={virtualScrollContainerRef}
-                style={virtualScroll ? { height: 400, overflow: 'auto' } : undefined}
+            ) : virtualScroll && viewMode === 'table' && propPagination === false ? (
+              <VirtualScroll
+                ref={setVirtualScrollRef}
+                items={dragSortedDataSource}
+                itemHeight={virtualScrollConfig.itemHeight ?? 50}
+                overscan={virtualScrollConfig.overscan ?? 5}
+                containerHeight={virtualScrollConfig?.containerHeight ?? 400}
+                enabled
+                onVisibleStateChange={setVirtualVisibleState}
+                onScrollToBottom={handleScrollToBottom}
+                loading={store.loading}
+                loadingComponent='加载更多...'
               >
-                {virtualScroll ? (
-                  <div style={{ height: virtualScrollState.totalHeight }}>
-                    <div
-                      style={{
-                        transform: `translateY(${virtualScrollState.offsetY}px)`,
-                      }}
-                    >
-                      <TableContent
-                        className={className}
-                        style={style}
-                        emptyRender={emptyRender}
-                        dataSource={virtualScrollState.visibleItems}
-                        dragSort={!!dragSort}
-                        getDragRowProps={getDragRowProps}
-                        getDragHandleProps={getDragHandleProps}
-                        handlers={eventHandlers as ProTableNEventHandlers}
-                        refreshTable={() => instance.action.reload()}
-                        showSkeleton={showSkeleton}
-                        tableSummary={tableSummary}
-                        stickyHeader={stickyHeader}
-                        cellMerge={cellMerge}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <TableContent
-                    className={className}
-                    style={style}
-                    emptyRender={emptyRender}
-                    dataSource={dragSort ? dragSortedDataSource : store.dataSource}
-                    dragSort={!!dragSort}
-                    getDragRowProps={getDragRowProps}
-                    getDragHandleProps={getDragHandleProps}
-                    handlers={eventHandlers as ProTableNEventHandlers}
-                    refreshTable={() => instance.action.reload()}
-                    showSkeleton={showSkeleton}
-                    tableSummary={tableSummary}
-                    stickyHeader={stickyHeader}
-                    cellMerge={cellMerge}
-                  />
-                )}
-              </div>
+                <TableContent
+                  className={className}
+                  style={style}
+                  emptyRender={emptyRender}
+                  dataSource={virtualVisibleState?.visibleItems ?? dragSortedDataSource}
+                  dragSort={!!dragSort}
+                  getDragRowProps={getDragRowProps}
+                  getDragHandleProps={getDragHandleProps}
+                  handlers={eventHandlers as ProTableNEventHandlers}
+                  refreshTable={() => instance.action.reload()}
+                  showSkeleton={showSkeleton}
+                  tableSummary={tableSummary}
+                  stickyHeader={stickyHeader}
+                  cellMerge={cellMerge}
+                />
+              </VirtualScroll>
+            ) : (
+              <TableContent
+                className={className}
+                style={style}
+                emptyRender={emptyRender}
+                dataSource={dragSort ? dragSortedDataSource : store.dataSource}
+                dragSort={!!dragSort}
+                getDragRowProps={getDragRowProps}
+                getDragHandleProps={getDragHandleProps}
+                handlers={eventHandlers as ProTableNEventHandlers}
+                refreshTable={() => instance.action.reload()}
+                showSkeleton={showSkeleton}
+                tableSummary={tableSummary}
+                stickyHeader={stickyHeader}
+                cellMerge={cellMerge}
+              />
             )}
 
-            {propPagination !== false && viewMode === 'table' && <Pagination pageSizeOptions={pageSizeOptions} />}
+            {propPagination !== false && !virtualScroll && viewMode === 'table' && (
+              <Pagination pageSizeOptions={pageSizeOptions} />
+            )}
           </>
         )}
       </>
@@ -358,9 +373,11 @@ const ProTableRenderer = forwardRef<
         <RootProvider props={mergedProps}>
           <DataProvider
             store={store}
-            formRef={formRef}
             action={instance.action}
             onDataSourceChange={onDataSourceChange}
+            editableKeys={instance.editableKeys}
+            editableInstance={instance.editableInstance}
+            editable={mergedProps.editable}
           >
             <ColumnProvider
               initialColumns={columns}

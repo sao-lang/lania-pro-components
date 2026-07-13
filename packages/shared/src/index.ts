@@ -79,10 +79,8 @@ export { useDraft } from './hooks/useDraft';
 export type { DraftStoreLike, UseDraftOptions, UseDraftReturn } from './hooks/useDraft';
 
 // ======================== 组件 ========================
-export { PerformanceMonitor } from './PerformanceMonitor';
-export type { PerformanceMonitorProps } from './PerformanceMonitor/types';
+export { PerformanceMonitor } from './components/PerformanceMonitor';
+export type { PerformanceMonitorProps } from './components/PerformanceMonitor/types';
 
-// ======================== 工厂函数 ========================
-// export { createProProvider } from './factories/createProProvider';
-// export { createImperativeInstance } from './factories/createImperativeInstance';
-// export { useActionButton } from './factories/useActionButton';
+export { VirtualScroll } from './components/VirtualScroll';
+export type { VirtualScrollProps, VirtualScrollHandle } from './components/VirtualScroll/types';

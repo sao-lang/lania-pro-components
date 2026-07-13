@@ -8,10 +8,10 @@
  * - 与表格视图共享数据源和选中状态
  */
 import React, { useMemo } from 'react';
-import { Card, Grid, Empty } from '@arco-design/web-react';
+import { Card, Grid, Empty, Radio, Checkbox } from '@arco-design/web-react';
 import { IconList, IconApps } from '@arco-design/web-react/icon';
 import type { ProColumnType, ProTableActionType } from '../types';
-import { getNestedValue } from '../utils';
+import { renderColumnByValueType } from '../utils';
 
 const { Row, Col } = Grid;
 
@@ -128,11 +128,18 @@ function defaultCardRender<T>(
   ) : (
     <div className='pro-table-card-content'>
       {dataColumns.slice(0, 4).map((col, idx) => {
-        const value = col.dataIndex ? getNestedValue(record as Record<string, unknown>, col.dataIndex) : null;
+        const text = col.dataIndex ? (record as Record<string, unknown>)[col.dataIndex as string] : undefined;
+        const record_ = record as Record<string, unknown>;
+        const action_ = action as ProTableActionType<Record<string, unknown>> | undefined;
+        const col_ = col as ProColumnType<Record<string, unknown>>;
+        const rendered = renderColumnByValueType(text, col_, record_, index, action_);
+        const finalRendered = col.render
+          ? col.render(rendered, record_ as T, index, action_ as ProTableActionType, col)
+          : rendered;
         return (
           <div key={idx} className='pro-table-card-item'>
             <span className='pro-table-card-label'>{col.title}:</span>
-            <span className='pro-table-card-value'>{value !== undefined && value !== null ? String(value) : '-'}</span>
+            <span className='pro-table-card-value'>{finalRendered}</span>
           </div>
         );
       })}
@@ -254,22 +261,18 @@ export function CardView<T extends Record<string, unknown> = Record<string, unkn
           className={`pro-table-card-wrapper ${isSelected ? 'selected' : ''}`}
           onClick={() => onSelect(record, !isSelected)}
         >
-          <div className='pro-table-card-select'>
+          <div className='pro-table-card-select' onClick={(e) => e.stopPropagation()}>
             {multiple ? (
-              <input
-                type='checkbox'
+              <Checkbox
                 checked={isSelected}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onSelect(record, e.target.checked);
+                onChange={(checked) => {
+                  onSelect(record, checked);
                 }}
               />
             ) : (
-              <input
-                type='radio'
+              <Radio
                 checked={isSelected}
-                onChange={(e) => {
-                  e.stopPropagation();
+                onChange={() => {
                   onSelect(record, true);
                 }}
               />
@@ -354,52 +357,23 @@ export function ViewModeSwitch(props: ViewModeSwitchProps): React.ReactElement {
   const { viewMode, onChange, disabled, className, style } = props;
 
   return (
-    <div
+    <Radio.Group
+      type='button'
+      value={viewMode}
+      onChange={(value: unknown) => onChange(value as 'table' | 'card')}
+      disabled={disabled}
       className={`pro-table-view-mode-switch ${className || ''}`}
-      style={{
-        display: 'inline-flex',
-        border: '1px solid var(--color-border-2)',
-        borderRadius: 4,
-        overflow: 'hidden',
-        ...style,
-      }}
+      style={style}
     >
-      <button
-        type='button'
-        disabled={disabled}
-        onClick={() => onChange('table')}
-        style={{
-          padding: '4px 12px',
-          border: 'none',
-          background: viewMode === 'table' ? 'var(--color-fill-2)' : 'transparent',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
-      >
+      <Radio value='table'>
         <IconList />
         列表
-      </button>
-      <button
-        type='button'
-        disabled={disabled}
-        onClick={() => onChange('card')}
-        style={{
-          padding: '4px 12px',
-          border: 'none',
-          borderLeft: '1px solid var(--color-border-2)',
-          background: viewMode === 'card' ? 'var(--color-fill-2)' : 'transparent',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
-      >
+      </Radio>
+      <Radio value='card'>
         <IconApps />
         卡片
-      </button>
-    </div>
+      </Radio>
+    </Radio.Group>
   );
 }
 

@@ -8,14 +8,18 @@
 import React, { createContext, useContext, useMemo, useEffect, useRef, useState } from 'react';
 import type { DataStoreImpl } from '../store/DataStore';
 import type { DataStoreState, DataStoreActions } from '../store/types';
-import type { ProTableActionType } from '../types';
-import type { ProFormInstance } from '../../ProForm/types';
-
+import type { ProTableActionType, ProTableProps } from '../types';
+import type { EditableTableInstance } from '../editable/types';
 export interface DataContextValue<T = Record<string, unknown>> extends DataStoreState<T>, DataStoreActions<T> {
   action: ProTableActionType<T>;
-  formRef: React.RefObject<ProFormInstance | null>;
   onDataSourceChange?: (dataSource: T[]) => void;
   getState: () => DataStoreState<T>;
+  /** 正在编辑的行 keys */
+  editableKeys?: (string | number)[];
+  /** 可编辑表格实例 */
+  editableInstance?: EditableTableInstance<T>;
+  /** 可编辑配置 */
+  editable?: ProTableProps<T>['editable'];
 }
 
 const DataContext = createContext<DataContextValue<Record<string, unknown>> | null>(null);
@@ -23,17 +27,24 @@ const DataContext = createContext<DataContextValue<Record<string, unknown>> | nu
 export interface DataProviderProps<T extends Record<string, unknown> = Record<string, unknown>> {
   children: React.ReactNode;
   store: DataStoreImpl<T>;
-  formRef: React.RefObject<ProFormInstance | null>;
   action: ProTableActionType<T>;
   onDataSourceChange?: (dataSource: T[]) => void;
+  /** 正在编辑的行 keys */
+  editableKeys?: (string | number)[];
+  /** 可编辑表格实例 */
+  editableInstance?: EditableTableInstance<T>;
+  /** 可编辑配置 */
+  editable?: ProTableProps<T>['editable'];
 }
 
 export const DataProvider = <T extends Record<string, unknown>>({
   children,
   store,
-  formRef,
   action,
   onDataSourceChange,
+  editableKeys: propEditableKeys,
+  editableInstance: propEditableInstance,
+  editable: propEditable,
 }: DataProviderProps<T>) => {
   const [, forceUpdate] = useState({});
   const prevTotalRef = useRef(store.total);
@@ -127,14 +138,18 @@ export const DataProvider = <T extends Record<string, unknown>>({
         pollingInterval: store.pollingInterval,
       }),
       action,
-      formRef,
       onDataSourceChange,
+      editableKeys: propEditableKeys,
+      editableInstance: propEditableInstance,
+      editable: propEditable,
     }),
     [
       store,
       action,
-      formRef,
       onDataSourceChange,
+      propEditableKeys,
+      propEditableInstance,
+      propEditable,
       store.dataSource,
       store.loading,
       store.error,

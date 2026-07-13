@@ -24,118 +24,60 @@
  */
 import React from 'react';
 import { Space, Button, Dropdown, Menu } from '@arco-design/web-react';
-import {
-  IconPlus,
-  IconEdit,
-  IconEye,
-  IconDelete,
-  IconDownload,
-  IconUpload,
-  IconArrowRight,
-  IconMore,
-} from '@arco-design/web-react/icon';
+import { IconMore } from '@arco-design/web-react/icon';
 import { ProDialog } from '../../ProDialog';
+import {
+  AddButton,
+  EditButton,
+  ViewButton,
+  DeleteButton,
+  ExportButton,
+  ImportButton,
+  JumpButton,
+} from '../../ActionButton';
 import type { ProTableActionType } from '../types';
 import type { OprActionButtonConfig, ToolbarActionButtonConfig, ProTableNEventHandlers } from '../types-action-button';
 
 const { Item: MenuItem } = Menu;
 
-/**
- * 获取默认图标
- */
-const getDefaultIcon = (type: string) => {
-  switch (type) {
-    case 'add':
-      return <IconPlus />;
-    case 'edit':
-      return <IconEdit />;
-    case 'view':
-      return <IconEye />;
-    case 'delete':
-      return <IconDelete />;
-    case 'export':
-      return <IconDownload />;
-    case 'import':
-      return <IconUpload />;
-    case 'jump':
-      return <IconArrowRight />;
-    default:
-      return null;
-  }
-};
+/** ActionButton 组件的 type 直接兼容 ButtonProps，无需转换 */
 
 /**
- * 获取默认文本
- */
-const getDefaultText = (type: string) => {
-  switch (type) {
-    case 'add':
-      return '新增';
-    case 'edit':
-      return '编辑';
-    case 'view':
-      return '查看';
-    case 'delete':
-      return '删除';
-    case 'export':
-      return '导出';
-    case 'import':
-      return '导入';
-    case 'jump':
-      return '跳转';
-    default:
-      return '按钮';
-  }
-};
-
-/**
- * 渲染新增按钮
+ * 渲染新增按钮 — 委托给 AddButton 组件
  */
 const renderAddButton = (
   config: Extract<ToolbarActionButtonConfig, { type: 'add' }>,
   handlers: ProTableNEventHandlers,
   action: ProTableActionType,
   refreshTable: () => void,
-) => {
-  const handleClick = () => {
-    ProDialog.form({
-      title: config.title || '新增',
-      width: config.width || 600,
-      schemas: config.schemas,
-      formProps: {
-        layout: 'vertical',
-        ...config.formProps,
-      },
-      onSubmit: async (values) => {
-        if (handlers.onCreate) {
-          const result = await handlers.onCreate(values);
-          if (result !== false) {
-            refreshTable();
-            return true;
-          }
+) => (
+  <AddButton
+    key={config.key}
+    text={config.text}
+    type={config.buttonType || 'primary'}
+    icon={config.icon}
+    title={config.title}
+    width={config.width}
+    schemas={config.schemas}
+    formProps={config.formProps as Record<string, unknown>}
+    dialogProps={config.dialogProps}
+    className={config.className}
+    style={config.style}
+    onSubmit={async (values) => {
+      if (handlers.onCreate) {
+        const result = await handlers.onCreate(values);
+        if (result !== false) {
+          refreshTable();
+          return true;
         }
-        return false;
-      },
-      ...config.dialogProps,
-    });
-  };
-
-  return (
-    <Button
-      key={config.key}
-      type={config.buttonType || 'primary'}
-      icon={config.icon || getDefaultIcon('add')}
-      onClick={handleClick}
-      className={config.className}
-      style={config.style}
-    >
-      {config.text || getDefaultText('add')}
-    </Button>
-  );
-};
+      }
+      return false;
+    }}
+  />
+);
 
 /**
- * 渲染编辑按钮
+ * 渲染编辑按钮 — 委托给 EditButton 组件
  */
 const renderEditButton = (
   config: Extract<OprActionButtonConfig, { type: 'edit' }>,
@@ -144,29 +86,36 @@ const renderEditButton = (
   action: ProTableActionType,
   refreshTable: () => void,
 ) => {
-  const handleClick = () => {
-    let initialValues: Record<string, unknown> = record;
+  const getInitialValues = (): Record<string, unknown> => {
     if (config.dataMap) {
-      initialValues = {};
+      const values: Record<string, unknown> = {};
       Object.entries(config.dataMap).forEach(([formField, dataField]) => {
-        initialValues[formField] = record[dataField];
+        values[formField] = record[dataField];
       });
+      return values;
     }
+    return record as Record<string, unknown>;
+  };
 
-    const id = ((record.id as string | number | undefined) || (record.key as string | number | undefined)) as
-      | string
-      | number;
+  const id = ((record.id as string | number | undefined) || (record.key as string | number | undefined)) as
+    string | number;
 
-    ProDialog.form({
-      title: config.title || '编辑',
-      width: config.width || 600,
-      schemas: config.schemas,
-      initialValues,
-      formProps: {
-        layout: 'vertical',
-        ...config.formProps,
-      },
-      onSubmit: async (values) => {
+  return (
+    <EditButton
+      key={config.key}
+      text={config.text}
+      type={config.buttonType || 'text'}
+      status={config.status}
+      icon={config.icon}
+      title={config.title}
+      width={config.width}
+      schemas={config.schemas}
+      formProps={config.formProps as Record<string, unknown>}
+      dialogProps={config.dialogProps}
+      className={config.className}
+      style={config.style}
+      getInitialValues={getInitialValues}
+      onSubmit={async (values) => {
         if (handlers.onEdit) {
           const result = await handlers.onEdit(id, values);
           if (result !== false) {
@@ -175,28 +124,14 @@ const renderEditButton = (
           }
         }
         return false;
-      },
-      ...config.dialogProps,
-    });
-  };
-
-  return (
-    <Button
-      key={config.key}
-      type={config.buttonType || 'text'}
-      status={config.status}
-      icon={config.icon || getDefaultIcon('edit')}
-      onClick={handleClick}
-      className={config.className}
-      style={config.style}
-    >
-      {config.text || getDefaultText('edit')}
-    </Button>
+      }}
+    />
   );
 };
 
 /**
- * 渲染查看按钮
+ * 渲染查看按钮 — 委托给 ViewButton 组件
+ * schemas 模式下通过 renderContent 内嵌 ProForm 只读表单
  */
 const renderViewButton = (
   config: Extract<OprActionButtonConfig, { type: 'view' }> & {
@@ -207,24 +142,27 @@ const renderViewButton = (
   record: Record<string, unknown>,
   handlers: ProTableNEventHandlers,
 ) => {
-  const handleClick = () => {
-    if (handlers.onView) {
-      handlers.onView(record);
-    }
-
-    let initialValues: Record<string, unknown> = record;
+  const getInitialValues = (): Record<string, unknown> => {
     if (config.dataMap) {
-      initialValues = {};
+      const values: Record<string, unknown> = {};
       Object.entries(config.dataMap).forEach(([formField, dataField]) => {
-        initialValues[formField] = record[dataField];
+        values[formField] = record[dataField];
       });
+      return values;
     }
+    return record as Record<string, unknown>;
+  };
 
-    // 如果有 schemas，使用表单模式展示
-    if (config.schemas) {
+  const title = config.title || '查看详情';
+  const width = config.width || 600;
+
+  if (config.schemas) {
+    // schemas 模式: 使用 ProDialog.form 只读展示
+    const initialValues = getInitialValues();
+    const handleClick = () => {
       ProDialog.form({
-        title: config.title || '查看详情',
-        width: config.width || 600,
+        title,
+        width,
         schemas: config.schemas,
         initialValues,
         formProps: {
@@ -235,36 +173,48 @@ const renderViewButton = (
         cancelText: '关闭',
         ...config.dialogProps,
       });
-    } else {
-      // 否则使用自定义内容
-      ProDialog.open({
-        title: config.title || '查看详情',
-        width: config.width || 600,
-        content: config.renderContent ? config.renderContent(record) : null,
-        showOk: false,
-        cancelText: '关闭',
-        ...config.dialogProps,
-      });
-    }
-  };
+    };
 
+    return (
+      <Button
+        key={config.key}
+        type={config.buttonType || 'text'}
+        status={config.status}
+        icon={config.icon}
+        onClick={handleClick}
+        className={config.className}
+        style={config.style}
+      >
+        {config.text || '查看'}
+      </Button>
+    );
+  }
+
+  // renderContent 模式
   return (
-    <Button
+    <ViewButton
       key={config.key}
+      text={config.text}
       type={config.buttonType || 'text'}
       status={config.status}
-      icon={config.icon || getDefaultIcon('view')}
-      onClick={handleClick}
+      icon={config.icon}
+      title={title}
+      width={width}
+      dialogProps={config.dialogProps}
       className={config.className}
       style={config.style}
-    >
-      {config.text || getDefaultText('view')}
-    </Button>
+      renderContent={() => {
+        if (handlers.onView) {
+          handlers.onView(record);
+        }
+        return config.renderContent ? config.renderContent(record) : null;
+      }}
+    />
   );
 };
 
 /**
- * 渲染删除按钮
+ * 渲染删除按钮 — 委托给 DeleteButton 组件
  */
 const renderDeleteButton = (
   config: Extract<OprActionButtonConfig, { type: 'delete' }>,
@@ -272,21 +222,26 @@ const renderDeleteButton = (
   handlers: ProTableNEventHandlers,
   refreshTable: () => void,
 ) => {
-  const handleClick = () => {
-    const idField = config.idField || 'id';
-    const id = record[idField] as string | number;
-    const content =
-      typeof config.confirmContent === 'function'
-        ? config.confirmContent(record)
-        : config.confirmContent || '确定要删除这条数据吗？删除后无法恢复。';
+  const idField = config.idField || 'id';
+  const id = record[idField] as string | number;
 
-    ProDialog.confirm({
-      title: config.confirmTitle || '确认删除',
-      content,
-      okText: config.okText || '确认删除',
-      cancelText: config.cancelText || '取消',
-      okButtonProps: { status: 'danger' },
-      onConfirm: async () => {
+  return (
+    <DeleteButton
+      key={config.key}
+      text={config.text}
+      type={config.buttonType || 'text'}
+      status={config.status || 'danger'}
+      icon={config.icon}
+      confirmTitle={config.confirmTitle}
+      confirmContent={
+        typeof config.confirmContent === 'function' ? config.confirmContent(record) : config.confirmContent
+      }
+      okText={config.okText}
+      cancelText={config.cancelText}
+      dialogProps={config.dialogProps}
+      className={config.className}
+      style={config.style}
+      onDelete={async () => {
         if (handlers.onDelete) {
           const result = await handlers.onDelete(id);
           if (result !== false) {
@@ -295,141 +250,113 @@ const renderDeleteButton = (
           }
         }
         return false;
-      },
-      ...config.dialogProps,
-    });
-  };
-
-  return (
-    <Button
-      key={config.key}
-      type={config.buttonType || 'text'}
-      status={config.status || 'danger'}
-      icon={config.icon || getDefaultIcon('delete')}
-      onClick={handleClick}
-      className={config.className}
-      style={config.style}
-    >
-      {config.text || getDefaultText('delete')}
-    </Button>
+      }}
+    />
   );
 };
 
 /**
- * 渲染导出按钮
+ * 渲染导出按钮 — 委托给 ExportButton 组件
  */
 const renderExportButton = (
   config: Extract<ToolbarActionButtonConfig, { type: 'export' }>,
   handlers: ProTableNEventHandlers,
 ) => {
-  const handleClick = async () => {
-    if (handlers.onExport) {
-      await handlers.onExport();
-    } else if (config.exportUrl) {
-      // 默认导出逻辑
-      const params = config.params ? `?${new URLSearchParams(config.params as Record<string, string>).toString()}` : '';
-      window.open(config.exportUrl + params, '_blank');
-    }
-  };
-
+  const onExport = handlers.onExport;
   return (
-    <Button
+    <ExportButton
       key={config.key}
+      text={config.text}
       type={config.buttonType || 'secondary'}
       status={config.status}
-      icon={config.icon || getDefaultIcon('export')}
-      onClick={handleClick}
+      icon={config.icon}
+      exportUrl={config.exportUrl}
+      params={config.params}
       className={config.className}
       style={config.style}
-    >
-      {config.text || getDefaultText('export')}
-    </Button>
+      onExport={onExport ? () => onExport() : undefined}
+    />
   );
 };
 
 /**
- * 渲染导入按钮
+ * 渲染导入按钮 — 委托给 ImportButton 组件
+ * 有 uploadUrl 时使用默认 Upload，否则通过 renderUpload 使用 handlers.onImport
  */
 const renderImportButton = (
   config: Extract<ToolbarActionButtonConfig, { type: 'import' }>,
   handlers: ProTableNEventHandlers,
   refreshTable: () => void,
 ) => {
-  const handleClick = () => {
-    ProDialog.open({
-      title: config.title || '导入数据',
-      width: config.width || 500,
-      content: (
-        <div style={{ padding: '20px 0' }}>
-          <input
-            type='file'
-            accept={config.accept || '.xlsx,.xls,.csv'}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file && handlers.onImport) {
-                await handlers.onImport(file);
-                refreshTable();
-              }
-            }}
-          />
-        </div>
-      ),
-      ...config.dialogProps,
-    });
-  };
-
+  const onImport = handlers.onImport;
   return (
-    <Button
+    <ImportButton
       key={config.key}
+      text={config.text}
       type={config.buttonType || 'secondary'}
       status={config.status}
-      icon={config.icon || getDefaultIcon('import')}
-      onClick={handleClick}
+      icon={config.icon}
+      title={config.title}
+      width={config.width}
+      accept={config.accept}
+      dialogProps={config.dialogProps}
+      uploadUrl={config.uploadUrl}
+      uploadParams={config.uploadParams}
       className={config.className}
       style={config.style}
-    >
-      {config.text || getDefaultText('import')}
-    </Button>
+      onSuccess={() => refreshTable()}
+      renderUpload={
+        onImport
+          ? () => (
+              <div style={{ padding: '20px 0' }}>
+                <input
+                  type='file'
+                  accept={config.accept || '.xlsx,.xls,.csv'}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      await onImport(file);
+                      refreshTable();
+                    }
+                  }}
+                />
+              </div>
+            )
+          : undefined
+      }
+    />
   );
 };
 
 /**
- * 渲染跳转按钮
+ * 渲染跳转按钮 — 委托给 JumpButton 组件
+ * paramsMap 逻辑在外部计算 URL 后传入
  */
 const renderJumpButton = (
   config: Extract<OprActionButtonConfig | ToolbarActionButtonConfig, { type: 'jump' }>,
   record?: Record<string, unknown>,
 ) => {
-  const handleClick = () => {
-    let url = config.to;
-
-    if (config.paramsMap && record) {
-      Object.entries(config.paramsMap).forEach(([param, field]) => {
-        url = url.replace(`{${param}}`, String((record as Record<string, unknown>)[field] || ''));
-      });
-    } else if (record) {
-      url = url.replace(/{(\w+)}/g, (match, key: string) => String((record as Record<string, unknown>)[key] || match));
-    }
-
-    if (config.target === '_blank') {
-      window.open(url, '_blank');
-    } else {
-      window.location.href = url;
-    }
-  };
+  let url = config.to;
+  if (config.paramsMap && record) {
+    Object.entries(config.paramsMap).forEach(([param, field]) => {
+      url = url.replace(`{${param}}`, String((record as Record<string, unknown>)[field] || ''));
+    });
+  } else if (record) {
+    url = url.replace(/{(\w+)}/g, (match, key: string) => String((record as Record<string, unknown>)[key] || match));
+  }
 
   return (
-    <Button
+    <JumpButton
       key={config.key}
+      text={config.text}
       type={config.buttonType || 'text'}
       status={config.status}
-      icon={config.icon || getDefaultIcon('jump')}
-      onClick={handleClick}
+      icon={config.icon}
+      to={url}
+      target={config.target}
       className={config.className}
       style={config.style}
-    >
-      {config.text || getDefaultText('jump')}
-    </Button>
+    />
   );
 };
 
@@ -512,13 +439,13 @@ export const renderOprActionButton = (
     return null;
   }
 
-  // 检查禁用状态
+  // 检查禁用状态 — ActionButton 组件的 disabled 不会阻止内部 onClick，需提前拦截
   const disabled = typeof config.disabled === 'function' ? config.disabled(record) : config.disabled === true;
 
   if (disabled) {
     return (
       <Button key={config.key} type='text' disabled>
-        {config.text || getDefaultText(config.type)}
+        {config.text}
       </Button>
     );
   }
@@ -563,7 +490,7 @@ export const renderToolbarActionButton = (
   if (disabled) {
     return (
       <Button key={config.key} type='secondary' disabled>
-        {config.text || getDefaultText(config.type)}
+        {config.text}
       </Button>
     );
   }
