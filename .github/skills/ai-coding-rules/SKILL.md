@@ -21,7 +21,7 @@ description: 这是一个通用的 AI 编码规则 skill。它不重复解释规
 
 在执行任务前，先判断当前任务属于哪一类，然后按需加载对应文件：
 
-- 通用开发约束：加载 rules/00-base.instructions.md
+- 通用开发约束，必须加载：加载 rules/00-base.instructions.md
 - TypeScript / TSX 相关代码：加载 rules/01-typescript.instructions.md
 - 代码重构：加载 rules/02-refactor.instructions.md
 - 测试相关任务：加载 rules/03-testing.instructions.md

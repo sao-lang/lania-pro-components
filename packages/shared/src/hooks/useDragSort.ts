@@ -81,7 +81,7 @@ export interface UseDragSortReturn<T = Record<string, unknown>> {
     record: T,
   ) => {
     draggable: boolean;
-    onDragStart: () => void;
+    onDragStart: (e: React.DragEvent) => void;
     onDragOver: (e: React.DragEvent) => void;
     onDragEnd: () => void;
     onDrop: (e: React.DragEvent) => void;
@@ -90,7 +90,8 @@ export interface UseDragSortReturn<T = Record<string, unknown>> {
   /** 获取拖拽手柄属性（type='handle' 模式下注入到手柄元素） */
   getDragHandleProps: (index: number) => {
     draggable: boolean;
-    onDragStart: () => void;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragEnd: () => void;
     style: React.CSSProperties;
     className: string;
   };
@@ -240,8 +241,11 @@ export function useDragSort<T = Record<string, unknown>>(options: {
 
       return {
         draggable: type === 'row' && !disabled,
-        onDragStart: () => {
+        onDragStart: (e: React.DragEvent) => {
           if (!disabled) {
+            // Firefox 要求必须调用 setData 才能开始拖拽
+            e.dataTransfer.setData('text/plain', '');
+            e.dataTransfer.effectAllowed = 'move';
             handleDragStart(index);
           }
         },
@@ -249,6 +253,7 @@ export function useDragSort<T = Record<string, unknown>>(options: {
           // 必须 preventDefault 才能触发 onDrop
           e.preventDefault();
           if (!disabled && dragState.isDragging) {
+            e.dataTransfer.dropEffect = 'move';
             handleDragOver(index);
           }
         },
@@ -283,11 +288,15 @@ export function useDragSort<T = Record<string, unknown>>(options: {
 
       return {
         draggable: !disabled,
-        onDragStart: () => {
+        onDragStart: (e: React.DragEvent) => {
           if (!disabled) {
+            // Firefox 要求必须调用 setData 才能开始拖拽
+            e.dataTransfer.setData('text/plain', '');
+            e.dataTransfer.effectAllowed = 'move';
             handleDragStart(index);
           }
         },
+        onDragEnd: handleDragEnd,
         style: {
           cursor: disabled ? 'not-allowed' : 'move',
           opacity: disabled ? 0.5 : 1,
@@ -296,7 +305,7 @@ export function useDragSort<T = Record<string, unknown>>(options: {
         className: 'pro-table-drag-handle',
       };
     },
-    [isDisabled, handleDragStart],
+    [isDisabled, handleDragStart, handleDragEnd],
   );
 
   /**

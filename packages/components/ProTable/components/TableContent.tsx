@@ -41,7 +41,7 @@ export interface TableContentProps<T = Record<string, unknown>> {
     record: T,
   ) => {
     draggable: boolean;
-    onDragStart: () => void;
+    onDragStart: (e: React.DragEvent) => void;
     onDragOver: (e: React.DragEvent) => void;
     onDragEnd: () => void;
     onDrop: (e: React.DragEvent) => void;
@@ -49,7 +49,8 @@ export interface TableContentProps<T = Record<string, unknown>> {
   };
   getDragHandleProps?: (index: number) => {
     draggable: boolean;
-    onDragStart: () => void;
+    onDragStart: (e: React.DragEvent) => void;
+    onDragEnd: () => void;
     style: React.CSSProperties;
     className: string;
   };
@@ -246,7 +247,13 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
       finalColumns = addCellMerge(finalColumns);
     }
 
-    if (dragSort && getDragHandleProps) {
+    // 判断拖拽模式：dragSort 为 true 或 { type: 'handle' } 时显示手柄列，
+    // { type: 'row' } 时整行可拖拽，不显示手柄列
+    const dragSortValue = rootProps.dragSort;
+    const dragSortType: 'handle' | 'row' =
+      typeof dragSortValue === 'object' && dragSortValue?.type === 'row' ? 'row' : 'handle';
+
+    if (dragSort && getDragHandleProps && dragSortType === 'handle') {
       const dragHandleColumn: TableColumnProps<T> = {
         title: '',
         dataIndex: '__drag_handle__',
@@ -256,14 +263,16 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
           const getPropsFn = getDragHandleProps as (index: number) => {
             draggable: boolean;
             onDragStart: () => void;
+            onDragEnd: () => void;
             style: React.CSSProperties;
             className: string;
           };
-          const { draggable, onDragStart, className: dragClassName, style: dragStyle } = getPropsFn(index);
+          const { draggable, onDragStart, onDragEnd, className: dragClassName, style: dragStyle } = getPropsFn(index);
           return (
             <span
               draggable={draggable}
               onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
               className={dragClassName}
               style={{
                 ...dragStyle,
@@ -283,7 +292,18 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
     }
 
     return finalColumns;
-  }, [columns, action, handlers, refreshTable, dragSort, getDragHandleProps, groupColumns, cellMerge, dataSource]);
+  }, [
+    columns,
+    action,
+    handlers,
+    refreshTable,
+    dragSort,
+    getDragHandleProps,
+    groupColumns,
+    cellMerge,
+    dataSource,
+    rootProps.dragSort,
+  ]);
 
   const handleTableChange = (
     pagination: PaginationProps,
@@ -323,11 +343,24 @@ export const TableContent = <T extends Record<string, unknown>>(props: TableCont
   };
 
   const getRowProps = (record: T, index: number): Record<string, unknown> => {
+    // 合并用户自定义 onRow，避免被 drag props 覆盖
+    const userOnRow = (tableRootProps as unknown as Record<string, unknown>).onRow as
+      ((record: T, index: number) => Record<string, unknown>) | undefined;
+    const userRowProps = userOnRow ? userOnRow(record, index) : {};
+
     if (dragSort && getDragRowProps) {
       const getPropsFn = getDragRowProps as (index: number, record: T) => Record<string, unknown>;
-      return getPropsFn(index, record);
+      const dragProps = getPropsFn(index, record);
+      return {
+        ...userRowProps,
+        ...dragProps,
+        style: {
+          ...((userRowProps.style as React.CSSProperties) || {}),
+          ...((dragProps.style as React.CSSProperties) || {}),
+        },
+      } as Record<string, unknown>;
     }
-    return {};
+    return userRowProps;
   };
 
   if (loading && showSkeleton) {
