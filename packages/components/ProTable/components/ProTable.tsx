@@ -47,8 +47,7 @@ import { useProTable, ProTableContext } from '../hooks/useProTable';
 import type { ProTableContextValue } from '../hooks/useProTable';
 import type { ProTableInstance } from '../types';
 import type { DataStoreImpl } from '../store/DataStore';
-import { useDragSort } from '../hooks';
-import { useVirtualScroll } from '@lania-pro-components/shared';
+import { useVirtualScroll, useDragSort } from '@lania-pro-components/shared';
 import { CardView, ViewModeSwitch, SearchSchemaSelector } from './';
 
 /**
